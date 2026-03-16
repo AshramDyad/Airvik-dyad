@@ -78,6 +78,13 @@ export type UnitsViewMode = 'remaining' | 'booked';
 
 export type AvailabilityCellStatus = 'free' | 'partial' | 'busy' | 'closed';
 
+export interface RoomDayReservation {
+  reservationId: string;
+  guestId: string;
+  checkInDate: string;
+  checkOutDate: string;
+}
+
 export interface AvailabilityDay {
   date: string;
   status: AvailabilityCellStatus;
@@ -87,6 +94,7 @@ export interface AvailabilityDay {
   hasCheckIn: boolean;
   hasCheckOut: boolean;
   isClosed: boolean;
+  roomReservations: Record<string, RoomDayReservation>;
 }
 
 export interface RoomAvailabilityMeta {

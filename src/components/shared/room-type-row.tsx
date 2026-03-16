@@ -12,7 +12,6 @@ import type {
   AvailabilityCellStatus,
   RoomTypeAvailability,
   UnitsViewMode,
-  Reservation,
   Guest,
 } from "@/data/types";
 import { cn } from "@/lib/utils";
@@ -50,22 +49,11 @@ export function RoomTypeRow({
 }: RoomTypeRowProps) {
   const [isExpanded, setIsExpanded] = React.useState(false);
   const { roomType, availability } = data;
-  const { reservations, guests } = useDataContext();
+  const { guests } = useDataContext();
 
   const guestMap = React.useMemo(() => {
     return new Map<string, Guest>(guests.map((guest) => [guest.id, guest]));
   }, [guests]);
-
-  const reservationMapByRoom = React.useMemo(() => {
-    const map = new Map<string, Reservation[]>();
-    reservations.forEach(reservation => {
-      if (reservation.status === 'Cancelled') return;
-      const roomReservations = map.get(reservation.roomId) || [];
-      roomReservations.push(reservation);
-      map.set(reservation.roomId, roomReservations);
-    });
-    return map;
-  }, [reservations]);
 
   const getGuestName = React.useCallback(
     (guestId: string) => {
@@ -83,24 +71,6 @@ export function RoomTypeRow({
   }
 
   const canExpand = roomType.rooms.length > 0;
-
-  const getReservationForRoomOnDate = (
-    roomId: string,
-    isoDate: string
-  ): Reservation | null => {
-    const dayReservations = reservationMapByRoom.get(roomId) ?? [];
-    const currentDate = parseISO(isoDate);
-
-    return (
-      dayReservations.find((reservation) => {
-        const checkIn = parseISO(reservation.checkInDate);
-        const checkOut = parseISO(reservation.checkOutDate);
-
-        // Hotel-style interval: [checkIn, checkOut)
-        return currentDate >= checkIn && currentDate < checkOut;
-      }) ?? null
-    );
-  };
 
   const toggleExpand = () => {
     if (canExpand) {
@@ -287,33 +257,33 @@ export function RoomTypeRow({
               const dayCells: React.ReactNode[] = [];
               for (let index = 0; index < availability.length; index++) {
                 const day = availability[index];
-                const reservation = getReservationForRoomOnDate(room.id, day.date);
+                const entry = day.roomReservations?.[room.id] ?? null;
                 const isTodayColumn = todayIso === day.date;
                 const isClosed = day.isClosed === true;
                 const columnTextClass = isTodayColumn
                   ? "text-white"
                   : "text-muted-foreground/70";
 
-                if (reservation) {
+                if (entry) {
                   let span = 0;
                   for (let offset = index; offset < availability.length; offset++) {
                     const compareDay = availability[offset];
-                    const compareReservation = getReservationForRoomOnDate(room.id, compareDay.date);
-                    if (!compareReservation || compareReservation.id !== reservation.id) {
+                    const compareEntry = compareDay.roomReservations?.[room.id];
+                    if (!compareEntry || compareEntry.reservationId !== entry.reservationId) {
                       break;
                     }
                     span += 1;
                   }
 
-                  const guestName = getGuestName(reservation.guestId);
+                  const guestName = getGuestName(entry.guestId);
                   dayCells.push(
                     <TableCell
-                      key={`${room.id}-${reservation.id}-${day.date}`}
+                      key={`${room.id}-${entry.reservationId}-${day.date}`}
                       className="p-0"
                       colSpan={span}
                     >
                       <ReservationHoverCard
-                        reservationIds={[reservation.id]}
+                        reservationIds={[entry.reservationId]}
                         date={day.date}
                       >
                         <div
