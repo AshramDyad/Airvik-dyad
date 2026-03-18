@@ -55,6 +55,13 @@ TEST_VERIFICATION_UserFormDialog.md
 TESTING_STRATEGY.md
 __tests__
 supabase/.temp/
+supabase/.branches/
+supabase/migrations_backup/
+supabase/seed.sql
+
+# playwright / test artifacts
+playwright/
+test-results/
 
 
 ROOM_TYPE_PRICE_FIX.md
