@@ -45,7 +45,13 @@ function RoomAvailabilityPanel({
     if (isSelected && selectedQuantity > maxSelectableRooms) {
       onUpdateQuantity(roomTypeId, Math.max(maxSelectableRooms, 1));
     }
-  }, [isSelected, maxSelectableRooms, onUpdateQuantity, roomTypeId, selectedQuantity]);
+  }, [
+    isSelected,
+    maxSelectableRooms,
+    onUpdateQuantity,
+    roomTypeId,
+    selectedQuantity,
+  ]);
 
   const handleCheckboxClick: React.MouseEventHandler<HTMLLabelElement> = (
     event,
@@ -138,10 +144,14 @@ function RoomAvailabilityPanel({
 }
 
 export default function RoomsPage() {
-  const { roomTypes, seasonalPrices, isLoading: isInitialLoading } = useDataContext();
+  const {
+    roomTypes,
+    seasonalPrices,
+    isLoading: isInitialLoading,
+  } = useDataContext();
   const visibleRoomTypes = React.useMemo(
     () => (roomTypes ?? []).filter((roomType) => roomType.isVisible !== false),
-    [roomTypes]
+    [roomTypes],
   );
   const {
     search,
@@ -161,8 +171,9 @@ export default function RoomsPage() {
     quantity: number;
   };
 
-  const [selectedRoomQuantities, setSelectedRoomQuantities] =
-    React.useState<SelectedRoomTypeQuantity[]>([]);
+  const [selectedRoomQuantities, setSelectedRoomQuantities] = React.useState<
+    SelectedRoomTypeQuantity[]
+  >([]);
 
   const handleSearch = (values: EnhancedBookingSearchFormValues) => {
     search(values.dateRange, values.roomOccupancies);
@@ -273,7 +284,11 @@ export default function RoomsPage() {
   }, [searchValues, totalGuests, totalSelectedCapacity]);
 
   const getMaxSelectableRooms = React.useCallback(
-    (perRoomCapacity: number, selectedQuantity: number, availableCount: number) => {
+    (
+      perRoomCapacity: number,
+      selectedQuantity: number,
+      availableCount: number,
+    ) => {
       const safeSelection = selectedQuantity > 0 ? selectedQuantity : 1;
 
       if (availableCount <= 0) {
@@ -320,7 +335,12 @@ export default function RoomsPage() {
       return false;
     }
     return totalAvailableCapacityForDates < totalGuests;
-  }, [searchValues, roomTypeAvailability, totalAvailableCapacityForDates, totalGuests]);
+  }, [
+    searchValues,
+    roomTypeAvailability,
+    totalAvailableCapacityForDates,
+    totalGuests,
+  ]);
 
   const dateAvailableRoomTypes: RoomType[] | null = React.useMemo(() => {
     if (!roomTypeAvailability) return null;
@@ -354,11 +374,15 @@ export default function RoomsPage() {
     dateAvailableRoomTypes !== null && dateAvailableRoomTypes.length > 0;
 
   const isOverCapacityForAnyRoom =
-    noMatchingTypes && hasDateAvailability && totalGuests > maxSingleRoomCapacity;
+    noMatchingTypes &&
+    hasDateAvailability &&
+    totalGuests > maxSingleRoomCapacity;
 
   const shouldShowMultiRoomFallback = noMatchingTypes && hasDateAvailability;
 
-  const primaryRoomsToDisplay = hasSearched ? availableRoomTypes : visibleRoomTypes;
+  const primaryRoomsToDisplay = hasSearched
+    ? availableRoomTypes
+    : visibleRoomTypes;
   const roomsToDisplay =
     shouldShowMultiRoomFallback && dateAvailableRoomTypes
       ? dateAvailableRoomTypes
@@ -366,14 +390,11 @@ export default function RoomsPage() {
 
   const showLoading = isInitialLoading || isSearching;
 
-  const showCapacityLockedToast = React.useCallback(
-    (guestCount: number) => {
-      toast(
-        `You have already selected rooms for ${guestCount} guest${guestCount === 1 ? "" : "s"}. If you want to select other rooms, please unselect the selected rooms first.`,
-      );
-    },
-    [],
-  );
+  const showCapacityLockedToast = React.useCallback((guestCount: number) => {
+    toast(
+      `You have already selected rooms for ${guestCount} guest${guestCount === 1 ? "" : "s"}. If you want to select other rooms, please unselect the selected rooms first.`,
+    );
+  }, []);
 
   return (
     /* Main Content */
@@ -433,7 +454,10 @@ export default function RoomsPage() {
           {showLoading ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-7">
               {[...Array(7)].map((_, i) => (
-                <div key={i} className="flex flex-col border border-border/40 overflow-hidden rounded-2xl shadow-lg">
+                <div
+                  key={i}
+                  className="flex flex-col border border-border/40 overflow-hidden rounded-2xl shadow-lg"
+                >
                   {/* Image skeleton */}
                   <div className="relative h-32 md:h-40 overflow-hidden">
                     <Skeleton className="h-full w-full" />
@@ -442,7 +466,7 @@ export default function RoomsPage() {
                       <Skeleton className="h-6 w-24 rounded-full" />
                     </div>
                   </div>
-                  
+
                   {/* Content skeleton */}
                   <div className="flex flex-col flex-1 bg-white">
                     {/* Title and description */}
@@ -450,7 +474,7 @@ export default function RoomsPage() {
                       <Skeleton className="h-5 w-3/4" />
                       <Skeleton className="h-4 w-full mt-1" />
                     </div>
-                    
+
                     {/* Footer */}
                     <div className="flex flex-col gap-1 px-4 pb-4 pt-0">
                       {/* Amenities and guests */}
@@ -485,10 +509,15 @@ export default function RoomsPage() {
                           No suitable rooms available for these dates
                         </h3>
                         <p className="text-sm md:text-base text-red-900/90 leading-relaxed">
-                          According to the dates you selected, we don&apos;t have enough rooms to host a total of {totalGuests} guest
+                          According to the dates you selected, we don&apos;t
+                          have enough rooms to host a total of {totalGuests}{" "}
+                          guest
                           {totalGuests === 1 ? "" : "s"}.<br />
-                          Please try selecting different dates or adjust your search. If you have any booking-related queries, you can contact us at
-                          <span className="font-semibold"> +91 85111 51708</span>.
+                          Please try selecting different dates or adjust your
+                          search. If you have any booking-related queries, you
+                          can contact us at
+                          <span className="font-semibold"> +91 8595251312</span>
+                          .
                         </p>
                       </div>
                     </div>
@@ -501,7 +530,8 @@ export default function RoomsPage() {
                         Clear search & view all rooms
                       </button>
                       <span className="text-[11px] md:text-xs text-red-900/70">
-                        Tip: Use the search box above to try different dates or guest combinations.
+                        Tip: Use the search box above to try different dates or
+                        guest combinations.
                       </span>
                     </div>
                   </div>
@@ -532,14 +562,16 @@ export default function RoomsPage() {
                             }.`}
                       </p>
                       <p className="mt-1">
-                        You can still stay with us by booking multiple rooms. Choose one or
-                        more room types below so the total capacity is at least {totalGuests} guest
+                        You can still stay with us by booking multiple rooms.
+                        Choose one or more room types below so the total
+                        capacity is at least {totalGuests} guest
                         {totalGuests === 1 ? "" : "s"}.
                       </p>
                       {isOverCapacityForAnyRoom && (
                         <p className="mt-1 text-[11px] sm:text-xs">
-                          No single room type can hold all guests, but a combination of
-                          multiple rooms can. Pick any mix of room types below.
+                          No single room type can hold all guests, but a
+                          combination of multiple rooms can. Pick any mix of
+                          room types below.
                         </p>
                       )}
                     </div>
@@ -550,31 +582,36 @@ export default function RoomsPage() {
                         ? format(searchValues.dateRange.from, "yyyy-MM-dd")
                         : undefined;
                       const displayPrice = checkInDate
-                        ? getSeasonalPrice(roomType.id, checkInDate, seasonalPrices) ?? roomType.price
+                        ? (getSeasonalPrice(
+                            roomType.id,
+                            checkInDate,
+                            seasonalPrices,
+                          ) ?? roomType.price)
                         : roomType.price;
 
                       return (
-                      <div key={roomType.id} className="space-y-2">
-                        <RoomTypeCard
-                          roomType={roomType}
-                          price={displayPrice}
-                          // Selection is now handled via checkbox + quantity below
-                          onSelect={() => {}}
-                          isSelectionComplete
-                          hasSearched={hasSearched}
-                          searchValues={searchValues}
-                        />
+                        <div key={roomType.id} className="space-y-2">
+                          <RoomTypeCard
+                            roomType={roomType}
+                            price={displayPrice}
+                            // Selection is now handled via checkbox + quantity below
+                            onSelect={() => {}}
+                            isSelectionComplete
+                            hasSearched={hasSearched}
+                            searchValues={searchValues}
+                          />
 
-                        {hasSearched &&
-                          !hasNoInventory &&
-                          roomTypeAvailability && (
+                          {hasSearched &&
+                            !hasNoInventory &&
+                            roomTypeAvailability &&
                             (() => {
                               const availableCount =
                                 availabilityByRoomTypeId.get(roomType.id) ?? 0;
                               const selectedQuantity = getSelectedQuantity(
                                 roomType.id,
                               );
-                              const perRoomCapacity = roomType.maxOccupancy || 0;
+                              const perRoomCapacity =
+                                roomType.maxOccupancy || 0;
                               const maxSelectableRooms = getMaxSelectableRooms(
                                 perRoomCapacity,
                                 selectedQuantity,
@@ -582,23 +619,22 @@ export default function RoomsPage() {
                               );
 
                               return (
-                            <RoomAvailabilityPanel
-                              roomTypeId={roomType.id}
-                                availableCount={availableCount}
-                                selectedQuantity={selectedQuantity}
-                              canAddMoreRooms={canAddMoreRooms}
-                              totalGuests={totalGuests}
-                              onUpdateQuantity={updateSelectedQuantity}
-                              showCapacityLockedToast={
-                                showCapacityLockedToast
-                              }
-                                maxSelectableRooms={maxSelectableRooms}
-                            />
+                                <RoomAvailabilityPanel
+                                  roomTypeId={roomType.id}
+                                  availableCount={availableCount}
+                                  selectedQuantity={selectedQuantity}
+                                  canAddMoreRooms={canAddMoreRooms}
+                                  totalGuests={totalGuests}
+                                  onUpdateQuantity={updateSelectedQuantity}
+                                  showCapacityLockedToast={
+                                    showCapacityLockedToast
+                                  }
+                                  maxSelectableRooms={maxSelectableRooms}
+                                />
                               );
-                            })()
-                          )}
-                      </div>
-                    );
+                            })()}
+                        </div>
+                      );
                     })}
                   </div>
                   {hasSearched && searchValues && !hasNoInventory && (
@@ -618,8 +654,9 @@ export default function RoomsPage() {
                       </p>
                       {!coversGuests && totalSelectedRooms > 0 && (
                         <p className="text-xs text-red-600">
-                          Selected rooms do not yet cover all guests. Add
-                          more rooms until the total capacity is at least {totalGuests} guest
+                          Selected rooms do not yet cover all guests. Add more
+                          rooms until the total capacity is at least{" "}
+                          {totalGuests} guest
                           {totalGuests === 1 ? "" : "s"} to continue.
                         </p>
                       )}
@@ -648,19 +685,22 @@ export default function RoomsPage() {
           )}
         </div>
       </section>
-      {hasSearched && searchValues && selectedRooms.length > 0 && !hasInsufficientTotalCapacity && (
-        <BookingSummary
-          selection={selectedRooms}
-          searchValues={searchValues}
-          onRemove={(index) => {
-            const roomToRemove = selectedRooms[index];
-            if (!roomToRemove) return;
-            const currentQuantity = getSelectedQuantity(roomToRemove.id);
-            updateSelectedQuantity(roomToRemove.id, currentQuantity - 1);
-          }}
-          onClear={() => setSelectedRoomQuantities([])}
-        />
-      )}
+      {hasSearched &&
+        searchValues &&
+        selectedRooms.length > 0 &&
+        !hasInsufficientTotalCapacity && (
+          <BookingSummary
+            selection={selectedRooms}
+            searchValues={searchValues}
+            onRemove={(index) => {
+              const roomToRemove = selectedRooms[index];
+              if (!roomToRemove) return;
+              const currentQuantity = getSelectedQuantity(roomToRemove.id);
+              updateSelectedQuantity(roomToRemove.id, currentQuantity - 1);
+            }}
+            onClear={() => setSelectedRoomQuantities([])}
+          />
+        )}
     </div>
   );
 }

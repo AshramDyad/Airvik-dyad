@@ -5,10 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Menu, ChevronDown, MapPin } from "lucide-react";
-import {
-  FaRegCalendarCheck,
-  FaWhatsapp,
-} from "react-icons/fa6";
+import { FaRegCalendarCheck, FaWhatsapp } from "react-icons/fa6";
 import type { Property } from "@/data/types";
 import {
   Sheet,
@@ -59,9 +56,9 @@ const navLinks = [
   // { href: "/feedback", label: "Feedback" },
 ];
 
-const whatsappNumber = "918511151708";
+const whatsappNumber = "918595251312";
 const whatsappMessage = encodeURIComponent(
-  "Hi! I'd like to know more about staying at Swaminarayan Ashram."
+  "Hi! I'd like to know more about staying at Swaminarayan Ashram.",
 );
 const whatsappContactUrl = `https://wa.me/${whatsappNumber}?text=${whatsappMessage}`;
 
@@ -73,7 +70,8 @@ export function Header({ propertyLocation }: HeaderProps) {
   const [isLocationDialogOpen, setIsLocationDialogOpen] = React.useState(false);
   const locationSrc = propertyLocation.google_maps_url?.trim() ?? "";
   const addressText =
-    propertyLocation.address?.trim() || "View the property location on the map.";
+    propertyLocation.address?.trim() ||
+    "View the property location on the map.";
   const hasLocationMap = locationSrc.length > 0;
 
   return (
@@ -85,13 +83,22 @@ export function Header({ propertyLocation }: HeaderProps) {
             <p className="text-sm font-medium text-white/90">
               Swaminarayan Ashram (Estd: 2002)
             </p>
-            <div className="flex items-center space-x-4 ">
+            <div className="flex items-center space-x-4">
               {/* contact number add */}
+              <a
+                href="tel:+918595251312"
+                className="text-sm font-medium text-white/90 flex items-center gap-1.5 hover:text-white transition-colors"
+              >
+                <FiPhone className="size-5" aria-hidden="true" />
+                +91 8595251312
+              </a>
+
+              <span className="text-sm font-medium text-white/90">&#124;</span>
+
               <a
                 href="tel:+918511151708"
                 className="text-sm font-medium text-white/90 flex items-center gap-1.5 hover:text-white transition-colors"
               >
-                <FiPhone className="size-5" aria-hidden="true" />
                 +91 85111 51708
               </a>
 
@@ -250,7 +257,7 @@ export function Header({ propertyLocation }: HeaderProps) {
                           {link.label}
                         </Link>
                       </SheetClose>
-                    )
+                    ),
                   )}
                 </nav>
                 <div className="mt-8 flex w-full flex-col gap-3">
@@ -300,7 +307,10 @@ export function Header({ propertyLocation }: HeaderProps) {
         </div>
       </header>
       {hasLocationMap ? (
-        <Dialog open={isLocationDialogOpen} onOpenChange={setIsLocationDialogOpen}>
+        <Dialog
+          open={isLocationDialogOpen}
+          onOpenChange={setIsLocationDialogOpen}
+        >
           <DialogContent className="max-w-[95vw] overflow-hidden p-0 md:max-w-4xl">
             <DialogHeader className="border-b border-border/40 px-6 py-5">
               <DialogTitle>Property Location</DialogTitle>
@@ -336,7 +346,7 @@ const ListItem = React.forwardRef<
           ref={ref}
           className={cn(
             "block select-none rounded-2xl px-4 py-3 leading-none no-underline outline-none hover:bg-primary/15 hover:text-primary focus-visible:outline-none",
-            className
+            className,
           )}
           {...props}
         >
