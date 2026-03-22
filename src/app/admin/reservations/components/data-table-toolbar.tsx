@@ -68,7 +68,7 @@ export function DataTableToolbar<TData>({
         ) : null}
         <DataTableViewOptions table={table} />
         <Button asChild>
-          <Link href="/admin/reservations/new">Add Reservation</Link>
+          <Link href="/admin/reservations/new" prefetch={false}>Add Reservation</Link>
         </Button>
       </div>
     </div>

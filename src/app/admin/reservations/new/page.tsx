@@ -493,7 +493,7 @@ export default function CreateReservationPage() {
             </p>
           </div>
           <Button variant="outline" asChild>
-            <Link href="/admin/reservations">Back to Reservations</Link>
+            <Link href="/admin/reservations" prefetch={false}>Back to Reservations</Link>
           </Button>
         </div>
 
@@ -577,7 +577,7 @@ export default function CreateReservationPage() {
                       )}
                     />
                     <Button variant="outline" className="h-12 shrink-0" asChild>
-                      <Link href={guestCreationUrl}>
+                      <Link href={guestCreationUrl} prefetch={false}>
                         Add New Guest
                       </Link>
                     </Button>

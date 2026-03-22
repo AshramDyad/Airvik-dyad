@@ -24,6 +24,7 @@ export const columns: ColumnDef<Guest>[] = [
       return (
         <Link
           href={`/admin/guests/${guest.id}`}
+          prefetch={false}
           className="font-medium text-primary hover:underline"
         >
           {guest.firstName} {guest.lastName}

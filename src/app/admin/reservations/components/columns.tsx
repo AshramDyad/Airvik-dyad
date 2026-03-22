@@ -175,7 +175,7 @@ export const columns: ColumnDef<ReservationWithDetails>[] = [
       }
 
       return (
-        <Link href={`/admin/reservations/${linkId}`} className="font-mono text-xs text-primary hover:underline">
+        <Link href={`/admin/reservations/${linkId}`} prefetch={false} className="font-mono text-xs text-primary hover:underline">
           {formatBookingCode(displayId)}
         </Link>
       )

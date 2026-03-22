@@ -65,7 +65,7 @@ export function ReservationHeader({ reservation, bookingStatus }: ReservationHea
     <>
       <div className="mb-6 flex flex-wrap items-center gap-3 rounded-2xl border border-border/40 bg-card/80 px-4 py-3 shadow-sm">
         <Button variant="outline" size="icon" className="h-9 w-9 rounded-xl border-border/50" asChild>
-          <Link href="/admin/reservations">
+          <Link href="/admin/reservations" prefetch={false}>
             <ArrowLeft className="h-4 w-4" />
             <span className="sr-only">Back</span>
           </Link>
@@ -89,7 +89,7 @@ export function ReservationHeader({ reservation, bookingStatus }: ReservationHea
             asChild={canBeModified}
           >
             {canBeModified ? (
-              <Link href={`/admin/reservations/${reservation.id}/edit`}>
+              <Link href={`/admin/reservations/${reservation.id}/edit`} prefetch={false}>
                 <Edit className="h-4 w-4 mr-2" />
                 Edit
               </Link>
