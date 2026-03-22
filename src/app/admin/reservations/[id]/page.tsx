@@ -23,18 +23,19 @@ import { isReservationRemovedDuringEdit } from "@/lib/reservations/filters";
 
 export default function ReservationDetailsPage() {
   const params = useParams<{ id: string }>();
-  const { 
-    reservations, 
-    guests, 
-    rooms, 
-    property, 
-    isLoading, 
+  const {
+    reservations,
+    guests,
+    rooms,
+    property,
+    isLoading,
     loadBookingDetails,
     isReservationsInitialLoading,
     isBookingLookupLoading,
     isSessionLoading,
     lookupStatus,
-    activeBookingReservations: isolatedBookingReservations
+    activeBookingReservations: isolatedBookingReservations,
+    bookings,
   } = useDataContext();
 
   const reservationIdFromParams = React.useMemo(() => {
@@ -51,11 +52,12 @@ export default function ReservationDetailsPage() {
   }, [reservationIdFromParams, loadBookingDetails]);
 
   const reservation = React.useMemo(() => {
-    const found = isolatedBookingReservations.find((r) => r.id === reservationIdFromParams) || 
-                  reservations.find((r) => r.id === reservationIdFromParams);
+    const found = isolatedBookingReservations.find((r) => r.id === reservationIdFromParams) ||
+                  reservations.find((r) => r.id === reservationIdFromParams) ||
+                  bookings.flatMap((b) => b.subRows).find((r) => r.id === reservationIdFromParams);
     console.log(`[Page] Finding reservation for ${reservationIdFromParams}: ${found ? 'Found' : 'Not Found'}`);
     return found;
-  }, [reservations, isolatedBookingReservations, reservationIdFromParams]);
+  }, [reservations, isolatedBookingReservations, bookings, reservationIdFromParams]);
 
   const isActuallyLoading = 
     isLoading || 

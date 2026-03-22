@@ -16,17 +16,18 @@ import { Skeleton } from "@/components/ui/skeleton";
 export default function ReservationEditPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
-  const { 
-    reservations, 
-    guests, 
-    rooms, 
-    isLoading, 
+  const {
+    reservations,
+    guests,
+    rooms,
+    isLoading,
     loadBookingDetails,
     isReservationsInitialLoading,
     isBookingLookupLoading,
     isSessionLoading,
     lookupStatus,
-    activeBookingReservations
+    activeBookingReservations,
+    bookings,
   } = useDataContext();
 
   const raw = params?.id;
@@ -40,11 +41,12 @@ export default function ReservationEditPage() {
   }, [reservationId, loadBookingDetails]);
 
   const reservation = React.useMemo(() => {
-    const found = activeBookingReservations.find((entry) => entry.id === reservationId) || 
-                  reservations.find((entry) => entry.id === reservationId);
+    const found = activeBookingReservations.find((entry) => entry.id === reservationId) ||
+                  reservations.find((entry) => entry.id === reservationId) ||
+                  bookings.flatMap((b) => b.subRows).find((entry) => entry.id === reservationId);
     console.log(`[EditPage] Finding reservation for ${reservationId}: ${found ? 'Found' : 'Not Found'}`);
     return found;
-  }, [reservations, activeBookingReservations, reservationId]);
+  }, [reservations, activeBookingReservations, bookings, reservationId]);
 
   const isActuallyLoading = 
     isLoading || 
