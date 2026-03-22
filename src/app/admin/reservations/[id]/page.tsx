@@ -86,8 +86,17 @@ export default function ReservationDetailsPage() {
   }
 
   if (!reservation && !isActuallyLoading && lookupStatus[reservationIdFromParams] === 'error') {
-    console.warn(`[Page] Decided to show 404 for ${reservationIdFromParams}`);
-    return notFound();
+    console.warn(`[Page] Reservation not found for ${reservationIdFromParams}`);
+    return (
+      <PermissionGate feature="reservations">
+        <div className="flex flex-col items-center justify-center py-20 text-center">
+          <h2 className="text-xl font-semibold">Reservation not found</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            The reservation you are looking for does not exist or has been removed.
+          </p>
+        </div>
+      </PermissionGate>
+    );
   }
 
   // Ensure TypeScript knows reservation is defined
