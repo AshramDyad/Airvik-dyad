@@ -294,6 +294,10 @@ export function useAppData() {
     async (id: string) => {
       if (isSessionLoading || !userId) {
         console.log(`[Lookup] Postponing lookup for ${id}: session loading or no user`);
+        setLookupStatus(prev => {
+          if (prev[id]) return prev;
+          return { ...prev, [id]: 'pending' };
+        });
         return;
       }
 

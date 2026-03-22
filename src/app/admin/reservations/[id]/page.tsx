@@ -23,18 +23,19 @@ import { isReservationRemovedDuringEdit } from "@/lib/reservations/filters";
 
 export default function ReservationDetailsPage() {
   const params = useParams<{ id: string }>();
-  const { 
-    reservations, 
-    guests, 
-    rooms, 
-    property, 
-    isLoading, 
+  const {
+    reservations,
+    guests,
+    rooms,
+    property,
+    isLoading,
     loadBookingDetails,
     isReservationsInitialLoading,
     isBookingLookupLoading,
     isSessionLoading,
     lookupStatus,
-    activeBookingReservations: isolatedBookingReservations
+    activeBookingReservations: isolatedBookingReservations,
+    bookings,
   } = useDataContext();
 
   const reservationIdFromParams = React.useMemo(() => {
@@ -51,11 +52,12 @@ export default function ReservationDetailsPage() {
   }, [reservationIdFromParams, loadBookingDetails]);
 
   const reservation = React.useMemo(() => {
-    const found = isolatedBookingReservations.find((r) => r.id === reservationIdFromParams) || 
-                  reservations.find((r) => r.id === reservationIdFromParams);
+    const found = isolatedBookingReservations.find((r) => r.id === reservationIdFromParams) ||
+                  reservations.find((r) => r.id === reservationIdFromParams) ||
+                  bookings.flatMap((b) => b.subRows).find((r) => r.id === reservationIdFromParams);
     console.log(`[Page] Finding reservation for ${reservationIdFromParams}: ${found ? 'Found' : 'Not Found'}`);
     return found;
-  }, [reservations, isolatedBookingReservations, reservationIdFromParams]);
+  }, [reservations, isolatedBookingReservations, bookings, reservationIdFromParams]);
 
   const isActuallyLoading = 
     isLoading || 
@@ -86,8 +88,17 @@ export default function ReservationDetailsPage() {
   }
 
   if (!reservation && !isActuallyLoading && lookupStatus[reservationIdFromParams] === 'error') {
-    console.warn(`[Page] Decided to show 404 for ${reservationIdFromParams}`);
-    return notFound();
+    console.warn(`[Page] Reservation not found for ${reservationIdFromParams}`);
+    return (
+      <PermissionGate feature="reservations">
+        <div className="flex flex-col items-center justify-center py-20 text-center">
+          <h2 className="text-xl font-semibold">Reservation not found</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            The reservation you are looking for does not exist or has been removed.
+          </p>
+        </div>
+      </PermissionGate>
+    );
   }
 
   // Ensure TypeScript knows reservation is defined

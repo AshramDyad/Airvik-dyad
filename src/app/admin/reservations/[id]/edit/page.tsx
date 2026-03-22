@@ -16,17 +16,18 @@ import { Skeleton } from "@/components/ui/skeleton";
 export default function ReservationEditPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
-  const { 
-    reservations, 
-    guests, 
-    rooms, 
-    isLoading, 
+  const {
+    reservations,
+    guests,
+    rooms,
+    isLoading,
     loadBookingDetails,
     isReservationsInitialLoading,
     isBookingLookupLoading,
     isSessionLoading,
     lookupStatus,
-    activeBookingReservations
+    activeBookingReservations,
+    bookings,
   } = useDataContext();
 
   const raw = params?.id;
@@ -40,11 +41,12 @@ export default function ReservationEditPage() {
   }, [reservationId, loadBookingDetails]);
 
   const reservation = React.useMemo(() => {
-    const found = activeBookingReservations.find((entry) => entry.id === reservationId) || 
-                  reservations.find((entry) => entry.id === reservationId);
+    const found = activeBookingReservations.find((entry) => entry.id === reservationId) ||
+                  reservations.find((entry) => entry.id === reservationId) ||
+                  bookings.flatMap((b) => b.subRows).find((entry) => entry.id === reservationId);
     console.log(`[EditPage] Finding reservation for ${reservationId}: ${found ? 'Found' : 'Not Found'}`);
     return found;
-  }, [reservations, activeBookingReservations, reservationId]);
+  }, [reservations, activeBookingReservations, bookings, reservationId]);
 
   const isActuallyLoading = 
     isLoading || 
@@ -67,8 +69,15 @@ export default function ReservationEditPage() {
   }
 
   if (!reservation && !isActuallyLoading && lookupStatus[reservationId] === 'error') {
-    console.warn(`[EditPage] Decided to show 404 for ${reservationId}`);
-    return notFound();
+    console.warn(`[EditPage] Reservation not found for ${reservationId}`);
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center">
+        <h2 className="text-xl font-semibold">Reservation not found</h2>
+        <p className="mt-2 text-sm text-muted-foreground">
+          The reservation you are looking for does not exist or has been removed.
+        </p>
+      </div>
+    );
   }
 
   // Ensure TypeScript knows reservation is defined
