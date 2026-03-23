@@ -18,6 +18,7 @@ import type {
   Post,
   RoomTypeAvailability,
   BookingRestriction,
+  PropertyClosure,
   AdminActivityLog,
   ActivitySection,
   ActivityEntityType,
@@ -1330,6 +1331,80 @@ export const getBookingRestrictions = async (): Promise<BookingRestriction[]> =>
   if (error) throw error;
   return (data ?? []).map((row) => fromDbBookingRestriction(row as DbBookingRestriction));
 };
+
+// Property Closures (Blocked Date Ranges)
+type DbPropertyClosure = {
+  id: string;
+  property_id: string;
+  room_type_id: string | null;
+  start_date: string;
+  end_date: string;
+  reason: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+const fromDbPropertyClosure = (row: DbPropertyClosure): PropertyClosure => ({
+  id: row.id,
+  propertyId: row.property_id,
+  roomTypeId: row.room_type_id ?? undefined,
+  startDate: row.start_date,
+  endDate: row.end_date,
+  reason: row.reason ?? undefined,
+});
+
+const toDbPropertyClosure = (
+  data: Partial<Omit<PropertyClosure, "id">>
+): Record<string, unknown> => {
+  const payload: Record<string, unknown> = {};
+  if (data.propertyId !== undefined) payload.property_id = data.propertyId;
+  if ("roomTypeId" in data) payload.room_type_id = data.roomTypeId ?? null;
+  if (data.startDate !== undefined) payload.start_date = data.startDate;
+  if (data.endDate !== undefined) payload.end_date = data.endDate;
+  if ("reason" in data) payload.reason = data.reason ?? null;
+  return payload;
+};
+
+export const getPropertyClosures = async (): Promise<PropertyClosure[]> => {
+  const { data, error } = await supabase
+    .from('property_closures')
+    .select('*')
+    .order('start_date');
+
+  if (error) throw error;
+  return (data ?? []).map((row) => fromDbPropertyClosure(row as DbPropertyClosure));
+};
+
+export const addPropertyClosure = async (
+  closureData: Omit<PropertyClosure, "id">
+): Promise<{ data: PropertyClosure | null; error: PostgrestError | null }> => {
+  const { data, error } = await supabase
+    .from('property_closures')
+    .insert([toDbPropertyClosure(closureData)])
+    .select()
+    .single();
+
+  if (error || !data) return { data: null, error };
+  return { data: fromDbPropertyClosure(data as DbPropertyClosure), error: null };
+};
+
+export const updatePropertyClosure = async (
+  id: string,
+  updatedData: Partial<Omit<PropertyClosure, "id">>
+): Promise<{ data: PropertyClosure | null; error: PostgrestError | null }> => {
+  const { data, error } = await supabase
+    .from('property_closures')
+    .update(toDbPropertyClosure(updatedData))
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error || !data) return { data: null, error };
+  return { data: fromDbPropertyClosure(data as DbPropertyClosure), error: null };
+};
+
+export const deletePropertyClosure = (id: string) =>
+  supabase.from('property_closures').delete().eq('id', id);
 
 export const getMonthlyAvailability = async (
   monthStart: string,

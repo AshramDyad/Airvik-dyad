@@ -68,12 +68,15 @@ const enhancedSearchSchema = z
 
 export type EnhancedBookingSearchFormValues = z.infer<typeof enhancedSearchSchema>;
 
+type ClosureDateRange = { startDate: string; endDate: string; roomTypeId?: string };
+
 interface BookingWidgetProps {
   onSearch: (values: EnhancedBookingSearchFormValues) => void;
   isLoading?: boolean;
+  blockedRanges?: ClosureDateRange[];
 }
 
-export function BookingWidget({ onSearch, isLoading = false }: BookingWidgetProps) {
+export function BookingWidget({ onSearch, isLoading = false, blockedRanges = [] }: BookingWidgetProps) {
   const [isMobile, setIsMobile] = React.useState(false);
   const [guestsPopoverOpen, setGuestsPopoverOpen] = React.useState(false);
   const hasInitializedRoomState = React.useRef(false);
@@ -172,6 +175,7 @@ export function BookingWidget({ onSearch, isLoading = false }: BookingWidgetProp
                     <ReservationDateRangePicker
                       value={field.value}
                       onChange={field.onChange}
+                      blockedRanges={blockedRanges}
                     />
                   </FormControl>
                   <FormMessage className="pl-2" />

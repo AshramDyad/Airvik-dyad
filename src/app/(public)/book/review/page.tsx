@@ -138,6 +138,7 @@ function BookingReviewContent() {
     addReservation,
     ratePlans,
     seasonalPrices,
+    propertyClosures,
     isLoading,
     property,
   } = useDataContext();
@@ -442,6 +443,26 @@ function BookingReviewContent() {
         .join(" ")
         .replace(/\s+/g, " ")
         .trim();
+
+      // Check for property closures blocking the selected dates
+      const blockingClosure = propertyClosures.find((closure) => {
+        const closureStart = parseISO(closure.startDate);
+        const closureEnd = parseISO(closure.endDate);
+        return areIntervalsOverlapping(
+          { start: fromDate!, end: toDate! },
+          { start: closureStart, end: closureEnd }
+        );
+      });
+
+      if (blockingClosure) {
+        toast.error("Booking Not Available", {
+          description:
+            blockingClosure.reason ||
+            "The property is closed for your selected dates. Please choose different dates.",
+        });
+        setIsProcessing(false);
+        return;
+      }
 
       // Find available physical rooms for the selection
       const assignedRoomIds: string[] = [];

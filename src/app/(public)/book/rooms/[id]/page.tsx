@@ -128,6 +128,7 @@ export default function RoomDetailsPage() {
     rooms,
     ratePlans,
     seasonalPrices,
+    propertyClosures,
     isLoading,
     property,
   } = useDataContext();
@@ -365,12 +366,17 @@ export default function RoomDetailsPage() {
       }
     }
 
+    // Convert property closures to react-day-picker date range matchers
+    const closureMatchers = propertyClosures
+      .filter((c) => !c.roomTypeId || c.roomTypeId === roomType.id)
+      .map((c) => ({ from: parseISO(c.startDate), to: parseISO(c.endDate) }));
+
     return {
-      disabledDates: [{ before: new Date() }, ...fullyBookedDates],
+      disabledDates: [{ before: new Date() }, ...fullyBookedDates, ...closureMatchers],
       minAvailableRoomsForStay,
       totalBookableRooms: numberOfRooms,
     };
-  }, [roomType, rooms, reservations, dateRange]);
+  }, [roomType, rooms, reservations, dateRange, propertyClosures]);
 
   const { disabledDates, minAvailableRoomsForStay, totalBookableRooms } = roomAvailability;
 
@@ -942,6 +948,44 @@ export default function RoomDetailsPage() {
                                   <p className="px-5 pb-1 text-xs text-muted-foreground">
                                     Availability reflects rooms housekeeping has marked Clean or Dirty; maintenance rooms stay hidden until they&apos;re ready.
                                   </p>
+                                  {(() => {
+                                    const relevantClosures = propertyClosures.filter(
+                                      (c) => !c.roomTypeId || c.roomTypeId === roomType?.id
+                                    );
+                                    if (relevantClosures.length === 0) return null;
+                                    return (
+                                      <div className="flex items-start gap-2 mx-5 mb-3 px-3 py-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg">
+                                        <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                                        <div>
+                                          {relevantClosures.length === 1 ? (
+                                            <span>
+                                              Bookings are closed from{" "}
+                                              <strong>
+                                                {format(new Date(relevantClosures[0].startDate + "T00:00:00"), "d MMM yyyy")}
+                                              </strong>{" "}
+                                              to{" "}
+                                              <strong>
+                                                {format(new Date(relevantClosures[0].endDate + "T00:00:00"), "d MMM yyyy")}
+                                              </strong>.
+                                            </span>
+                                          ) : (
+                                            <>
+                                              <span className="font-medium">Bookings are closed during:</span>
+                                              <ul className="mt-1 space-y-0.5 list-disc list-inside">
+                                                {relevantClosures.map((c, i) => (
+                                                  <li key={i}>
+                                                    {format(new Date(c.startDate + "T00:00:00"), "d MMM yyyy")}
+                                                    {" – "}
+                                                    {format(new Date(c.endDate + "T00:00:00"), "d MMM yyyy")}
+                                                  </li>
+                                                ))}
+                                              </ul>
+                                            </>
+                                          )}
+                                        </div>
+                                      </div>
+                                    );
+                                  })()}
                                 </PopoverContent>
                               </Popover>
                               <FormMessage className="pl-2" />
