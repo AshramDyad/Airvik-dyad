@@ -429,7 +429,7 @@ export default function RoomDetailsPage() {
   const nightCount =
     dateRange?.from && dateRange?.to
       ? differenceInDays(dateRange.to, dateRange.from)
-      : 2;
+      : 0;
 
   // Use shared pricing calculation
   const checkInDate = dateRange?.from
@@ -1305,17 +1305,19 @@ export default function RoomDetailsPage() {
                     />
 
                     {/* Pricing Breakdown */}
-                    <PricingBreakdown
-                      nightlyRate={pricing.nightlyRate}
-                      nights={nightCount}
-                      rooms={roomsCount}
-                      totalCost={pricing.totalCost}
-                      taxesAndFees={pricing.taxesAndFees}
-                      grandTotal={pricing.grandTotal}
-                      taxesApplied={pricing.taxesApplied}
-                      taxRatePercent={pricing.taxRatePercent}
-                      currency={property.currency}
-                    />
+                    {nightCount > 0 && (
+                      <PricingBreakdown
+                        nightlyRate={pricing.nightlyRate}
+                        nights={nightCount}
+                        rooms={roomsCount}
+                        totalCost={pricing.totalCost}
+                        taxesAndFees={pricing.taxesAndFees}
+                        grandTotal={pricing.grandTotal}
+                        taxesApplied={pricing.taxesApplied}
+                        taxRatePercent={pricing.taxRatePercent}
+                        currency={property.currency}
+                      />
+                    )}
                     {roomsUnavailableForDates && (
                       <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
                         <Info className="h-4 w-4" />

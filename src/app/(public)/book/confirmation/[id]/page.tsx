@@ -15,6 +15,9 @@ import {
   CalendarDays,
   IndianRupee,
   Copy,
+  Info,
+  Clock,
+  AlertCircle,
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -368,12 +371,61 @@ export default function BookingConfirmationPage() {
                   {reservation.id}
                 </span>
               </div>
-              <div className="mx-auto mt-6 max-w-2xl">
-                <InlineAlert
-                  variant="info"
-                  title="Payment confirmation call"
-                  description="Within a short time, our reception team will call you and confirm the payment."
-                />
+              <div className="mx-auto mt-8 max-w-5xl">
+                {/* Payment confirmation call and Notes: */}
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2 text-left">
+                  {/* English Info Card */}
+                  <div className="rounded-2xl border border-primary/20 bg-primary/5 p-6 shadow-sm">
+                    <h3 className="mb-4 font-serif text-xl font-semibold text-foreground flex items-center gap-2">
+                      <Info className="h-5 w-5 text-primary" />
+                      Important Information
+                    </h3>
+                    <div className="space-y-4 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-2 font-medium text-foreground">
+                        <Clock className="h-4 w-4 text-primary" />
+                        Check-In Time: 12:00 PM - Checkout Time: 10:00 AM
+                      </div>
+                      <p className="leading-relaxed">
+                        <strong className="font-semibold text-foreground">Notes:</strong> This ashram is Gujarati. Food is served here in a Gujarati style. Meals are complimentary. This is an ashram. Here you must have to wash your own plates.
+                      </p>
+                      <div className="flex items-start gap-2 rounded-lg bg-destructive/10 p-3 text-destructive">
+                        <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-destructive" />
+                        <p className="font-medium leading-snug">
+                          Without donation/confirmation receipt, booking will not be considered valid.
+                        </p>
+                      </div>
+                      <p className="border-t border-primary/10 pt-4">
+                        Our team will contact you shortly to confirm the payment. If you do not receive a call from our side within 30 minutes, you are requested to contact the booking representative at <a href="tel:+918511151708" className="whitespace-nowrap font-bold text-primary hover:underline">+91 8511151708</a> or <a href="tel:+918595251312" className="whitespace-nowrap font-bold text-primary hover:underline">+91 8595251312</a>.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Hindi Info Card */}
+                  <div className="rounded-2xl border border-primary/20 bg-primary/5 p-6 shadow-sm">
+                    <h3 className="mb-4 font-serif text-xl font-semibold text-foreground flex items-center gap-2">
+                      <Info className="h-5 w-5 text-primary" />
+                      महत्वपूर्ण जानकारी
+                    </h3>
+                    <div className="space-y-4 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-2 font-medium text-foreground">
+                        <Clock className="h-4 w-4 text-primary" />
+                        चेक-इन समय: दोपहर 12:00 बजे - चेक-आउट: सुबह 10:00 बजे
+                      </div>
+                      <p className="leading-relaxed">
+                        <strong className="font-semibold text-foreground">नोट्स:</strong> यह एक गुजराती आश्रम है। यहाँ गुजराती शैली में भोजन परोसा जाता है। भोजन निःशुल्क है। यह एक आश्रम है, इसलिए यहाँ आपको अपनी प्लेटें स्वयं धोनी होंगी।
+                      </p>
+                      <div className="flex items-start gap-2 rounded-lg bg-destructive/10 p-3 text-destructive">
+                        <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-destructive" />
+                        <p className="font-medium leading-snug">
+                          दान/पुष्टिकरण रसीद के बिना बुकिंग मान्य नहीं मानी जाएगी।
+                        </p>
+                      </div>
+                      <p className="border-t border-primary/10 pt-4">
+                        हमारी टीम भुगतान की पुष्टि करने के लिए आपसे शीघ्र ही संपर्क करेगी। यदि आपको 30 मिनट के भीतर हमारी ओर से कोई कॉल प्राप्त नहीं होती है, तो आपसे अनुरोध है कि बुकिंग प्रतिनिधि से <a href="tel:+918511151708" className="whitespace-nowrap font-bold text-primary hover:underline">+91 8511151708</a> या <a href="tel:+918595251312" className="whitespace-nowrap font-bold text-primary hover:underline">+91 8595251312</a> पर संपर्क करें।
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

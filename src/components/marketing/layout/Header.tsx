@@ -86,20 +86,20 @@ export function Header({ propertyLocation }: HeaderProps) {
             <div className="flex items-center space-x-4">
               {/* contact number add */}
               <a
-                href="tel:+918595251312"
+                href="tel:+918511151708"
                 className="text-sm font-medium text-white/90 flex items-center gap-1.5 hover:text-white transition-colors"
               >
                 <FiPhone className="size-5" aria-hidden="true" />
-                +91 8595251312
+                +91 8511151708
               </a>
 
               <span className="text-sm font-medium text-white/90">&#124;</span>
 
               <a
-                href="tel:+918511151708"
+                href="tel:+918595251312"
                 className="text-sm font-medium text-white/90 flex items-center gap-1.5 hover:text-white transition-colors"
               >
-                +91 85111 51708
+                +91 8595251312
               </a>
 
               {hasLocationMap ? (
