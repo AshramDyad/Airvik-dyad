@@ -77,7 +77,7 @@ export function GuestDetailsCard({ guest }: GuestDetailsCardProps) {
       </CardContent>
       <CardFooter className="border-t border-border/40 px-6 py-4">
         <Button variant="outline" size="sm" asChild>
-          <Link href={`/admin/guests/${guest.id}`}>View Guest Profile</Link>
+          <Link href={`/admin/guests/${guest.id}`} prefetch={false}>View Guest Profile</Link>
         </Button>
       </CardFooter>
     </Card>

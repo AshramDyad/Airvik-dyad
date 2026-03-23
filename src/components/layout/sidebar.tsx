@@ -250,6 +250,7 @@ export function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
           {!isCollapsed && (
             <Link
               href="/"
+              prefetch={false}
               className="flex items-center gap-3 overflow-hidden text-foreground transition-colors focus-visible:outline-none"
             >
               <Image
@@ -291,6 +292,7 @@ export function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
                   <TooltipTrigger asChild>
                     <Link
                       href={href}
+                      prefetch={false}
                       className={cn(
                         "flex h-11 w-11 items-center justify-center rounded-2xl text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary focus-visible:outline-none",
                         isActive && "bg-primary/10 text-primary shadow-sm"
@@ -353,6 +355,7 @@ export function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
                             <Link
                               key={sub.href}
                               href={sub.href}
+                              prefetch={false}
                               className={cn(
                                 "flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-primary/5 hover:text-primary",
                                 isExactPathActive(sub.href) &&
@@ -389,6 +392,7 @@ export function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
                                   <Link
                                     key={child.href}
                                     href={child.href}
+                                    prefetch={false}
                                     className={cn(
                                       "rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-primary/5 hover:text-primary",
                                       isExactPathActive(child.href) &&
@@ -413,6 +417,7 @@ export function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
               <Link
                 key={href}
                 href={href}
+                prefetch={false}
                 className={cn(
                   "flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-primary/5 hover:text-primary focus-visible:outline-none",
                   isActive && "bg-primary/10 text-primary shadow-sm"
@@ -431,6 +436,7 @@ export function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
                 <TooltipTrigger asChild>
                   <Link
                     href="/admin/settings"
+                    prefetch={false}
                     className={cn(
                       "flex h-11 w-11 items-center justify-center rounded-2xl text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
                       pathname === "/admin/settings" &&
@@ -451,6 +457,7 @@ export function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
             ) : (
               <Link
                 href="/admin/settings"
+                prefetch={false}
                 className={cn(
                   "flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-primary/5 hover:text-primary focus-visible:outline-none",
                   pathname === "/admin/settings" &&

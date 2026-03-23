@@ -116,7 +116,7 @@ export default function ReservationEditPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Button variant="outline" size="sm" asChild>
-          <Link href={`/admin/reservations/${reservation.id}`}>
+          <Link href={`/admin/reservations/${reservation.id}`} prefetch={false}>
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to details
           </Link>
