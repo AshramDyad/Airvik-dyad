@@ -158,6 +158,16 @@ export interface BookingRestriction {
   roomTypeId?: string;
 }
 
+// Blocked date ranges — admin-defined periods when users cannot make bookings
+export interface PropertyClosure {
+  id: string;
+  propertyId: string;
+  roomTypeId?: string;  // undefined = entire property blocked
+  startDate: string;    // YYYY-MM-DD
+  endDate: string;      // YYYY-MM-DD
+  reason?: string;
+}
+
 // Room occupancy configuration
 export interface RoomOccupancy {
   adults: number;

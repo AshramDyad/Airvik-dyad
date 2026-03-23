@@ -1,9 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { Calendar as CalendarIcon } from "lucide-react";
-import { format } from "date-fns";
-import type { DateRange } from "react-day-picker";
+import { CalendarIcon, Info } from "lucide-react";
+import { format, parseISO } from "date-fns";
+import type { DateRange, Matcher } from "react-day-picker";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -14,12 +14,15 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 
+type ClosureDateRange = { startDate: string; endDate: string; roomTypeId?: string };
+
 type ReservationDateRangePickerProps = {
   value?: DateRange;
   onChange: (range: DateRange | undefined) => void;
   className?: string;
   disabled?: boolean;
   allowPastDates?: boolean;
+  blockedRanges?: ClosureDateRange[];
 };
 
 export function ReservationDateRangePicker({
@@ -28,6 +31,7 @@ export function ReservationDateRangePicker({
   className,
   disabled = false,
   allowPastDates = false,
+  blockedRanges = [],
 }: ReservationDateRangePickerProps) {
   const [isMobile, setIsMobile] = React.useState(false);
   const [open, setOpen] = React.useState(false);
@@ -137,9 +141,17 @@ export function ReservationDateRangePicker({
           selected={value}
           onSelect={handleSelect}
           numberOfMonths={isMobile ? 1 : 2}
-          disabled={(date) =>
-            !allowPastDates && date < new Date(new Date().setHours(0, 0, 0, 0))
-          }
+          disabled={[
+            ...(allowPastDates
+              ? []
+              : [{ before: new Date(new Date().setHours(0, 0, 0, 0)) }] as Matcher[]),
+            ...blockedRanges
+              .filter((r) => !r.roomTypeId)
+              .map((r) => ({
+                from: parseISO(r.startDate),
+                to: parseISO(r.endDate),
+              })) as Matcher[],
+          ]}
           showOutsideDays
           className="pt-3 pb-4 md:pt-4 md:pb-5 px-1 md:px-5"
           classNames={{
@@ -174,6 +186,42 @@ export function ReservationDateRangePicker({
             day_hidden: "invisible",
           }}
         />
+        {(() => {
+          const closures = blockedRanges.filter((r) => !r.roomTypeId);
+          if (closures.length === 0) return null;
+          return (
+            <div className="flex items-start gap-2 px-5 py-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg mx-1 mb-3">
+              <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+              <div>
+                {closures.length === 1 ? (
+                  <span>
+                    Bookings are closed from{" "}
+                    <strong>
+                      {format(new Date(closures[0].startDate + "T00:00:00"), "d MMM yyyy")}
+                    </strong>{" "}
+                    to{" "}
+                    <strong>
+                      {format(new Date(closures[0].endDate + "T00:00:00"), "d MMM yyyy")}
+                    </strong>.
+                  </span>
+                ) : (
+                  <>
+                    <span className="font-medium">Bookings are closed during:</span>
+                    <ul className="mt-1 space-y-0.5 list-disc list-inside">
+                      {closures.map((r, i) => (
+                        <li key={i}>
+                          {format(new Date(r.startDate + "T00:00:00"), "d MMM yyyy")}
+                          {" – "}
+                          {format(new Date(r.endDate + "T00:00:00"), "d MMM yyyy")}
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+              </div>
+            </div>
+          );
+        })()}
         <div className="flex justify-end border-t border-border/20 pt-4 mt-2">
           <Button
             type="button"

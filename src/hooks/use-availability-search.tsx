@@ -13,11 +13,12 @@ import { useDataContext } from "@/context/data-context";
 import type {
   RoomType,
   BookingRestriction,
+  PropertyClosure,
   RoomOccupancy,
   BookingValidation,
 } from "@/data/types";
 import { isBookableRoom } from "@/lib/rooms";
-import { getBookingRestrictions } from "@/lib/api";
+import { getBookingRestrictions, getPropertyClosures } from "@/lib/api";
 
 // Booking restriction validation helper
 const checkRestrictions = (
@@ -60,6 +61,25 @@ const checkRestrictions = (
   return { isValid: true };
 };
 
+// Property closure check helper
+const isDateRangeBlocked = (
+  checkIn: Date,
+  checkOut: Date,
+  roomTypeId: string,
+  closures: PropertyClosure[]
+): boolean => {
+  return closures.some((closure) => {
+    // If the closure is room-type-specific, only apply it to that room type
+    if (closure.roomTypeId && closure.roomTypeId !== roomTypeId) return false;
+
+    const closureStart = new Date(closure.startDate + "T00:00:00");
+    const closureEnd = new Date(closure.endDate + "T00:00:00");
+
+    // Overlaps if closure starts before check-out AND closure ends on or after check-in
+    return closureStart < checkOut && closureEnd >= checkIn;
+  });
+};
+
 export interface RoomTypeAvailabilitySummary {
   roomTypeId: string;
   availableRooms: number;
@@ -76,24 +96,31 @@ export function useAvailabilitySearch() {
     RoomType[] | null
   >(null);
   const [hasNoInventory, setHasNoInventory] = React.useState(false);
+  const [isDatesBlocked, setIsDatesBlocked] = React.useState(false);
   const [restrictions, setRestrictions] = React.useState<BookingRestriction[]>([]);
+  const [closures, setClosures] = React.useState<PropertyClosure[]>([]);
   const [roomTypeAvailability, setRoomTypeAvailability] = React.useState<
     RoomTypeAvailabilitySummary[] | null
   >(null);
 
-  // Load booking restrictions from API
+  // Load booking restrictions and property closures from API
   React.useEffect(() => {
-    const loadRestrictions = async () => {
+    const loadData = async () => {
       try {
-        const restrictionsData = await getBookingRestrictions();
+        const [restrictionsData, closuresData] = await Promise.all([
+          getBookingRestrictions(),
+          getPropertyClosures(),
+        ]);
         setRestrictions(restrictionsData);
+        setClosures(closuresData);
       } catch (error) {
-        console.error('Failed to load booking restrictions:', error);
+        console.error('Failed to load booking restrictions/closures:', error);
         setRestrictions([]);
+        setClosures([]);
       }
     };
 
-    loadRestrictions();
+    loadData();
   }, []);
 
   const search = React.useCallback(
@@ -101,6 +128,7 @@ export function useAvailabilitySearch() {
       setIsLoading(true);
       setAvailableRoomTypes(null);
       setHasNoInventory(false);
+      setIsDatesBlocked(false);
       setRoomTypeAvailability(null);
 
       // Simulate network delay for a better user experience
@@ -131,6 +159,7 @@ export function useAvailabilitySearch() {
 
         const availabilitySummaries: RoomTypeAvailabilitySummary[] = [];
         const availableMatchingOccupancy: RoomType[] = [];
+        let closureBlockedCount = 0;
 
           visibleRoomTypes.forEach((rt) => {
           // Check if room type has valid category filter
@@ -148,6 +177,12 @@ export function useAvailabilitySearch() {
             restrictions,
           );
           if (!restrictionCheck.isValid) {
+            return;
+          }
+
+          // Check property closures (blocked date ranges)
+          if (isDateRangeBlocked(dateRange.from!, dateRange.to!, rt.id, closures)) {
+            closureBlockedCount += 1;
             return;
           }
 
@@ -235,10 +270,14 @@ export function useAvailabilitySearch() {
 
         setAvailableRoomTypes(availableMatchingOccupancy);
         setRoomTypeAvailability(availabilitySummaries);
+        // Mark as blocked if closures accounted for all filtered-out room types
+        if (closureBlockedCount > 0 && availableMatchingOccupancy.length === 0) {
+          setIsDatesBlocked(true);
+        }
         setIsLoading(false);
       }, 500);
     },
-    [reservations, visibleRoomTypes, rooms, restrictions, checkRestrictions]
+    [reservations, visibleRoomTypes, rooms, restrictions, closures]
   );
 
   return {
@@ -249,5 +288,7 @@ export function useAvailabilitySearch() {
     setAvailableRoomTypes,
     setRoomTypeAvailability,
     hasNoInventory,
+    isDatesBlocked,
+    closures,
   };
 }

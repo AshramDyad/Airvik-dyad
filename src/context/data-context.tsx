@@ -89,6 +89,7 @@ import type {
   RoomCategory,
   RatePlan,
   SeasonalPrice,
+  PropertyClosure,
   Property,
   User,
   Role,
@@ -220,6 +221,10 @@ interface DataContextType {
     updatedData: Partial<Omit<SeasonalPrice, "id">>
   ) => Promise<void>;
   deleteSeasonalPrice: (id: string) => Promise<boolean>;
+  propertyClosures: PropertyClosure[];
+  addPropertyClosure: (data: Omit<PropertyClosure, "id">) => Promise<PropertyClosure>;
+  updatePropertyClosure: (id: string, updatedData: Partial<Omit<PropertyClosure, "id">>) => Promise<void>;
+  deletePropertyClosure: (id: string) => Promise<boolean>;
   addRole: (role: Omit<Role, "id">) => void;
   updateRole: (roleId: string, updatedData: Partial<Omit<Role, "id">>) => void;
   deleteRole: (roleId: string) => Promise<boolean>;

@@ -161,6 +161,8 @@ export default function RoomsPage() {
     setAvailableRoomTypes,
     setRoomTypeAvailability,
     hasNoInventory,
+    isDatesBlocked,
+    closures,
   } = useAvailabilitySearch();
   const [hasSearched, setHasSearched] = React.useState(false);
   const [searchValues, setSearchValues] =
@@ -181,6 +183,15 @@ export default function RoomsPage() {
     setSearchValues(values);
     setSelectedRoomQuantities([]); // Clear previous selection on new search
   };
+
+  // Show popup when the searched dates are blocked by a property closure
+  React.useEffect(() => {
+    if (isDatesBlocked) {
+      toast.error("Rooms are fully booked for this period", {
+        description: "Please select different dates for your stay.",
+      });
+    }
+  }, [isDatesBlocked]);
 
   const handleClearSearch = () => {
     setHasSearched(false);
@@ -411,7 +422,7 @@ export default function RoomsPage() {
               your ideal accommodation.
             </p>
           </div>
-          <BookingWidget onSearch={handleSearch} />
+          <BookingWidget onSearch={handleSearch} blockedRanges={closures} />
         </div>
       </section>
 

@@ -24,6 +24,7 @@ import type {
   RoomCategory,
   RatePlan,
   SeasonalPrice,
+  PropertyClosure,
   Property,
   User,
   Role,
@@ -283,6 +284,7 @@ export function useAppData() {
   const [roomCategories, setRoomCategories] = React.useState<RoomCategory[]>([]);
   const [ratePlans, setRatePlans] = React.useState<RatePlan[]>([]);
   const [seasonalPrices, setSeasonalPrices] = React.useState<SeasonalPrice[]>([]);
+  const [propertyClosures, setPropertyClosures] = React.useState<PropertyClosure[]>([]);
   const [users, setUsers] = React.useState<User[]>([]);
   const [roles, setRoles] = React.useState<Role[]>([]);
   const [amenities, setAmenities] = React.useState<Amenity[]>([]);
@@ -402,7 +404,7 @@ export function useAppData() {
       console.log(`[AppData] Fetching global data (userId: ${userId})`);
       const [
         propertyRes, guestsRes, roomsRes, roomTypesRes, roomCategoriesRes, ratePlansRes,
-        seasonalPricesRes,
+        seasonalPricesRes, propertyClosuresRes,
         rolesRes, amenitiesRes, stickyNotesRes, usersFuncRes, housekeepingAssignmentsRes,
         roomTypeAmenitiesRes,
         dashboardReservationsRes
@@ -414,6 +416,7 @@ export function useAppData() {
         api.getRoomCategories(),
         api.getRatePlans(),
         api.getSeasonalPrices(),
+        api.getPropertyClosures().then(data => ({ data })).catch(() => ({ data: [] as PropertyClosure[] })),
         userId ? api.getRoles() : Promise.resolve({ data: [] }),
         api.getAmenities(),
         userId ? api.getStickyNotes(userId) : Promise.resolve({ data: [] }),
@@ -440,6 +443,7 @@ export function useAppData() {
         setRooms(roomsRes.data || []);
         setRatePlans(ratePlansRes.data || []);
         setSeasonalPrices(seasonalPricesRes.data || []);
+        setPropertyClosures(propertyClosuresRes.data || []);
         setRoles([]);
         setAmenities(amenitiesRes.data || []);
         setStickyNotes([]);
@@ -468,6 +472,7 @@ export function useAppData() {
       setRooms(roomsRes.data || []);
       setRatePlans(ratePlansRes.data || []);
       setSeasonalPrices(seasonalPricesRes.data || []);
+      setPropertyClosures(propertyClosuresRes.data || []);
       setRoles((rolesRes.data || []).map(mapDbRole));
       setAmenities(amenitiesRes.data || []);
       setStickyNotes(stickyNotesRes.data || []);
@@ -1185,6 +1190,53 @@ export function useAppData() {
     return true;
   };
 
+  const addPropertyClosure = async (data: Omit<PropertyClosure, "id">) => {
+    const { data: created, error } = await api.addPropertyClosure(data);
+    if (error || !created) throw error ?? new Error("Failed to create property closure");
+    setPropertyClosures(prev => [...prev, created]);
+    recordActivity({
+      section: "settings",
+      entityType: "property",
+      entityId: created.id,
+      entityLabel: created.reason || `Closure ${created.startDate} – ${created.endDate}`,
+      action: "property_closure_created",
+      details: `Blocked dates ${created.startDate} to ${created.endDate}`,
+    });
+    return created;
+  };
+
+  const updatePropertyClosure = async (id: string, updatedData: Partial<Omit<PropertyClosure, "id">>) => {
+    const { data: updated, error } = await api.updatePropertyClosure(id, updatedData);
+    if (error || !updated) throw error ?? new Error("Failed to update property closure");
+    setPropertyClosures(prev => prev.map(c => c.id === id ? updated : c));
+    recordActivity({
+      section: "settings",
+      entityType: "property",
+      entityId: id,
+      entityLabel: updated.reason || `Closure ${updated.startDate} – ${updated.endDate}`,
+      action: "property_closure_updated",
+      details: `Updated blocked dates ${updated.startDate} to ${updated.endDate}`,
+    });
+  };
+
+  const deletePropertyClosure = async (id: string) => {
+    const existing = propertyClosures.find(c => c.id === id);
+    const { error } = await api.deletePropertyClosure(id);
+    if (error) { console.error(error); return false; }
+    setPropertyClosures(prev => prev.filter(c => c.id !== id));
+    if (existing) {
+      recordActivity({
+        section: "settings",
+        entityType: "property",
+        entityId: existing.id,
+        entityLabel: existing.reason || `Closure ${existing.startDate} – ${existing.endDate}`,
+        action: "property_closure_deleted",
+        details: `Deleted blocked dates ${existing.startDate} to ${existing.endDate}`,
+      });
+    }
+    return true;
+  };
+
   const addRole = async (roleData: Omit<Role, "id">) => {
     const { data, error } = await api.addRole(roleData);
     if (error) throw error;
@@ -1460,6 +1512,7 @@ export function useAppData() {
     roomCategories,
     ratePlans,
     seasonalPrices,
+    propertyClosures,
     users,
     roles,
     amenities,
@@ -1494,6 +1547,9 @@ export function useAppData() {
     addSeasonalPrice,
     updateSeasonalPrice,
     deleteSeasonalPrice,
+    addPropertyClosure,
+    updatePropertyClosure,
+    deletePropertyClosure,
     addRole,
     updateRole,
     deleteRole,

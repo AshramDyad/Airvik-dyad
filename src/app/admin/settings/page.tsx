@@ -13,6 +13,7 @@ import { UsersManagement } from "./components/users-management";
 import { PropertySettingsForm } from "./components/property-settings-form";
 import { AmenitiesManagement } from "./components/amenities-management";
 import { CsvImportPanel } from "./components/data-tools/csv-import-panel";
+import { PropertyClosuresSection } from "./components/property-closures-section";
 import { PermissionGate } from "@/components/admin/permission-gate";
 
 export default function SettingsPage() {
@@ -38,6 +39,7 @@ export default function SettingsPage() {
           </TabsList>
           <TabsContent value="property">
             <PropertySettingsForm />
+            <PropertyClosuresSection />
           </TabsContent>
           <TabsContent value="amenities">
             <AmenitiesManagement />
