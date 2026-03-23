@@ -215,6 +215,51 @@ export function DataTable({
   const hasRows = table.getRowModel().rows.length > 0
   const showLoadingState = Boolean(isLoading) && !hasRows
 
+  const scrollContainerRef = React.useRef<HTMLDivElement>(null)
+  const isDragging = React.useRef(false)
+  const dragStartX = React.useRef(0)
+  const dragStartY = React.useRef(0)
+  const scrollLeftStart = React.useRef(0)
+  const scrollTopStart = React.useRef(0)
+
+  React.useEffect(() => {
+    const onMouseMove = (e: MouseEvent) => {
+      if (!isDragging.current || !scrollContainerRef.current) return
+      scrollContainerRef.current.scrollLeft = scrollLeftStart.current - (dragStartX.current - e.clientX)
+      scrollContainerRef.current.scrollTop = scrollTopStart.current - (dragStartY.current - e.clientY)
+    }
+
+    const onMouseUp = () => {
+      if (!isDragging.current) return
+      isDragging.current = false
+      if (scrollContainerRef.current) {
+        scrollContainerRef.current.style.cursor = ""
+        scrollContainerRef.current.style.userSelect = ""
+      }
+    }
+
+    document.addEventListener("mousemove", onMouseMove)
+    document.addEventListener("mouseup", onMouseUp)
+    return () => {
+      document.removeEventListener("mousemove", onMouseMove)
+      document.removeEventListener("mouseup", onMouseUp)
+    }
+  }, [])
+
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement
+    if (target.closest('button, a, input, select, [role="button"]')) return
+    isDragging.current = true
+    dragStartX.current = e.clientX
+    dragStartY.current = e.clientY
+    scrollLeftStart.current = scrollContainerRef.current?.scrollLeft ?? 0
+    scrollTopStart.current = scrollContainerRef.current?.scrollTop ?? 0
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.style.cursor = "grabbing"
+      scrollContainerRef.current.style.userSelect = "none"
+    }
+  }
+
   return (
     <div className="flex flex-col gap-6 h-[calc(100vh-110px)]">
       <div className="shrink-0">
@@ -226,14 +271,18 @@ export function DataTable({
           isLoading={Boolean(isLoading)}
         />
       </div>
-      <div className="flex-1 min-h-0 overflow-auto rounded-2xl border border-border/50 bg-card shadow-lg scrollbar-hide">
-        <Table className="relative">
+      <div
+        ref={scrollContainerRef}
+        className="flex-1 min-h-0 overflow-auto rounded-2xl border border-border/50 bg-card shadow-lg scrollbar-hide cursor-grab"
+        onMouseDown={handleMouseDown}
+      >
+        <Table className="relative min-w-max" baseWrapper={false}>
           <TableHeader className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_rgba(0,0,0,0.05)] dark:shadow-[0_1px_0_0_rgba(255,255,255,0.05)] after:absolute after:bottom-0 after:left-0 after:right-0 after:h-px after:bg-border/50">
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id} className="hover:bg-transparent border-b-0">
                 {headerGroup.headers.map((header) => {
                   return (
-                    <TableHead key={header.id}>
+                    <TableHead key={header.id} className="whitespace-nowrap">
                       {header.isPlaceholder
                         ? null
                         : flexRender(
@@ -261,7 +310,7 @@ export function DataTable({
                 {table.getRowModel().rows.map((row) => (
                   <TableRow key={row.id}>
                     {row.getVisibleCells().map((cell) => (
-                      <TableCell key={cell.id}>
+                      <TableCell key={cell.id} className="whitespace-nowrap">
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </TableCell>
                     ))}
