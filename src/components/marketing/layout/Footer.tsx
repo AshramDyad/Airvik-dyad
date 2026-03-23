@@ -131,18 +131,27 @@ export function Footer({ propertyLocation }: FooterProps) {
                   </span>
                 </a>
                 <a
-                  href="tel:+918595251312"
-                  className="flex min-w-0 items-start gap-3 hover:text-primary transition-colors focus-visible:outline-none"
-                >
-                  <Phone className="h-5 w-5 text-primary flex-shrink-0" />
-                  <span className="w-full break-all">+91 8595251312</span>
-                </a>
-                <a
                   href="tel:+918511151708"
                   className="flex min-w-0 items-start gap-3 hover:text-primary transition-colors focus-visible:outline-none"
                 >
+                  <Phone className="h-5 w-5 text-primary flex-shrink-0" />
+                  <span className="w-full break-all">+91 8511151708</span>
+                </a>
+
+                <a
+                  href="tel:+918595251312"
+                  className="flex min-w-0 items-start gap-3 hover:text-primary transition-colors focus-visible:outline-none"
+                >
                   <div className="h-5 w-5 flex-shrink-0" />
-                  <span className="w-full break-all">+91 85111 51708</span>
+                  <span className="w-full break-all">+91 8595251312</span>
+                </a>
+
+                <a
+                  href="tel:+919319825050"
+                  className="flex min-w-0 items-start gap-3 hover:text-primary transition-colors focus-visible:outline-none"
+                >
+                  <div className="h-5 w-5 flex-shrink-0" />
+                  <span className="w-full break-all">+91 9319825050</span>
                 </a>
                 {hasLocationMap ? (
                   <button
