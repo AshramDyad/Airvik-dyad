@@ -30,9 +30,12 @@ import type {
 } from "@/data/types"
 import { useCurrencyFormatter } from "@/hooks/use-currency";
 import { formatBookingCode } from "@/lib/reservations/formatting";
+import { cn } from "@/lib/utils";
 
 export type ReservationWithDetails = Reservation & {
   displayAmount?: number;
+  paidAmount?: number;
+  remainingBalance?: number;
   guestName: string;
   roomNumber: string;
   nights: number;
@@ -115,6 +118,28 @@ function AmountCell({ row }: CellContext<ReservationWithDetails, unknown>) {
       ? row.original.displayAmount
       : normalizedTotal;
   return <div className="text-right font-medium">{formatCurrency(amount)}</div>;
+}
+
+function PaidAmountCell({ row }: CellContext<ReservationWithDetails, unknown>) {
+  const formatCurrency = useCurrencyFormatter();
+  if (row.depth > 0) return null;
+  const paid = row.original.paidAmount ?? 0;
+  return (
+    <div className="text-right font-medium text-emerald-600">
+      {paid === 0 ? "-" : formatCurrency(paid)}
+    </div>
+  );
+}
+
+function RemainingBalanceCell({ row }: CellContext<ReservationWithDetails, unknown>) {
+  const formatCurrency = useCurrencyFormatter();
+  if (row.depth > 0) return null;
+  const balance = row.original.remainingBalance ?? 0;
+  return (
+    <div className={cn("text-right font-medium", balance > 0 ? "text-rose-600" : "text-emerald-600")}>
+      {formatCurrency(balance)}
+    </div>
+  );
 }
 
 export const columns: ColumnDef<ReservationWithDetails>[] = [
@@ -290,6 +315,16 @@ export const columns: ColumnDef<ReservationWithDetails>[] = [
     accessorKey: "totalAmount",
     header: () => <div className="text-right">Amount</div>,
     cell: AmountCell,
+  },
+  {
+    id: "paidAmount",
+    header: () => <div className="text-right">Paid</div>,
+    cell: PaidAmountCell,
+  },
+  {
+    id: "remainingBalance",
+    header: () => <div className="text-right">Balance</div>,
+    cell: RemainingBalanceCell,
   },
   {
     accessorKey: "status",

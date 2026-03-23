@@ -8,7 +8,11 @@ import { columns, ReservationWithDetails } from "./components/columns";
 import { DataTable } from "./components/data-table";
 import { useDataContext } from "@/context/data-context";
 import type { FolioItem, ReservationStatus } from "@/data/types";
-import { calculateReservationTaxAmount } from "@/lib/reservations/calculate-financials";
+import {
+  calculateReservationTaxAmount,
+  calculateReservationFinancials,
+  resolveReservationTaxConfig,
+} from "@/lib/reservations/calculate-financials";
 import { PermissionGate } from "@/components/admin/permission-gate";
 
 function sumAdditionalCharges(folioItems: FolioItem[] = []) {
@@ -38,6 +42,18 @@ function getReservationDisplayAmount(
   const taxes = calculateReservationTaxAmount(reservation, property);
   const additionalCharges = sumAdditionalCharges(reservation.folio ?? []);
   return reservation.totalAmount + taxes + additionalCharges;
+}
+
+function getReservationPaidAndBalance(
+  reservation: ReservationWithDetails,
+  property: { tax_enabled?: boolean | null; tax_percentage?: number | null }
+): { paidAmount: number; remainingBalance: number } {
+  const taxConfig = resolveReservationTaxConfig(reservation, property);
+  const financials = calculateReservationFinancials(reservation, taxConfig);
+  return {
+    paidAmount: financials.totalPaid,
+    remainingBalance: financials.balance,
+  };
 }
 
 export default function ReservationsPage() {
@@ -115,24 +131,42 @@ export default function ReservationsPage() {
         detailedBooking.subRows = (booking.subRows as unknown as ReservationWithDetails[]).map((sub: ReservationWithDetails) => {
           const subWithDetails = { ...sub } as unknown as ReservationWithDetails;
           subWithDetails.nights = calculateNights(sub);
-          subWithDetails.displayAmount = isRevenueReservation(sub.status)
-            ? getReservationDisplayAmount(subWithDetails, property)
-            : 0;
+          if (isRevenueReservation(sub.status)) {
+            subWithDetails.displayAmount = getReservationDisplayAmount(subWithDetails, property);
+            const { paidAmount, remainingBalance } = getReservationPaidAndBalance(subWithDetails, property);
+            subWithDetails.paidAmount = paidAmount;
+            subWithDetails.remainingBalance = remainingBalance;
+          } else {
+            subWithDetails.displayAmount = 0;
+            subWithDetails.paidAmount = 0;
+            subWithDetails.remainingBalance = 0;
+          }
           return subWithDetails;
         });
 
         // Top level amount is always the sum of subRows
         if (detailedBooking.subRows && detailedBooking.subRows.length > 0) {
           detailedBooking.displayAmount = detailedBooking.subRows.reduce((sum, sub) => sum + (sub.displayAmount || 0), 0);
+          detailedBooking.paidAmount = detailedBooking.subRows.reduce((sum, sub) => sum + (sub.paidAmount ?? 0), 0);
+          detailedBooking.remainingBalance = detailedBooking.subRows.reduce((sum, sub) => sum + (sub.remainingBalance ?? 0), 0);
         } else {
           detailedBooking.displayAmount = isRevenueReservation(detailedBooking.status)
             ? getReservationDisplayAmount(detailedBooking, property)
             : 0;
+          detailedBooking.paidAmount = 0;
+          detailedBooking.remainingBalance = 0;
         }
       } else {
-        detailedBooking.displayAmount = isRevenueReservation(detailedBooking.status)
-          ? getReservationDisplayAmount(detailedBooking, property)
-          : 0;
+        if (isRevenueReservation(detailedBooking.status)) {
+          detailedBooking.displayAmount = getReservationDisplayAmount(detailedBooking, property);
+          const { paidAmount, remainingBalance } = getReservationPaidAndBalance(detailedBooking, property);
+          detailedBooking.paidAmount = paidAmount;
+          detailedBooking.remainingBalance = remainingBalance;
+        } else {
+          detailedBooking.displayAmount = 0;
+          detailedBooking.paidAmount = 0;
+          detailedBooking.remainingBalance = 0;
+        }
       }
 
       return detailedBooking;
