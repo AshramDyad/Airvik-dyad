@@ -257,6 +257,7 @@ export interface FolioItem {
   amount: number;
   timestamp: string;
   paymentMethod?: string | null;
+  transactionId?: string | null;
   externalSource?: string | null;
   externalReference?: string | null;
   externalMetadata?: Record<string, unknown> | null;

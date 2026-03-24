@@ -7,12 +7,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useDataContext } from "@/context/data-context";
 import type { ReservationWithDetails } from "@/app/admin/reservations/components/columns";
@@ -21,13 +16,18 @@ interface LinkedReservationsCardProps {
   reservations: ReservationWithDetails[];
 }
 
-export function LinkedReservationsCard({ reservations }: LinkedReservationsCardProps) {
+export function LinkedReservationsCard({
+  reservations,
+}: LinkedReservationsCardProps) {
   const { rooms, roomTypes } = useDataContext();
 
   const sortedReservations = [...reservations].sort((a, b) => {
     const roomA = a.roomNumber || "";
     const roomB = b.roomNumber || "";
-    return roomA.localeCompare(roomB, undefined, { numeric: true, sensitivity: "base" });
+    return roomA.localeCompare(roomB, undefined, {
+      numeric: true,
+      sensitivity: "base",
+    });
   });
 
   const descriptionPrefix =
@@ -50,18 +50,20 @@ export function LinkedReservationsCard({ reservations }: LinkedReservationsCardP
             No rooms are currently assigned to this booking.
           </p>
         ) : (
-          <div className="rounded-2xl border border-border/40">
+          <div className="rounded-2xl border border-border/40 max-h-80 overflow-y-auto">
             <Table>
               <TableBody>
                 {sortedReservations.map((res) => {
                   const room = rooms.find((r) => r.id === res.roomId);
-                  const roomType = roomTypes.find((rt) => rt.id === room?.roomTypeId);
+                  const roomType = roomTypes.find(
+                    (rt) => rt.id === room?.roomTypeId,
+                  );
                   const roomLabel = room?.roomNumber || res.roomNumber || "N/A";
                   return (
                     <TableRow key={res.id}>
                       <TableCell className="space-y-1">
                         <p className="font-medium">
-                          {(roomType?.name || "Room type")} · Room {roomLabel}
+                          {roomType?.name || "Room type"} · Room {roomLabel}
                         </p>
                       </TableCell>
                       <TableCell className="text-right">
