@@ -622,7 +622,8 @@ export async function generateInvoice(
 
   // ========== CARDS: GUEST & RESERVATION (Stacked Full-Width) ==========
   const cardWidth = pageWidth - margin * 2;
-  const cardHeight = 26; // Reduced height to remove bottom whitespace
+  const guestCardHeight = 34; // 3 rows: Name/Email/Phone, Address, City/Pincode/Country
+  const resCardHeight = 26; // 2 rows: Booking ID/Check-in/Check-out/Duration, Guests
 
   // Helper for grid item
   const drawGridItem = (
@@ -643,7 +644,7 @@ export async function generateInvoice(
   };
 
   // -- Guest Details Card --
-  drawRoundedCard(doc, margin, yPos, cardWidth, cardHeight);
+  drawRoundedCard(doc, margin, yPos, cardWidth, guestCardHeight);
 
   const guestContentX = margin + 5;
   const guestContentY = yPos + 8;
@@ -677,26 +678,30 @@ export async function generateInvoice(
     drawGridItem("Phone No:", guest.phone, nextX, row1Y);
   }
 
-  // Row 2: Address, City, Pincode, Country
+  // Row 2: Address (full width)
   let row2Y = row1Y + 6;
   nextX = guestContentX;
   if (guest?.address) {
-    nextX += drawGridItem("Address:", guest.address, nextX, row2Y) + 10;
+    drawGridItem("Address:", guest.address, nextX, row2Y);
   }
+
+  // Row 3: City, Pincode, Country
+  const row3Y = row2Y + 6;
+  nextX = guestContentX;
   if (guest?.city) {
-    nextX += drawGridItem("City:", guest.city, nextX, row2Y) + 10;
+    nextX += drawGridItem("City:", guest.city, nextX, row3Y) + 10;
   }
   if (guest?.pincode) {
-    nextX += drawGridItem("Pincode:", guest.pincode, nextX, row2Y) + 10;
+    nextX += drawGridItem("Pincode:", guest.pincode, nextX, row3Y) + 10;
   }
   if (guest?.country) {
-    drawGridItem("Country:", guest.country, nextX, row2Y);
+    drawGridItem("Country:", guest.country, nextX, row3Y);
   }
 
-  yPos += cardHeight + 4;
+  yPos += guestCardHeight + 4;
 
   // -- Reservation Details Card --
-  drawRoundedCard(doc, margin, yPos, cardWidth, cardHeight);
+  drawRoundedCard(doc, margin, yPos, cardWidth, resCardHeight);
 
   const resContentX = margin + 5;
   const resContentY = yPos + 8;
@@ -774,16 +779,9 @@ export async function generateInvoice(
     guestText += ` (${breakdown.join(", ")})`;
   }
 
-  nextX += drawGridItem("Guests:", guestText, nextX, row2Y) + 20;
+  drawGridItem("Guests:", guestText, nextX, row2Y);
 
-  // Transaction ID field
-  const firstPaymentFolio = reservations
-    .flatMap((r) => r.folio)
-    .find((f) => f.amount < 0);
-  const transactionRef = firstPaymentFolio?.externalReference || "N/A";
-  drawGridItem("Transaction ID:", transactionRef, nextX, row2Y);
-
-  yPos += cardHeight + 4; // Gap before table
+  yPos += resCardHeight + 4; // Gap before table
 
   // ========== TABLE ==========
   // Columns: Room Name, Quantity, Donation (per night), Amount

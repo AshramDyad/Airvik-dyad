@@ -16,10 +16,14 @@ import {
   ChevronRight,
   Clock3,
   DownloadCloud,
+  Download,
+  Eye,
+  Loader2,
 } from "lucide-react";
 import { format } from "date-fns";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -41,7 +45,13 @@ import type {
   Reservation,
   ReservationSource,
   ReservationStatus,
+  Guest,
+  Property,
+  Room,
+  RoomType,
 } from "@/data/types";
+import { useDataContext } from "@/context/data-context";
+import type { InvoiceData } from "@/lib/invoice/generate-invoice";
 import { useCurrencyFormatter } from "@/hooks/use-currency";
 import { formatBookingCode } from "@/lib/reservations/formatting";
 import { cn } from "@/lib/utils";
@@ -56,6 +66,127 @@ export type ReservationWithDetails = Reservation & {
   roomCount?: number;
   subRows?: ReservationWithDetails[];
 };
+
+function buildInvoiceData(
+  row: ReservationWithDetails,
+  guests: Guest[],
+  property: Property,
+  rooms: Room[],
+  roomTypes: RoomType[],
+): InvoiceData {
+  const reservations: Reservation[] = row.subRows?.length
+    ? (row.subRows as unknown as Reservation[])
+    : [row as unknown as Reservation];
+  const guest = guests.find((g) => g.id === row.guestId) ?? null;
+  return { reservations, guest, property, rooms, roomTypes };
+}
+
+function InvoiceDownloadCell({ row }: CellContext<ReservationWithDetails, unknown>) {
+  const [isGenerating, setIsGenerating] = React.useState(false);
+  const { guests, property, rooms, roomTypes } = useDataContext();
+
+  if (row.depth > 0) return null;
+
+  const handleDownload = async () => {
+    setIsGenerating(true);
+    try {
+      const invoiceData = buildInvoiceData(row.original, guests, property, rooms, roomTypes);
+      if (invoiceData.reservations.length === 0) {
+        toast.error("No reservation data available.");
+        return;
+      }
+      const { generateInvoice } = await import("@/lib/invoice/generate-invoice");
+      await generateInvoice(invoiceData);
+      toast.success("Invoice downloaded successfully!");
+    } catch (error) {
+      console.error("Failed to generate invoice:", error);
+      toast.error("Failed to generate invoice. Please try again.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            className="h-8 w-8 p-0"
+            onClick={() => void handleDownload()}
+            disabled={isGenerating}
+          >
+            {isGenerating ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
+            <span className="sr-only">Download Invoice</span>
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>Download Invoice</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
+function InvoiceViewCell({ row }: CellContext<ReservationWithDetails, unknown>) {
+  const [isGenerating, setIsGenerating] = React.useState(false);
+  const { guests, property, rooms, roomTypes } = useDataContext();
+
+  if (row.depth > 0) return null;
+
+  const handleView = async () => {
+    setIsGenerating(true);
+    try {
+      const invoiceData = buildInvoiceData(row.original, guests, property, rooms, roomTypes);
+      if (invoiceData.reservations.length === 0) {
+        toast.error("No reservation data available.");
+        return;
+      }
+      const { generateInvoice } = await import("@/lib/invoice/generate-invoice");
+      const blob = await generateInvoice(invoiceData, { returnBlob: true });
+      if (blob) {
+        const url = URL.createObjectURL(blob);
+        window.open(url, "_blank");
+        setTimeout(() => URL.revokeObjectURL(url), 10000);
+        toast.success("Invoice opened in new tab.");
+      }
+    } catch (error) {
+      console.error("Failed to generate invoice:", error);
+      toast.error("Failed to generate invoice. Please try again.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            className="h-8 w-8 p-0"
+            onClick={() => void handleView()}
+            disabled={isGenerating}
+          >
+            {isGenerating ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Eye className="h-4 w-4" />
+            )}
+            <span className="sr-only">View Invoice</span>
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>View Invoice</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
 
 export const statuses = [
   { value: "Tentative", label: "Tentative", icon: HelpCircle },
@@ -455,6 +586,16 @@ export const columns: ColumnDef<ReservationWithDetails>[] = [
         </TooltipProvider>
       );
     },
+  },
+  {
+    id: "invoiceDownload",
+    header: "Download",
+    cell: InvoiceDownloadCell,
+  },
+  {
+    id: "invoiceView",
+    header: "View",
+    cell: InvoiceViewCell,
   },
   {
     id: "actions",
