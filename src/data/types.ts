@@ -607,9 +607,14 @@ export interface ManualReceipt {
   slipNo: number;
   firstName: string;
   lastName: string;
+  fullName: string | null;
   phone: string;
   email: string | null;
   address: string | null;
+  city: string | null;
+  pancard: string | null;
+  aadharCard: string | null;
+  dob: string | null;
   amount: number;
   paymentMethod: string;
   transactionId: string | null;
@@ -618,5 +623,9 @@ export interface ManualReceipt {
   byHand: string | null;
   creator: string | null;
   imgLink: string | null;
+  trust: string | null;
+  donationType: string | null;
+  donationIn: string | null;
+  paymentMode: string | null;
   createdAt: string;
 }
