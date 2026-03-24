@@ -7,6 +7,7 @@ import * as z from "zod";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { FileText, Send, Loader2, Plus, Pencil, Trash2, ExternalLink } from "lucide-react";
+import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -44,14 +45,7 @@ import { DeleteConfirmationDialog } from "@/components/shared/delete-confirmatio
 import { useDataContext } from "@/context/data-context";
 import { authorizedFetch } from "@/lib/auth/client-session";
 import { formatCurrency } from "@/lib/currency";
-import type {
-  Guest,
-  ManualReceipt,
-  Reservation,
-  ReservationPaymentMethod,
-  Room,
-  RoomType,
-} from "@/data/types";
+import type { ManualReceipt } from "@/data/types";
 
 const PAYMENT_METHODS = [
   "Cash",
@@ -63,7 +57,8 @@ const PAYMENT_METHODS = [
 
 const STATUS_OPTIONS = ["Accepted", "Pending", "Rejected"] as const;
 
-const formSchema = z.object({
+// Edit dialog uses legacy firstName/lastName fields for backward compat
+const editFormSchema = z.object({
   firstName: z.string().min(1, "First name is required."),
   lastName: z.string().min(1, "Last name is required."),
   phone: z.string().min(10, "Phone must be at least 10 characters."),
@@ -87,9 +82,9 @@ const formSchema = z.object({
   imgLink: z.string().optional(),
 });
 
-type FormValues = z.infer<typeof formSchema>;
+type EditFormValues = z.infer<typeof editFormSchema>;
 
-const defaultFormValues: FormValues = {
+const defaultEditValues: EditFormValues = {
   firstName: "",
   lastName: "",
   phone: "",
@@ -105,21 +100,8 @@ const defaultFormValues: FormValues = {
   imgLink: "",
 };
 
-type ReceiptLike = {
-  firstName: string;
-  lastName: string;
-  phone: string;
-  email?: string | null;
-  address?: string | null;
-  amount: number;
-  paymentMethod: string;
-  transactionId?: string | null;
-};
-
 export default function ManualReceiptPage() {
   const { property } = useDataContext();
-  const [downloading, setDownloading] = React.useState(false);
-  const [sending, setSending] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
   const [receipts, setReceipts] = React.useState<ManualReceipt[]>([]);
   const [loadingReceipts, setLoadingReceipts] = React.useState(true);
@@ -134,9 +116,9 @@ export default function ManualReceiptPage() {
   const [dateTo, setDateTo] = React.useState("");
   const [filterPaymentType, setFilterPaymentType] = React.useState("");
 
-  const form = useForm<FormValues>({
-    resolver: zodResolver(formSchema),
-    defaultValues: defaultFormValues,
+  const form = useForm<EditFormValues>({
+    resolver: zodResolver(editFormSchema),
+    defaultValues: defaultEditValues,
   });
 
   const filteredReceipts = React.useMemo(() => {
@@ -173,22 +155,20 @@ export default function ManualReceiptPage() {
     fetchReceipts();
   }, [fetchReceipts]);
 
-  function openCreateDialog() {
-    setEditingReceipt(null);
-    form.reset(defaultFormValues);
-    setDialogOpen(true);
-  }
-
   function openEditDialog(receipt: ManualReceipt) {
     setEditingReceipt(receipt);
+    // Populate from fullName if available, otherwise use firstName/lastName
+    const nameParts = receipt.fullName
+      ? receipt.fullName.split(/\s+/)
+      : [receipt.firstName, receipt.lastName];
     form.reset({
-      firstName: receipt.firstName,
-      lastName: receipt.lastName,
+      firstName: nameParts[0] ?? receipt.firstName,
+      lastName: nameParts.slice(1).join(" ") || receipt.lastName,
       phone: receipt.phone,
       email: receipt.email || "",
       address: receipt.address || "",
       amount: receipt.amount,
-      paymentMethod: receipt.paymentMethod as FormValues["paymentMethod"],
+      paymentMethod: (receipt.paymentMethod as EditFormValues["paymentMethod"]) ?? "Cash",
       transactionId: receipt.transactionId || "",
       note: receipt.note || "",
       status: receipt.status || "Accepted",
@@ -199,31 +179,7 @@ export default function ManualReceiptPage() {
     setDialogOpen(true);
   }
 
-  async function saveReceipt(values: FormValues): Promise<ManualReceipt | null> {
-    try {
-      const res = await authorizedFetch("/api/admin/manual-receipts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => null);
-        throw new Error(
-          (body as { message?: string } | null)?.message || "Save failed",
-        );
-      }
-      const json = (await res.json()) as { data: ManualReceipt };
-      return json.data;
-    } catch (err) {
-      console.error(err);
-      toast.error(
-        err instanceof Error ? err.message : "Failed to save receipt.",
-      );
-      return null;
-    }
-  }
-
-  async function updateReceipt(id: string, values: FormValues): Promise<ManualReceipt | null> {
+  async function updateReceipt(id: string, values: EditFormValues): Promise<ManualReceipt | null> {
     try {
       const res = await authorizedFetch(`/api/admin/manual-receipts/${id}`, {
         method: "PATCH",
@@ -285,7 +241,7 @@ export default function ManualReceiptPage() {
         prev.map((r) => (r.id === updated.id ? updated : r)),
       );
       toast.success("Receipt updated.");
-      form.reset(defaultFormValues);
+      form.reset(defaultEditValues);
       setEditingReceipt(null);
       setDialogOpen(false);
     } finally {
@@ -293,162 +249,40 @@ export default function ManualReceiptPage() {
     }
   }
 
-  function buildReceiptData(values: ReceiptLike) {
-    const now = new Date().toISOString();
-    const bookingId = crypto.randomUUID();
-    const roomTypeId = crypto.randomUUID();
-    const roomId = crypto.randomUUID();
-    const amount = Number(values.amount);
-
-    const guest: Guest = {
-      id: crypto.randomUUID(),
-      firstName: values.firstName,
-      lastName: values.lastName,
-      email: values.email || "",
-      phone: values.phone,
-      address: values.address || undefined,
-    };
-
-    const roomType: RoomType = {
-      id: roomTypeId,
-      name: "Donation",
-      description: "",
-      maxOccupancy: 1,
-      bedTypes: [],
-      price: amount,
-      amenities: [],
-      photos: [],
-      isVisible: false,
-    };
-
-    const room: Room = {
-      id: roomId,
-      roomNumber: "-",
-      roomTypeId,
-      status: "Clean",
-    };
-
-    const reservation: Reservation = {
-      id: crypto.randomUUID(),
-      bookingId,
-      guestId: guest.id,
-      roomId,
-      ratePlanId: null,
-      checkInDate: now,
-      checkOutDate: now,
-      numberOfGuests: 1,
-      status: "Confirmed",
-      folio: [
-        {
-          id: crypto.randomUUID(),
-          description: `Donation – ${values.paymentMethod}`,
-          amount: -amount,
-          timestamp: now,
-          paymentMethod: values.paymentMethod,
-          transactionId: values.transactionId || null,
-        },
-      ],
-      totalAmount: amount,
-      bookingDate: now,
-      source: "reception",
-      paymentMethod: values.paymentMethod as ReservationPaymentMethod,
-      adultCount: 1,
-      childCount: 0,
-      taxEnabledSnapshot: false,
-      taxRateSnapshot: 0,
-    };
-
+  // Build receipt input for PDF generation (handles both old and new receipts)
+  function buildReceiptInput(r: ManualReceipt) {
     return {
-      reservations: [reservation],
-      guest,
-      property,
-      rooms: [room],
-      roomTypes: [roomType],
+      slipNo: r.slipNo,
+      fullName: r.fullName ?? `${r.firstName} ${r.lastName}`.trim(),
+      phone: r.phone,
+      email: r.email,
+      address: r.address,
+      city: r.city,
+      pancard: r.pancard,
+      aadharCard: r.aadharCard,
+      dob: r.dob,
+      amount: r.amount,
+      trust: r.trust,
+      donationType: r.donationType,
+      donationIn: r.donationIn,
+      paymentMode: r.paymentMode ?? r.paymentMethod,
+      transactionId: r.transactionId,
+      byHand: r.byHand,
+      note: r.note,
+      createdAt: r.createdAt,
     };
-  }
-
-  async function handleDownload() {
-    const valid = await form.trigger();
-    if (!valid) return;
-
-    setDownloading(true);
-    try {
-      const values = form.getValues();
-      const saved = await saveReceipt(values);
-      if (!saved) return;
-
-      const data = buildReceiptData(values);
-      const { generateInvoice } = await import("@/lib/invoice/generate-invoice");
-      await generateInvoice(data);
-      toast.success("Receipt downloaded.");
-      form.reset(defaultFormValues);
-      setDialogOpen(false);
-      fetchReceipts();
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to generate receipt.");
-    } finally {
-      setDownloading(false);
-    }
-  }
-
-  async function handleWhatsApp() {
-    const valid = await form.trigger();
-    if (!valid) return;
-
-    const values = form.getValues();
-    setSending(true);
-    try {
-      const saved = await saveReceipt(values);
-      if (!saved) return;
-
-      const data = buildReceiptData(values);
-      const { generateInvoice } = await import("@/lib/invoice/generate-invoice");
-      const blob = await generateInvoice(data, { returnBlob: true });
-      if (!blob) {
-        toast.error("Failed to generate receipt PDF.");
-        return;
-      }
-
-      const formData = new FormData();
-      formData.append("phone", values.phone);
-      formData.append(
-        "file",
-        new File([blob], "Donation_Receipt.pdf", { type: "application/pdf" }),
-      );
-
-      const res = await authorizedFetch(
-        "/api/admin/send-invoice-whatsapp",
-        { method: "POST", body: formData },
-      );
-
-      if (!res.ok) {
-        const body = await res.json().catch(() => null);
-        throw new Error(
-          (body as { message?: string } | null)?.message || "Send failed",
-        );
-      }
-
-      toast.success("Receipt sent on WhatsApp.");
-      form.reset(defaultFormValues);
-      setDialogOpen(false);
-      fetchReceipts();
-    } catch (err) {
-      console.error(err);
-      toast.error(
-        err instanceof Error ? err.message : "Failed to send receipt.",
-      );
-    } finally {
-      setSending(false);
-    }
   }
 
   async function handleHistoryDownload(receipt: ManualReceipt) {
     setHistoryBusy(receipt.id);
     try {
-      const data = buildReceiptData(receipt);
-      const { generateInvoice } = await import("@/lib/invoice/generate-invoice");
-      await generateInvoice(data);
+      const { generateManualDonationReceipt } = await import(
+        "@/lib/invoice/generate-manual-donation-receipt"
+      );
+      await generateManualDonationReceipt({
+        receipt: buildReceiptInput(receipt),
+        property,
+      });
       toast.success("Receipt downloaded.");
     } catch (err) {
       console.error(err);
@@ -461,9 +295,13 @@ export default function ManualReceiptPage() {
   async function handleHistoryWhatsApp(receipt: ManualReceipt) {
     setHistoryBusy(receipt.id);
     try {
-      const data = buildReceiptData(receipt);
-      const { generateInvoice } = await import("@/lib/invoice/generate-invoice");
-      const blob = await generateInvoice(data, { returnBlob: true });
+      const { generateManualDonationReceipt } = await import(
+        "@/lib/invoice/generate-manual-donation-receipt"
+      );
+      const blob = await generateManualDonationReceipt(
+        { receipt: buildReceiptInput(receipt), property },
+        { returnBlob: true },
+      );
       if (!blob) {
         toast.error("Failed to generate receipt PDF.");
         return;
@@ -473,13 +311,15 @@ export default function ManualReceiptPage() {
       formData.append("phone", receipt.phone);
       formData.append(
         "file",
-        new File([blob], "Donation_Receipt.pdf", { type: "application/pdf" }),
+        new File([blob], `Donation_Receipt_MR-${receipt.slipNo}.pdf`, {
+          type: "application/pdf",
+        }),
       );
 
-      const res = await authorizedFetch(
-        "/api/admin/send-invoice-whatsapp",
-        { method: "POST", body: formData },
-      );
+      const res = await authorizedFetch("/api/admin/send-invoice-whatsapp", {
+        method: "POST",
+        body: formData,
+      });
 
       if (!res.ok) {
         const body = await res.json().catch(() => null);
@@ -499,9 +339,6 @@ export default function ManualReceiptPage() {
     }
   }
 
-  const busy = downloading || sending || saving;
-  const isEditing = editingReceipt !== null;
-
   return (
     <div className="flex flex-col gap-6">
       {/* Page header */}
@@ -509,12 +346,14 @@ export default function ManualReceiptPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Manual Receipt</h1>
           <p className="text-sm text-muted-foreground">
-            Generate a donation receipt for walk-in or phone bookings.
+            Generate a donation receipt for walk-in or phone donations.
           </p>
         </div>
-        <Button onClick={openCreateDialog}>
-          <Plus className="mr-2 h-4 w-4" />
-          New Receipt
+        <Button asChild>
+          <Link href="/admin/manual-receipt/new">
+            <Plus className="mr-2 h-4 w-4" />
+            New Receipt
+          </Link>
         </Button>
       </div>
 
@@ -567,7 +406,7 @@ export default function ManualReceiptPage() {
         </Button>
       </div>
 
-      {/* Receipt History — primary view */}
+      {/* Receipt History */}
       {loadingReceipts ? (
         <div className="flex items-center justify-center py-8">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -575,9 +414,11 @@ export default function ManualReceiptPage() {
       ) : receipts.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <p className="text-muted-foreground">No receipts generated yet.</p>
-          <Button className="mt-4" onClick={openCreateDialog}>
-            <Plus className="mr-2 h-4 w-4" />
-            Create your first receipt
+          <Button className="mt-4" asChild>
+            <Link href="/admin/manual-receipt/new">
+              <Plus className="mr-2 h-4 w-4" />
+              Create your first receipt
+            </Link>
           </Button>
         </div>
       ) : (
@@ -603,7 +444,7 @@ export default function ManualReceiptPage() {
             <TableBody>
               {filteredReceipts.map((r) => (
                 <TableRow key={r.id}>
-                  {/* Actions: Download PDF, Send WhatsApp */}
+                  {/* Actions */}
                   <TableCell>
                     <div className="flex gap-1">
                       <Button
@@ -653,7 +494,7 @@ export default function ManualReceiptPage() {
                   {/* Donor Name */}
                   <TableCell>
                     <div className="text-sm">
-                      {r.firstName} {r.lastName}
+                      {r.fullName ?? `${r.firstName} ${r.lastName}`.trim()}
                     </div>
                     <div className="text-xs text-muted-foreground">
                       {r.phone}
@@ -679,7 +520,7 @@ export default function ManualReceiptPage() {
                   </TableCell>
 
                   {/* Note */}
-                  <TableCell className="text-sm max-w-[150px] truncate" title={r.note || undefined}>
+                  <TableCell className="text-sm max-w-[150px] truncate" title={r.note ?? undefined}>
                     {r.note || "—"}
                   </TableCell>
 
@@ -755,18 +596,16 @@ export default function ManualReceiptPage() {
         </div>
       )}
 
-      {/* New / Edit Receipt Dialog */}
+      {/* Edit Receipt Dialog */}
       <Dialog open={dialogOpen} onOpenChange={(open) => {
         setDialogOpen(open);
         if (!open) setEditingReceipt(null);
       }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{isEditing ? "Edit Receipt" : "New Receipt"}</DialogTitle>
+            <DialogTitle>Edit Receipt</DialogTitle>
             <DialogDescription>
-              {isEditing
-                ? "Update the receipt details below."
-                : "Fill in the donor details to generate a donation receipt."}
+              Update the receipt details below.
             </DialogDescription>
           </DialogHeader>
           <Form {...form}>
@@ -910,7 +749,7 @@ export default function ManualReceiptPage() {
                 )}
               />
 
-              {/* New fields: Note, By Hand, Creator, Img Link */}
+              {/* Note & By Hand */}
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
@@ -940,6 +779,7 @@ export default function ManualReceiptPage() {
                 />
               </div>
 
+              {/* Creator & Img Link */}
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
@@ -969,7 +809,7 @@ export default function ManualReceiptPage() {
                 />
               </div>
 
-              {/* Status (shown for edit mode, defaults to Accepted for new) */}
+              {/* Status */}
               <FormField
                 control={form.control}
                 name="status"
@@ -998,54 +838,22 @@ export default function ManualReceiptPage() {
                 )}
               />
 
-              {/* Actions */}
-              {isEditing ? (
-                <div className="flex gap-4 pt-2">
-                  <Button
-                    type="button"
-                    onClick={handleEditSave}
-                    disabled={busy}
-                    className="flex-1"
-                  >
-                    {saving ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <Pencil className="mr-2 h-4 w-4" />
-                    )}
-                    Save Changes
-                  </Button>
-                </div>
-              ) : (
-                <div className="flex gap-4 pt-2">
-                  <Button
-                    type="button"
-                    onClick={handleDownload}
-                    disabled={busy}
-                    className="flex-1"
-                  >
-                    {downloading ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <FileText className="mr-2 h-4 w-4" />
-                    )}
-                    Download PDF
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleWhatsApp}
-                    disabled={busy}
-                    className="flex-1"
-                  >
-                    {sending ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <Send className="mr-2 h-4 w-4" />
-                    )}
-                    Send on WhatsApp
-                  </Button>
-                </div>
-              )}
+              {/* Save */}
+              <div className="flex gap-4 pt-2">
+                <Button
+                  type="button"
+                  onClick={handleEditSave}
+                  disabled={saving}
+                  className="flex-1"
+                >
+                  {saving ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Pencil className="mr-2 h-4 w-4" />
+                  )}
+                  Save Changes
+                </Button>
+              </div>
             </form>
           </Form>
         </DialogContent>
