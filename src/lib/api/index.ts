@@ -107,6 +107,7 @@ type DbFolioItem = {
   amount: number;
   timestamp: string;
   payment_method: string | null;
+  transaction_id: string | null;
   external_source: string | null;
   external_reference: string | null;
   external_metadata: Record<string, unknown> | null;
@@ -237,6 +238,7 @@ type FolioItemInsertPayload = {
   description: string;
   amount: number;
   payment_method?: string | null;
+  transaction_id?: string | null;
   timestamp?: string;
   external_source?: string | null;
   external_reference?: string | null;
@@ -430,6 +432,7 @@ const fromDbFolioItem = (dbFolio: DbFolioItem): FolioItem => ({
   amount: Number(dbFolio.amount),
   timestamp: dbFolio.timestamp,
   paymentMethod: dbFolio.payment_method ?? undefined,
+  transactionId: dbFolio.transaction_id ?? undefined,
   externalSource: dbFolio.external_source ?? undefined,
   externalReference: dbFolio.external_reference ?? undefined,
   externalMetadata: dbFolio.external_metadata ?? undefined,
@@ -481,6 +484,7 @@ const toDbFolioItem = (folioItem: FolioItem, reservationId?: string): DbFolioIte
   amount: folioItem.amount,
   timestamp: folioItem.timestamp,
   payment_method: folioItem.paymentMethod ?? null,
+  transaction_id: folioItem.transactionId ?? null,
   external_source: folioItem.externalSource ?? null,
   external_reference: folioItem.externalReference ?? null,
   external_metadata: folioItem.externalMetadata ?? null,
@@ -1092,6 +1096,7 @@ export const addFolioItem = (itemData: FolioItemInsertPayload) =>
         description: itemData.description,
         amount: itemData.amount,
         payment_method: itemData.payment_method ?? null,
+        transaction_id: itemData.transaction_id ?? null,
         external_source: itemData.external_source ?? INTERNAL_FOLIO_SOURCE,
         external_reference: itemData.external_reference ?? null,
         external_metadata: itemData.external_metadata ?? {},

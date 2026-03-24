@@ -839,6 +839,7 @@ export function useAppData() {
       description: item.description,
       amount: item.amount,
       payment_method: item.paymentMethod ?? null,
+      transaction_id: item.transactionId ?? null,
       external_source: item.externalSource ?? undefined,
       external_reference: item.externalReference ?? null,
       external_metadata: item.externalMetadata ?? undefined,
@@ -855,6 +856,7 @@ export function useAppData() {
       amount: number;
       timestamp: string | null;
       payment_method: string | null;
+      transaction_id: string | null;
       external_source: string | null;
       external_reference: string | null;
       external_metadata: Record<string, unknown> | null;
@@ -865,6 +867,7 @@ export function useAppData() {
       amount: inserted.amount,
       timestamp: inserted.timestamp ?? new Date().toISOString(),
       paymentMethod: inserted.payment_method ?? undefined,
+      transactionId: inserted.transaction_id ?? undefined,
       externalSource: inserted.external_source ?? undefined,
       externalReference: inserted.external_reference ?? undefined,
       externalMetadata: inserted.external_metadata ?? undefined,

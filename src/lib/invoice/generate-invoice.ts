@@ -1,7 +1,13 @@
 import { jsPDF } from "jspdf";
 import "jspdf-autotable";
 import { format, parseISO, differenceInDays } from "date-fns";
-import type { Guest, Property, Reservation, Room, RoomType } from "@/data/types";
+import type {
+  Guest,
+  Property,
+  Reservation,
+  Room,
+  RoomType,
+} from "@/data/types";
 import { isReservationRemovedDuringEdit } from "@/lib/reservations/filters";
 
 // Extend jsPDF type to include autoTable
@@ -39,7 +45,10 @@ interface AutoTableOptions {
     fontSize?: number;
     textColor?: [number, number, number] | string;
   };
-  columnStyles?: Record<number, { halign?: "left" | "center" | "right"; cellWidth?: number | "auto" }>;
+  columnStyles?: Record<
+    number,
+    { halign?: "left" | "center" | "right"; cellWidth?: number | "auto" }
+  >;
   margin?: { top?: number; right?: number; bottom?: number; left?: number };
   tableWidth?: "auto" | "wrap" | number;
   didDrawPage?: (data: { doc: jsPDF; pageNumber: number }) => void;
@@ -128,7 +137,7 @@ function generateInvoiceNumber(bookingId: string, bookingDate: string): string {
 function calculateRoomChargeSummaries(
   reservations: Reservation[],
   rooms: Room[],
-  roomTypes: RoomType[]
+  roomTypes: RoomType[],
 ): RoomChargeSummary[] {
   const roomMap = new Map(rooms.map((r) => [r.id, r]));
   const roomTypeMap = new Map(roomTypes.map((rt) => [rt.id, rt]));
@@ -145,9 +154,9 @@ function calculateRoomChargeSummaries(
     const nights = Math.max(
       differenceInDays(
         parseISO(reservation.checkOutDate),
-        parseISO(reservation.checkInDate)
+        parseISO(reservation.checkInDate),
       ),
-      1
+      1,
     );
 
     const roomNumber = room.roomNumber;
@@ -180,37 +189,53 @@ function calculateRoomChargeSummaries(
 /**
  * Extract additional charges from folio
  */
-function calculateAdditionalCharges(reservations: Reservation[]): { description: string; amount: number }[] {
+function calculateAdditionalCharges(
+  reservations: Reservation[],
+): { description: string; amount: number }[] {
   return reservations.flatMap((r) =>
     (r.folio || [])
       .filter((item) => item.amount > 0)
       .map((item) => ({
         description: item.description,
         amount: item.amount,
-      }))
+      })),
   );
 }
 
 /**
  * Extract payment records from folio
  */
-function calculatePayments(reservations: Reservation[]): { description: string; amount: number; date: string; method: string }[] {
+function calculatePayments(
+  reservations: Reservation[],
+): {
+  description: string;
+  amount: number;
+  date: string;
+  method: string;
+  transactionId: string;
+}[] {
   return reservations.flatMap((r) =>
     (r.folio || [])
       .filter((item) => item.amount < 0)
       .map((item) => ({
         description: item.description,
         amount: Math.abs(item.amount),
-        date: item.timestamp ? format(parseISO(item.timestamp), "dd MMM yyyy") : "-",
+        date: item.timestamp
+          ? format(parseISO(item.timestamp), "dd MMM yyyy")
+          : "-",
         method: item.paymentMethod || "-",
-      }))
+        transactionId: item.transactionId || "-",
+      })),
   );
 }
 
 /**
  * Calculate tax
  */
-function calculateTaxTotals(reservations: Reservation[], property: Property): { taxAmount: number; taxRate: number | null } {
+function calculateTaxTotals(
+  reservations: Reservation[],
+  property: Property,
+): { taxAmount: number; taxRate: number | null } {
   let totalTax = 0;
   const taxRates = new Set<number>();
 
@@ -221,10 +246,10 @@ function calculateTaxTotals(reservations: Reservation[], property: Property): { 
 
     if (typeof reservation.taxEnabledSnapshot === "boolean") {
       isTaxEnabled = reservation.taxEnabledSnapshot;
-      taxRateValue = isTaxEnabled ? reservation.taxRateSnapshot ?? 0 : 0;
+      taxRateValue = isTaxEnabled ? (reservation.taxRateSnapshot ?? 0) : 0;
     } else {
       isTaxEnabled = !!property.tax_enabled;
-      taxRateValue = isTaxEnabled ? property.tax_percentage ?? 0 : 0;
+      taxRateValue = isTaxEnabled ? (property.tax_percentage ?? 0) : 0;
     }
 
     const taxAmount = reservation.totalAmount * taxRateValue;
@@ -267,7 +292,7 @@ async function loadImage(url: string): Promise<ImageResult | null> {
         resolve({
           base64: canvas.toDataURL("image/png"),
           width: naturalWidth,
-          height: naturalHeight
+          height: naturalHeight,
         });
       };
       img.onerror = (e) => {
@@ -290,7 +315,7 @@ function calculateDimensions(
   originalW: number,
   originalH: number,
   targetH: number | "auto",
-  targetW: number | "auto"
+  targetW: number | "auto",
 ): { width: number; height: number } {
   // Case 1: Fixed Height & Fixed Width (User specified both)
   if (typeof targetH === "number" && typeof targetW === "number") {
@@ -323,7 +348,13 @@ function calculateDimensions(
 /**
  * Draw a rounded rectangle with specific style
  */
-function drawRoundedCard(doc: jsPDF, x: number, y: number, width: number, height: number) {
+function drawRoundedCard(
+  doc: jsPDF,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+) {
   doc.setDrawColor(220, 220, 220); // #dcdcdc
   doc.setFillColor(255, 255, 255); // White
   doc.roundedRect(x, y, width, height, 2, 2, "FD"); // Fill and Draw
@@ -362,12 +393,19 @@ function drawFinalBranding(doc: jsPDF, yPos: number): number {
   doc.setFontSize(10);
   doc.setTextColor(COLORS.PRIMARY);
   doc.setFont("helvetica", "bold"); // Made Bold for better branding
-  doc.text("Thank you for choosing Sahajanand Wellness Trust!", pageWidth / 2, currentY, { align: "center" });
+  doc.text(
+    "Thank you for choosing Sahajanand Wellness Trust!",
+    pageWidth / 2,
+    currentY,
+    { align: "center" },
+  );
 
   doc.setFontSize(9);
   doc.setTextColor(COLORS.TEXT_LIGHT);
   doc.setFont("helvetica", "normal");
-  doc.text("We look forward to welcoming you.", pageWidth / 2, currentY + 5, { align: "center" });
+  doc.text("We look forward to welcoming you.", pageWidth / 2, currentY + 5, {
+    align: "center",
+  });
 
   return currentY + 10;
 }
@@ -375,7 +413,11 @@ function drawFinalBranding(doc: jsPDF, yPos: number): number {
 /**
  * Ensure enough space remains on page for a section
  */
-function ensureSpace(doc: jsPDF, currentY: number, requiredHeight: number): number {
+function ensureSpace(
+  doc: jsPDF,
+  currentY: number,
+  requiredHeight: number,
+): number {
   const pageHeight = doc.internal.pageSize.getHeight();
   const threshold = pageHeight - FOOTER_HEIGHT - 10; // Extra buffer
 
@@ -393,10 +435,18 @@ export async function generateInvoice(
   data: InvoiceData,
   options?: { returnBlob?: boolean },
 ): Promise<Blob | void> {
-  const { reservations: allReservations, guest, property, rooms, roomTypes } = data;
+  const {
+    reservations: allReservations,
+    guest,
+    property,
+    rooms,
+    roomTypes,
+  } = data;
 
   // Filter out removed reservations
-  const reservations = allReservations.filter(r => !isReservationRemovedDuringEdit(r));
+  const reservations = allReservations.filter(
+    (r) => !isReservationRemovedDuringEdit(r),
+  );
 
   if (reservations.length === 0) {
     console.error("No active reservations provided for invoice generation");
@@ -409,19 +459,29 @@ export async function generateInvoice(
   const checkOutDate = primaryReservation.checkOutDate;
   const bookingDate = primaryReservation.bookingDate;
 
-  const roomChargeSummaries = calculateRoomChargeSummaries(reservations, rooms, roomTypes);
+  const roomChargeSummaries = calculateRoomChargeSummaries(
+    reservations,
+    rooms,
+    roomTypes,
+  );
   const additionalCharges = calculateAdditionalCharges(reservations);
   const payments = calculatePayments(reservations);
 
   const roomSubtotal = reservations.reduce((sum, r) => sum + r.totalAmount, 0);
-  const additionalChargesSubtotal = additionalCharges.reduce((sum, c) => sum + c.amount, 0);
+  const additionalChargesSubtotal = additionalCharges.reduce(
+    (sum, c) => sum + c.amount,
+    0,
+  );
   const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
 
   const { taxAmount, taxRate } = calculateTaxTotals(reservations, property);
   const grandTotal = roomSubtotal + additionalChargesSubtotal + taxAmount;
   const balanceDue = Math.max(0, grandTotal - totalPaid);
 
-  const nights = Math.max(differenceInDays(parseISO(checkOutDate), parseISO(checkInDate)), 1);
+  const nights = Math.max(
+    differenceInDays(parseISO(checkOutDate), parseISO(checkInDate)),
+    1,
+  );
   const invoiceNumber = generateInvoiceNumber(bookingId, bookingDate);
   const invoiceDate = format(new Date(), "dd MMM yyyy");
 
@@ -449,7 +509,7 @@ export async function generateInvoice(
       logoResult.width,
       logoResult.height,
       LOGO_CONFIG.HOTEL_LOGO.height,
-      LOGO_CONFIG.HOTEL_LOGO.width
+      LOGO_CONFIG.HOTEL_LOGO.width,
     );
 
     doc.addImage(logoResult.base64, "PNG", margin, yPos, width, height);
@@ -459,13 +519,17 @@ export async function generateInvoice(
   doc.setTextColor(COLORS.PRIMARY);
   doc.setFontSize(24);
   doc.setFont("helvetica", "bold");
-  doc.text("Donation Receipt", pageWidth - margin, yPos + 12, { align: "right" });
+  doc.text("Booking Receipt", pageWidth - margin, yPos + 12, {
+    align: "right",
+  });
 
   doc.setTextColor(COLORS.TEXT_LIGHT); // Grey
   doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
 
-  doc.text(`Receipt No:`, pageWidth - margin - 35, yPos + 22, { align: "right" });
+  doc.text(`Receipt No:`, pageWidth - margin - 35, yPos + 22, {
+    align: "right",
+  });
   doc.setTextColor(COLORS.TEXT_DARK); // Black
   doc.setFont("helvetica", "bold");
   doc.text(invoiceNumber, pageWidth - margin, yPos + 22, { align: "right" });
@@ -481,7 +545,12 @@ export async function generateInvoice(
   // Use a sensible offset if auto calculation makes the logo very small or large
   // A safe fixed offset is often better for layout stability, or we can use the configured logo height.
   // Using fixed offset from Top margin + reasonable gap
-  const hotelDetailsY = yPos + (typeof LOGO_CONFIG.HOTEL_LOGO.height === 'number' ? LOGO_CONFIG.HOTEL_LOGO.height : 30) + 10;
+  const hotelDetailsY =
+    yPos +
+    (typeof LOGO_CONFIG.HOTEL_LOGO.height === "number"
+      ? LOGO_CONFIG.HOTEL_LOGO.height
+      : 30) +
+    10;
 
   doc.setFontSize(11);
   doc.setTextColor(COLORS.TEXT_DARK);
@@ -552,11 +621,17 @@ export async function generateInvoice(
   yPos = trustY + 4; // Tightened spacing
 
   // ========== CARDS: GUEST & RESERVATION (Stacked Full-Width) ==========
-  const cardWidth = pageWidth - (margin * 2);
+  const cardWidth = pageWidth - margin * 2;
   const cardHeight = 26; // Reduced height to remove bottom whitespace
 
   // Helper for grid item
-  const drawGridItem = (label: string, value: string, x: number, y: number, labelWidthOffset: number = 0) => {
+  const drawGridItem = (
+    label: string,
+    value: string,
+    x: number,
+    y: number,
+    labelWidthOffset: number = 0,
+  ) => {
     doc.setFont("helvetica", "bold");
     doc.setTextColor(COLORS.TEXT_DARK);
     doc.text(label, x, y);
@@ -579,7 +654,12 @@ export async function generateInvoice(
   doc.text("Guests Details", guestContentX, guestContentY);
 
   doc.setDrawColor(COLORS.BORDER);
-  doc.line(guestContentX, guestContentY + 2, margin + cardWidth - 5, guestContentY + 2);
+  doc.line(
+    guestContentX,
+    guestContentY + 2,
+    margin + cardWidth - 5,
+    guestContentY + 2,
+  );
 
   const guestName = guest
     ? [guest.firstName, guest.lastName].filter(Boolean).join(" ")
@@ -626,28 +706,69 @@ export async function generateInvoice(
   doc.setFont("helvetica", "bold");
   doc.text("Reservation", resContentX, resContentY);
 
-  doc.line(resContentX, resContentY + 2, margin + cardWidth - 5, resContentY + 2);
+  doc.line(
+    resContentX,
+    resContentY + 2,
+    margin + cardWidth - 5,
+    resContentY + 2,
+  );
 
   // Row 1: Booking ID, Check-in, Check-out, Duration
   row1Y = resContentY + 8;
   nextX = resContentX;
-  nextX += drawGridItem("Booking ID:", bookingId.substring(0, 8).toUpperCase(), nextX, row1Y) + 12;
-  nextX += drawGridItem("Check-in:", format(parseISO(checkInDate), "dd MMM yyyy"), nextX, row1Y) + 12;
-  nextX += drawGridItem("Check-out:", format(parseISO(checkOutDate), "dd MMM yyyy"), nextX, row1Y) + 12;
-  drawGridItem("Duration:", `${nights} night${nights === 1 ? "" : "s"}`, nextX, row1Y);
+  nextX +=
+    drawGridItem(
+      "Booking ID:",
+      bookingId.substring(0, 8).toUpperCase(),
+      nextX,
+      row1Y,
+    ) + 12;
+  nextX +=
+    drawGridItem(
+      "Check-in:",
+      format(parseISO(checkInDate), "dd MMM yyyy"),
+      nextX,
+      row1Y,
+    ) + 12;
+  nextX +=
+    drawGridItem(
+      "Check-out:",
+      format(parseISO(checkOutDate), "dd MMM yyyy"),
+      nextX,
+      row1Y,
+    ) + 12;
+  drawGridItem(
+    "Duration:",
+    `${nights} night${nights === 1 ? "" : "s"}`,
+    nextX,
+    row1Y,
+  );
 
   // Row 2: Guests, Bank
   row2Y = row1Y + 6;
   nextX = resContentX;
 
-  const totalGuests = reservations.reduce((sum, r) => sum + (r.numberOfGuests || 0), 0);
-  const totalAdults = reservations.reduce((sum, r) => sum + (r.adultCount || 0), 0);
-  const totalChildren = reservations.reduce((sum, r) => sum + (r.childCount || 0), 0);
+  const totalGuests = reservations.reduce(
+    (sum, r) => sum + (r.numberOfGuests || 0),
+    0,
+  );
+  const totalAdults = reservations.reduce(
+    (sum, r) => sum + (r.adultCount || 0),
+    0,
+  );
+  const totalChildren = reservations.reduce(
+    (sum, r) => sum + (r.childCount || 0),
+    0,
+  );
 
   let guestText = totalGuests.toString();
   const breakdown: string[] = [];
-  if (totalAdults > 0) breakdown.push(`${totalAdults} adult${totalAdults === 1 ? "" : "s"}`);
-  if (totalChildren > 0) breakdown.push(`${totalChildren} ${totalChildren === 1 ? "child" : "children"}`);
+  if (totalAdults > 0)
+    breakdown.push(`${totalAdults} adult${totalAdults === 1 ? "" : "s"}`);
+  if (totalChildren > 0)
+    breakdown.push(
+      `${totalChildren} ${totalChildren === 1 ? "child" : "children"}`,
+    );
 
   if (breakdown.length > 0) {
     guestText += ` (${breakdown.join(", ")})`;
@@ -656,7 +777,9 @@ export async function generateInvoice(
   nextX += drawGridItem("Guests:", guestText, nextX, row2Y) + 20;
 
   // Transaction ID field
-  const firstPaymentFolio = reservations.flatMap(r => r.folio).find(f => f.amount < 0);
+  const firstPaymentFolio = reservations
+    .flatMap((r) => r.folio)
+    .find((f) => f.amount < 0);
   const transactionRef = firstPaymentFolio?.externalReference || "N/A";
   drawGridItem("Transaction ID:", transactionRef, nextX, row2Y);
 
@@ -665,7 +788,9 @@ export async function generateInvoice(
   // ========== TABLE ==========
   // Columns: Room Name, Quantity, Donation (per night), Amount
 
-  const tableHead = [["Room Name", "Quantity", "Donation (per night)", "Amount"]];
+  const tableHead = [
+    ["Room Name", "Quantity", "Donation (per night)", "Amount"],
+  ];
 
   const tableBody = [
     // Room Charges
@@ -724,11 +849,12 @@ export async function generateInvoice(
     doc.text("Payments Record", margin, yPos);
     yPos += 5;
 
-    const paymentHead = [["Date", "Description", "Method", "Amount"]];
+    const paymentHead = [["Date", "Description", "Method", "Txn ID", "Amount"]];
     const paymentBody = payments.map((p) => [
       p.date,
       p.description,
       p.method,
+      p.transactionId,
       formatCurrency(p.amount),
     ]);
 
@@ -749,10 +875,11 @@ export async function generateInvoice(
         textColor: [51, 51, 51],
       },
       columnStyles: {
-        0: { cellWidth: 30, halign: "left" },
+        0: { cellWidth: 28, halign: "left" },
         1: { cellWidth: "auto", halign: "left" },
-        2: { cellWidth: 30, halign: "left" },
-        3: { cellWidth: 30, halign: "right" },
+        2: { cellWidth: 28, halign: "left" },
+        3: { cellWidth: 30, halign: "left" },
+        4: { cellWidth: 28, halign: "right" },
       },
       styles: {
         cellPadding: 2.5,
@@ -774,7 +901,11 @@ export async function generateInvoice(
   const totalsWidth = 80;
   const totalsX = pageWidth - margin - totalsWidth;
 
-  const drawTotalRow = (label: string, value: string, isSpecial: boolean = false) => {
+  const drawTotalRow = (
+    label: string,
+    value: string,
+    isSpecial: boolean = false,
+  ) => {
     const rowHeight = 8; // Consistent row height for equal spacing
 
     // Ensure space for this row
@@ -811,7 +942,10 @@ export async function generateInvoice(
   }
 
   if (additionalChargesSubtotal > 0) {
-    drawTotalRow("Additional Donations", formatCurrency(additionalChargesSubtotal));
+    drawTotalRow(
+      "Additional Donations",
+      formatCurrency(additionalChargesSubtotal),
+    );
   }
 
   yPos += 1; // Small consistent gap

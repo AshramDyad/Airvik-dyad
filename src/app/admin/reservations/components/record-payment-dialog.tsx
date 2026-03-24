@@ -42,16 +42,34 @@ import {
 } from "@/lib/reservations/calculate-financials";
 import { useCurrencyFormatter } from "@/hooks/use-currency";
 
-const paymentSchema = z.object({
-  amount: z.coerce.number().min(0.01, "Amount must be greater than 0."),
-  method: z.string({ required_error: "Please select a payment method." }),
-  percentage: z
-    .number()
-    .min(0, "Percentage must be at least 0%.")
-    .max(100, "Percentage cannot exceed 100%")
-    .optional(),
-  entryMode: z.enum(["amount", "percentage"]),
-});
+const METHODS_REQUIRING_TXN_ID = ["Credit Card", "Bank Transfer"] as const;
+
+const paymentSchema = z
+  .object({
+    amount: z.coerce.number().min(0.01, "Amount must be greater than 0."),
+    method: z.string({ required_error: "Please select a payment method." }),
+    percentage: z
+      .number()
+      .min(0, "Percentage must be at least 0%.")
+      .max(100, "Percentage cannot exceed 100%")
+      .optional(),
+    entryMode: z.enum(["amount", "percentage"]),
+    transactionId: z.string().optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (
+      METHODS_REQUIRING_TXN_ID.includes(
+        data.method as (typeof METHODS_REQUIRING_TXN_ID)[number]
+      ) &&
+      (!data.transactionId || data.transactionId.trim() === "")
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Transaction ID is required for this payment method.",
+        path: ["transactionId"],
+      });
+    }
+  });
 
 interface RecordPaymentDialogProps {
   reservationId: string;
@@ -102,6 +120,10 @@ export function RecordPaymentDialog({
 
   const entryMode = form.watch("entryMode");
   const percentageValue = form.watch("percentage");
+  const selectedMethod = form.watch("method");
+  const requiresTransactionId = METHODS_REQUIRING_TXN_ID.includes(
+    selectedMethod as (typeof METHODS_REQUIRING_TXN_ID)[number]
+  );
   const isPercentageMode = entryMode === "percentage";
   const normalizedPercentage = React.useMemo(() => {
     if (percentageValue === undefined || percentageValue === null) {
@@ -169,6 +191,12 @@ export function RecordPaymentDialog({
     });
   }, [normalizedPercentage, outstandingBalance, form, isPercentageMode]);
 
+  React.useEffect(() => {
+    if (!requiresTransactionId) {
+      form.setValue("transactionId", "", { shouldValidate: false });
+    }
+  }, [requiresTransactionId, form]);
+
   async function onSubmit(values: z.infer<typeof paymentSchema>) {
     if (!reservation) {
       toast.error("Reservation not found.");
@@ -190,14 +218,12 @@ export function RecordPaymentDialog({
 
     try {
       const paymentAmount = Math.abs(values.amount);
-      await addFolioItem(
-        reservationId,
-        {
-          description: `Payment - ${values.method}`,
-          amount: -paymentAmount,
-          paymentMethod: values.method,
-        }
-      );
+      await addFolioItem(reservationId, {
+        description: `Payment - ${values.method}`,
+        amount: -paymentAmount,
+        paymentMethod: values.method,
+        transactionId: values.transactionId?.trim() || undefined,
+      });
       toast.success("Payment recorded successfully!");
       form.reset();
       setOpen(false);
@@ -331,6 +357,27 @@ export function RecordPaymentDialog({
                       <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
                     </SelectContent>
                   </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="transactionId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>
+                    Transaction ID
+                    {requiresTransactionId && <span className="text-destructive"> *</span>}
+                  </FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder={requiresTransactionId ? "Enter transaction ID" : "Not required for Cash"}
+                      disabled={!requiresTransactionId}
+                      {...field}
+                      value={field.value ?? ""}
+                    />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}

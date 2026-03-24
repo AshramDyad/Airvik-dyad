@@ -131,6 +131,7 @@ export function BillingCard({ reservation, groupSummary }: BillingCardProps) {
               <TableHead className="w-[120px]">Date</TableHead>
               <TableHead>Description</TableHead>
               <TableHead className="w-[140px]">Method</TableHead>
+              <TableHead className="w-[140px]">Transaction ID</TableHead>
               <TableHead className="text-right">Amount</TableHead>
             </TableRow>
           </TableHeader>
@@ -149,6 +150,9 @@ export function BillingCard({ reservation, groupSummary }: BillingCardProps) {
                 <TableCell className="text-sm text-muted-foreground">
                   {item.paymentMethod || "-"}
                 </TableCell>
+                <TableCell className="text-sm text-muted-foreground">
+                  {item.transactionId || "-"}
+                </TableCell>
                 <TableCell
                   className={cn(
                       "text-right font-medium",
@@ -165,7 +169,7 @@ export function BillingCard({ reservation, groupSummary }: BillingCardProps) {
             {sortedFolio.length === 0 && (
               <TableRow>
                 <TableCell
-                  colSpan={4}
+                  colSpan={5}
                   className="h-24 text-center text-muted-foreground"
                 >
                   No charges or payments posted yet.
