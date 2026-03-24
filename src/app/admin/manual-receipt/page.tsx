@@ -345,7 +345,7 @@ export default function ManualReceiptPage() {
           amount: -amount,
           timestamp: now,
           paymentMethod: values.paymentMethod,
-          externalReference: values.transactionId || null,
+          transactionId: values.transactionId || null,
         },
       ],
       totalAmount: amount,

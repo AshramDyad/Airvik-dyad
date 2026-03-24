@@ -774,14 +774,7 @@ export async function generateInvoice(
     guestText += ` (${breakdown.join(", ")})`;
   }
 
-  nextX += drawGridItem("Guests:", guestText, nextX, row2Y) + 20;
-
-  // Transaction ID field
-  const firstPaymentFolio = reservations
-    .flatMap((r) => r.folio)
-    .find((f) => f.amount < 0);
-  const transactionRef = firstPaymentFolio?.externalReference || "N/A";
-  drawGridItem("Transaction ID:", transactionRef, nextX, row2Y);
+  drawGridItem("Guests:", guestText, nextX, row2Y);
 
   yPos += cardHeight + 4; // Gap before table
 
