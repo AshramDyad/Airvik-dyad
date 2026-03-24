@@ -1,14 +1,28 @@
-"use client"
+"use client";
 
-import React from "react"
-import { ColumnDef, Table, type CellContext } from "@tanstack/react-table"
-import { MoreHorizontal, CheckCircle2, XCircle, LogIn, LogOut, HelpCircle, AlertCircle, Monitor, User, ChevronDown, ChevronRight, Clock3, DownloadCloud } from "lucide-react"
-import { format } from "date-fns"
-import Link from "next/link"
-import { useRouter } from "next/navigation"
+import React from "react";
+import { ColumnDef, Table, type CellContext } from "@tanstack/react-table";
+import {
+  MoreHorizontal,
+  CheckCircle2,
+  XCircle,
+  LogIn,
+  LogOut,
+  HelpCircle,
+  AlertCircle,
+  Monitor,
+  User,
+  ChevronDown,
+  ChevronRight,
+  Clock3,
+  DownloadCloud,
+} from "lucide-react";
+import { format } from "date-fns";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,18 +30,18 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+} from "@/components/ui/dropdown-menu";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@/components/ui/tooltip"
+} from "@/components/ui/tooltip";
 import type {
   Reservation,
   ReservationSource,
   ReservationStatus,
-} from "@/data/types"
+} from "@/data/types";
 import { useCurrencyFormatter } from "@/hooks/use-currency";
 import { formatBookingCode } from "@/lib/reservations/formatting";
 import { cn } from "@/lib/utils";
@@ -51,16 +65,25 @@ export const statuses = [
   { value: "Checked-out", label: "Checked-out", icon: LogOut },
   { value: "Cancelled", label: "Cancelled", icon: XCircle },
   { value: "No-show", label: "No-show", icon: AlertCircle },
-]
+];
 
-function ReservationActions({ reservation, table }: { reservation: ReservationWithDetails; table: Table<ReservationWithDetails> }) {
+function ReservationActions({
+  reservation,
+  table,
+}: {
+  reservation: ReservationWithDetails;
+  table: Table<ReservationWithDetails>;
+}) {
   const router = useRouter();
   const status = reservation.status;
 
-  const canBeCancelled = ["Cancelled", "Checked-out", "No-show"].includes(status) === false;
+  const canBeCancelled =
+    ["Cancelled", "Checked-out", "No-show"].includes(status) === false;
   const canBeCheckedIn = status === "Confirmed";
   const canBeCheckedOut = status === "Checked-in";
-  const detailsId = reservation.subRows ? reservation.subRows[0].id : reservation.id;
+  const detailsId = reservation.subRows
+    ? reservation.subRows[0].id
+    : reservation.id;
 
   return (
     <DropdownMenu>
@@ -72,11 +95,17 @@ function ReservationActions({ reservation, table }: { reservation: ReservationWi
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuLabel>Actions</DropdownMenuLabel>
-        <DropdownMenuItem onSelect={() => router.push(`/admin/reservations/${detailsId}`)}>
+        <DropdownMenuItem
+          onSelect={() => router.push(`/admin/reservations/${detailsId}`)}
+        >
           View Details
         </DropdownMenuItem>
         <DropdownMenuItem
-          onClick={() => navigator.clipboard.writeText(formatBookingCode(reservation.bookingId))}
+          onClick={() =>
+            navigator.clipboard.writeText(
+              formatBookingCode(reservation.bookingId),
+            )
+          }
         >
           Copy booking ID
         </DropdownMenuItem>
@@ -103,7 +132,7 @@ function ReservationActions({ reservation, table }: { reservation: ReservationWi
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
-  )
+  );
 }
 
 function AmountCell({ row }: CellContext<ReservationWithDetails, unknown>) {
@@ -131,12 +160,19 @@ function PaidAmountCell({ row }: CellContext<ReservationWithDetails, unknown>) {
   );
 }
 
-function RemainingBalanceCell({ row }: CellContext<ReservationWithDetails, unknown>) {
+function RemainingBalanceCell({
+  row,
+}: CellContext<ReservationWithDetails, unknown>) {
   const formatCurrency = useCurrencyFormatter();
   if (row.depth > 0) return null;
   const balance = row.original.remainingBalance ?? 0;
   return (
-    <div className={cn("text-right font-medium", balance > 0 ? "text-rose-600" : "text-emerald-600")}>
+    <div
+      className={cn(
+        "text-right font-medium",
+        balance > 0 ? "text-rose-600" : "text-emerald-600",
+      )}
+    >
       {formatCurrency(balance)}
     </div>
   );
@@ -144,7 +180,7 @@ function RemainingBalanceCell({ row }: CellContext<ReservationWithDetails, unkno
 
 export const columns: ColumnDef<ReservationWithDetails>[] = [
   {
-    id: 'expander',
+    id: "expander",
     header: () => null,
     cell: ({ row }) => {
       if (row.getCanExpand()) {
@@ -175,7 +211,9 @@ export const columns: ColumnDef<ReservationWithDetails>[] = [
     accessorKey: "bookingId",
     header: "Booking ID",
     filterFn: (row, id, value) => {
-      const input = String(value ?? "").trim().toLowerCase();
+      const input = String(value ?? "")
+        .trim()
+        .toLowerCase();
       if (!input) return true;
       const rawValue = String(row.getValue(id) ?? "");
       const normalized = rawValue
@@ -200,11 +238,14 @@ export const columns: ColumnDef<ReservationWithDetails>[] = [
       }
 
       return (
-        <Link href={`/admin/reservations/${linkId}`} className="font-mono text-xs text-primary hover:underline">
+        <Link
+          href={`/admin/reservations/${linkId}`}
+          className="font-mono text-xs text-primary hover:underline"
+        >
           {formatBookingCode(displayId)}
         </Link>
-      )
-    }
+      );
+    },
   },
   {
     accessorKey: "bookingDate",
@@ -214,13 +255,15 @@ export const columns: ColumnDef<ReservationWithDetails>[] = [
       const dateValue = row.getValue("bookingDate") as string;
       if (!dateValue) return null;
       return format(new Date(dateValue), "MMM d, yyyy");
-    }
+    },
   },
   {
     accessorKey: "guestName",
     header: "Customer Name",
     filterFn: (row, id, value) => {
-      const input = String(value ?? "").trim().toLowerCase();
+      const input = String(value ?? "")
+        .trim()
+        .toLowerCase();
       if (!input) return true;
       const guestName = String(row.getValue(id) ?? "").toLowerCase();
       return guestName.includes(input);
@@ -228,7 +271,7 @@ export const columns: ColumnDef<ReservationWithDetails>[] = [
     cell: ({ row, getValue }) => {
       if (row.depth > 0) return null;
       return getValue();
-    }
+    },
   },
   {
     accessorKey: "roomNumber",
@@ -244,7 +287,8 @@ export const columns: ColumnDef<ReservationWithDetails>[] = [
       }
 
       const subRows = original.subRows ?? [];
-      const roomCount = original.roomCount ?? (subRows.length > 0 ? subRows.length : 1);
+      const roomCount =
+        original.roomCount ?? (subRows.length > 0 ? subRows.length : 1);
 
       // Extract room numbers from subRows, filtering out "N/A" if possible
       const childRooms = subRows
@@ -252,9 +296,10 @@ export const columns: ColumnDef<ReservationWithDetails>[] = [
         .filter((num): num is string => !!num && num !== "N/A");
 
       // If childRooms is empty but firstRes has a room number, use it
-      const primaryRoomNumber = original.roomNumber && original.roomNumber !== "N/A"
-        ? original.roomNumber
-        : (childRooms[0] ?? "N/A");
+      const primaryRoomNumber =
+        original.roomNumber && original.roomNumber !== "N/A"
+          ? original.roomNumber
+          : (childRooms[0] ?? "N/A");
 
       return (
         <div className="space-y-1">
@@ -267,13 +312,29 @@ export const columns: ColumnDef<ReservationWithDetails>[] = [
             </span>
           )}
           {roomCount > 1 && childRooms.length > 0 && (
-            <span className="block text-xs text-muted-foreground leading-tight">
-              {childRooms.join(", ")}
-            </span>
+            <div className="flex flex-wrap items-center gap-x-1 text-xs text-muted-foreground leading-tight">
+              <span>{childRooms.slice(0, 3).join(", ")}</span>
+              {childRooms.length > 3 && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="cursor-pointer font-medium text-primary">
+                        +{childRooms.length - 3} more
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="max-w-[260px]">
+                      <p className="text-xs leading-relaxed">
+                        {childRooms.slice(3).join(",  ")}
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+            </div>
           )}
         </div>
       );
-    }
+    },
   },
   {
     accessorKey: "numberOfGuests",
@@ -281,7 +342,7 @@ export const columns: ColumnDef<ReservationWithDetails>[] = [
     cell: ({ row, getValue }) => {
       if (row.depth > 0) return null;
       return getValue();
-    }
+    },
   },
   {
     accessorKey: "checkInDate",
@@ -291,7 +352,7 @@ export const columns: ColumnDef<ReservationWithDetails>[] = [
       const dateValue = row.getValue("checkInDate") as string;
       if (!dateValue) return null;
       return format(new Date(dateValue), "MMM d, yyyy");
-    }
+    },
   },
   {
     accessorKey: "checkOutDate",
@@ -301,7 +362,7 @@ export const columns: ColumnDef<ReservationWithDetails>[] = [
       const dateValue = row.getValue("checkOutDate") as string;
       if (!dateValue) return null;
       return format(new Date(dateValue), "MMM d, yyyy");
-    }
+    },
   },
   {
     accessorKey: "nights",
@@ -309,7 +370,7 @@ export const columns: ColumnDef<ReservationWithDetails>[] = [
     cell: ({ row, getValue }) => {
       if (row.depth > 0) return null;
       return getValue();
-    }
+    },
   },
   {
     accessorKey: "totalAmount",
@@ -330,19 +391,23 @@ export const columns: ColumnDef<ReservationWithDetails>[] = [
     accessorKey: "status",
     header: "Status",
     filterFn: (row, id, value) => {
-      return value.includes(row.getValue(id))
+      return value.includes(row.getValue(id));
     },
     cell: ({ row }) => {
-      const status = statuses.find(s => s.value === row.getValue("status"))
+      const status = statuses.find((s) => s.value === row.getValue("status"));
       if (!status) return null;
       if (row.depth > 0) return null;
 
       const variant: "default" | "secondary" | "destructive" | "outline" =
-        status.value === "Checked-in" ? "default" :
-          status.value === "Confirmed" ? "secondary" :
-            status.value === "Cancelled" ? "destructive" : "outline";
-      return <Badge variant={variant}>{status.label}</Badge>
-    }
+        status.value === "Checked-in"
+          ? "default"
+          : status.value === "Confirmed"
+            ? "secondary"
+            : status.value === "Cancelled"
+              ? "destructive"
+              : "outline";
+      return <Badge variant={variant}>{status.label}</Badge>;
+    },
   },
   {
     accessorKey: "paymentMethod",
@@ -350,8 +415,10 @@ export const columns: ColumnDef<ReservationWithDetails>[] = [
     cell: ({ row }) => {
       if (row.depth > 0) return null;
       const method = row.getValue("paymentMethod") as string | undefined;
-      return <span className="text-sm text-muted-foreground">{method || "-"}</span>;
-    }
+      return (
+        <span className="text-sm text-muted-foreground">{method || "-"}</span>
+      );
+    },
   },
   {
     accessorKey: "source",
@@ -386,8 +453,8 @@ export const columns: ColumnDef<ReservationWithDetails>[] = [
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
-      )
-    }
+      );
+    },
   },
   {
     id: "actions",
@@ -396,4 +463,4 @@ export const columns: ColumnDef<ReservationWithDetails>[] = [
       return <ReservationActions reservation={row.original} table={table} />;
     },
   },
-]
+];
