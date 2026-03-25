@@ -27,7 +27,7 @@ export function BrochureDownloadCard() {
   };
 
   return (
-    <div className="rounded-2xl border border-border/40 bg-white p-8 shadow-lg max-w-sm w-full space-y-6">
+    <div className="rounded-2xl border border-border/40 bg-white p-8 shadow-lg max-w-2xl w-full space-y-6">
       <div className="flex flex-col items-center gap-3 text-center">
         <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
           <Download className="h-8 w-8 text-primary" />
