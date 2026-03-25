@@ -16,6 +16,7 @@ import { BookingSummary } from "@/components/public/booking-summary";
 import type { RoomType } from "@/data/types";
 import { TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
+import { BrochureSection } from "@/components/public/brochure-section";
 
 interface RoomAvailabilityPanelProps {
   roomTypeId: string;
@@ -410,6 +411,7 @@ export default function RoomsPage() {
   return (
     /* Main Content */
     <div>
+      <BrochureSection />
       {/* Booking Widget */}
       <section className="relative py-12 md:py-16 bg-gradient-to-b from-primary/5 via-muted/20 to-background">
         <div className="container mx-auto px-4">

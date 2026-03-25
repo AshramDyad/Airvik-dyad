@@ -22,6 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { label } from "yet-another-react-lightbox";
 
 const quickLinks = [
   { href: "/book", label: "Rooms" },
@@ -29,6 +30,8 @@ const quickLinks = [
   { href: "/shop", label: "Shop" },
   { href: "/amenities", label: "Amenities" },
   { href: "/ashram-glimpse", label: "Ashram Glimpse" },
+  /* borche add */
+  { href: "/brochure" , label : "Brochure"}
 ];
 
 const AshramLinks = [
