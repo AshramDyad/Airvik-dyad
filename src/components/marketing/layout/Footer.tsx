@@ -214,19 +214,14 @@ export function Footer({ propertyLocation }: FooterProps) {
             {/* Column 4: QR Code */}
             <div>
               <div className="flex flex-col lg:items-end">
-                <div className="w-3/5">
-                  <h3 className="text-xl font-bold text-foreground mb-6 inline-block">
-                    Scan to Explore
-                  </h3>
-                  <Image
-                    src="/qr-code-for-website.jpg"
-                    alt="Rishikesh Dham QR code"
-                    width={280}
-                    height={300}
-                    quality={100}
-                    className="w-full rounded-lg object-contain"
-                  />
-                </div>
+                <Image
+                  src="/qr-code-for-website.jpg"
+                  alt="Rishikesh Dham QR code"
+                  width={280}
+                  height={400}
+                  quality={100}
+                  className="w-full max-w-[280px] h-auto rounded-lg object-contain"
+                />
               </div>
             </div>
           </div>
