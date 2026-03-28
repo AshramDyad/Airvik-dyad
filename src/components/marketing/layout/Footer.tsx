@@ -31,7 +31,7 @@ const quickLinks = [
   { href: "/amenities", label: "Amenities" },
   { href: "/ashram-glimpse", label: "Ashram Glimpse" },
   /* borche add */
-  { href: "/brochure" , label : "Brochure"}
+  { href: "/brochure", label: "Brochure" },
 ];
 
 const AshramLinks = [

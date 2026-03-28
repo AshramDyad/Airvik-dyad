@@ -50,7 +50,7 @@ export function BrochureDownloadCard() {
         <Button asChild className="w-full">
           <a
             href={BROCHURE_PDF_PATH}
-            download="Sahajanand-Wellness-Brochure.pdf"
+            download="sahajanand-wellness-brochure.pdf"
           >
             <Download />
             Download Brochure
