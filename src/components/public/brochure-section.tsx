@@ -21,7 +21,6 @@ export function BrochureSection() {
       <div className="container mx-auto px-4">
         <div className="mx-auto">
           <div className="rounded-2xl px-4 text-center space-y-3">
-
             {/* Icon */}
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 border border-primary/15">
               <BookOpen className="h-7 w-7 text-primary" />
@@ -58,7 +57,7 @@ export function BrochureSection() {
               <Button size="lg" asChild>
                 <a
                   href={BROCHURE_PDF_PATH}
-                  download="Sahajanand-Wellness-Brochure.pdf"
+                  download="sahajanand-wellness-brochure.pdf"
                 >
                   <Download />
                   Download Brochure
