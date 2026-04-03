@@ -395,7 +395,7 @@ export default function BookingConfirmationPage() {
                         </p>
                       </div>
                       <p className="border-t border-primary/10 pt-4">
-                        Our team will contact you shortly to confirm the payment. If you do not receive a call from our side within 30 minutes, you are requested to contact the booking representative at <a href="tel:+918511151708" className="whitespace-nowrap font-bold text-primary hover:underline">+91 8511151708</a> or <a href="tel:+918595251312" className="whitespace-nowrap font-bold text-primary hover:underline">+91 8595251312</a>.
+                        Our team will contact you shortly to confirm the payment. If you do not receive a call from our side within 30 minutes, you are requested to contact the booking representative at <a href="tel:+918511151708" className="whitespace-nowrap font-bold text-primary hover:underline">+91 8511151708</a> or <a href="tel:+919411109999" className="whitespace-nowrap font-bold text-primary hover:underline">+91 9411109999</a>.
                       </p>
                     </div>
                   </div>
@@ -421,7 +421,7 @@ export default function BookingConfirmationPage() {
                         </p>
                       </div>
                       <p className="border-t border-primary/10 pt-4">
-                        हमारी टीम भुगतान की पुष्टि करने के लिए आपसे शीघ्र ही संपर्क करेगी। यदि आपको 30 मिनट के भीतर हमारी ओर से कोई कॉल प्राप्त नहीं होती है, तो आपसे अनुरोध है कि बुकिंग प्रतिनिधि से <a href="tel:+918511151708" className="whitespace-nowrap font-bold text-primary hover:underline">+91 8511151708</a> या <a href="tel:+918595251312" className="whitespace-nowrap font-bold text-primary hover:underline">+91 8595251312</a> पर संपर्क करें।
+                        हमारी टीम भुगतान की पुष्टि करने के लिए आपसे शीघ्र ही संपर्क करेगी। यदि आपको 30 मिनट के भीतर हमारी ओर से कोई कॉल प्राप्त नहीं होती है, तो आपसे अनुरोध है कि बुकिंग प्रतिनिधि से <a href="tel:+918511151708" className="whitespace-nowrap font-bold text-primary hover:underline">+91 8511151708</a> या <a href="tel:+919411109999" className="whitespace-nowrap font-bold text-primary hover:underline">+91 9411109999</a> पर संपर्क करें।
                       </p>
                     </div>
                   </div>

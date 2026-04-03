@@ -529,7 +529,7 @@ export default function RoomsPage() {
                           Please try selecting different dates or adjust your
                           search. If you have any booking-related queries, you
                           can contact us at
-                          <span className="font-semibold"> +91 8595251312</span>
+                          <span className="font-semibold"> +91 9411109999</span>
                           .
                         </p>
                       </div>

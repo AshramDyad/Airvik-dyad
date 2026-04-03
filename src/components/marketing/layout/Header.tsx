@@ -56,7 +56,7 @@ const navLinks = [
   // { href: "/feedback", label: "Feedback" },
 ];
 
-const whatsappNumber = "918595251312";
+const whatsappNumber = "919411109999";
 const whatsappMessage = encodeURIComponent(
   "Hi! I'd like to know more about staying at Swaminarayan Ashram.",
 );
@@ -96,10 +96,10 @@ export function Header({ propertyLocation }: HeaderProps) {
               <span className="text-sm font-medium text-white/90">&#124;</span>
 
               <a
-                href="tel:+918595251312"
+                href="tel:+919411109999"
                 className="text-sm font-medium text-white/90 flex items-center gap-1.5 hover:text-white transition-colors"
               >
-                +91 8595251312
+                +91 9411109999
               </a>
 
               {hasLocationMap ? (
