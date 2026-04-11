@@ -216,9 +216,9 @@ export function Footer({ propertyLocation }: FooterProps) {
               <div className="flex flex-col lg:items-end">
                 <Image
                   src="/qr-code-for-website.jpg"
-                  alt="Rishikesh Dham QR code"
-                  width={280}
-                  height={400}
+                  alt="Sahajanand Wellness Trust — PNB Scan & Pay QR (UPI: 9313123575m@pnb)"
+                  width={1950}
+                  height={3816}
                   quality={100}
                   className="w-full max-w-[280px] h-auto rounded-lg object-contain"
                 />
