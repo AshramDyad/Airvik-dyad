@@ -11,7 +11,7 @@ const MAX_PAGE_LIMIT = 500;
 export const RESERVATIONS_CACHE_TAG = "reservations";
 export const RESERVATIONS_COUNT_CACHE_TAG = "reservations:count";
 
-type DbBookingSummaryRow = {
+export type DbBookingSummaryRow = {
   booking_id: string;
   booking_date: string;
   guest_id: string;
@@ -47,7 +47,7 @@ const normalizePageParams = (params: ReservationPageParams = {}): Required<Reser
   return { limit, offset, query };
 };
 
-const mapBookingSummaryRow = (row: DbBookingSummaryRow) => {
+export const mapBookingSummaryRow = (row: DbBookingSummaryRow) => {
   const reservationRows = row.reservation_rows || [];
 
   const validSubRows = reservationRows.map((r) => ({
