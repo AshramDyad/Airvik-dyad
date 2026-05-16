@@ -8,9 +8,11 @@ import { createServerSupabaseClient } from "@/integrations/supabase/server";
 
 // Column selection to reduce egress
 export const DONATION_SELECT_COLUMNS = 'id, donor_name, email, phone, amount_in_minor, currency, frequency, message, consent, payment_provider, payment_status, razorpay_order_id, razorpay_payment_id, razorpay_signature, upi_reference, metadata, created_at, updated_at' as const;
+export const DONATION_CREATE_RETURN_COLUMNS = "id, created_at, updated_at" as const;
 export const DONATION_ID_SELECT_COLUMNS = "id" as const;
 export const DONATION_STATS_SELECT_COLUMNS =
   "total_amount_in_minor, total_donations, monthly_donations, last_donation_at" as const;
+export const DONATION_UPDATE_TIMESTAMP_COLUMNS = "updated_at" as const;
 
 type DbDonation = {
   id: string;
@@ -32,6 +34,9 @@ type DbDonation = {
   created_at: string;
   updated_at: string;
 };
+
+type DbDonationCreateReturn = Pick<DbDonation, "id" | "created_at" | "updated_at">;
+type DbDonationUpdateTimestamp = Pick<DbDonation, "updated_at">;
 
 type DbDonationStats = {
   total_amount_in_minor: number | null;
@@ -139,33 +144,45 @@ const toDonationUpdatePayload = (input: UpdateDonationInput): Record<string, unk
 
 export async function createDonationRecord(input: CreateDonationInput): Promise<Donation> {
   const supabase = createServerSupabaseClient();
+  const insertPayload: Omit<DbDonation, "id" | "created_at" | "updated_at"> = {
+    donor_name: input.donorName,
+    email: input.email,
+    phone: input.phone,
+    amount_in_minor: input.amountInMinor,
+    currency: input.currency,
+    frequency: input.frequency,
+    message: input.message ?? null,
+    consent: input.consent,
+    payment_provider: input.paymentProvider,
+    payment_status: input.paymentStatus ?? "pending",
+    razorpay_order_id: input.razorpayOrderId ?? null,
+    razorpay_payment_id: input.razorpayPaymentId ?? null,
+    razorpay_signature: input.razorpaySignature ?? null,
+    upi_reference: input.upiReference ?? null,
+    metadata: input.metadata ?? {},
+  };
+
   const { data, error } = await supabase
     .from("donations")
-    .insert({
-      donor_name: input.donorName,
-      email: input.email,
-      phone: input.phone,
-      amount_in_minor: input.amountInMinor,
-      currency: input.currency,
-      frequency: input.frequency,
-      message: input.message ?? null,
-      consent: input.consent,
-      payment_provider: input.paymentProvider,
-      payment_status: input.paymentStatus ?? "pending",
-      razorpay_order_id: input.razorpayOrderId ?? null,
-      razorpay_payment_id: input.razorpayPaymentId ?? null,
-      razorpay_signature: input.razorpaySignature ?? null,
-      upi_reference: input.upiReference ?? null,
-      metadata: input.metadata ?? {},
-    })
-    .select(DONATION_SELECT_COLUMNS)
+    .insert(insertPayload)
+    .select(DONATION_CREATE_RETURN_COLUMNS)
     .single();
 
   if (error) {
     throw new Error(`Failed to create donation: ${error.message}`);
   }
 
-  return fromDbDonation(data as DbDonation);
+  const generated = data as DbDonationCreateReturn | null;
+  if (!generated) {
+    throw new Error("Failed to create donation: no row returned");
+  }
+
+  return fromDbDonation({
+    id: generated.id,
+    ...insertPayload,
+    created_at: generated.created_at,
+    updated_at: generated.updated_at,
+  });
 }
 
 export async function getDonations(filters: DonationListFilters = {}): Promise<Donation[]> {
@@ -233,6 +250,32 @@ export async function updateDonationRecord(
   }
 
   return fromDbDonation(data as DbDonation);
+}
+
+export async function updateDonationRecordTimestampOnly(
+  donationId: string,
+  input: UpdateDonationInput,
+): Promise<{ updatedAt: string }> {
+  const supabase = createServerSupabaseClient();
+  const payload = toDonationUpdatePayload(input);
+
+  const { data, error } = await supabase
+    .from("donations")
+    .update(payload)
+    .eq("id", donationId)
+    .select(DONATION_UPDATE_TIMESTAMP_COLUMNS)
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to update donation: ${error.message}`);
+  }
+
+  const row = data as DbDonationUpdateTimestamp | null;
+  if (!row) {
+    throw new Error("Failed to update donation: no row returned");
+  }
+
+  return { updatedAt: row.updated_at };
 }
 
 export async function updateDonationRecordWithoutReturning(

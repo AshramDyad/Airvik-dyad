@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import type { ManualReceipt } from "@/data/types";
 import { createServerSupabaseClient } from "@/integrations/supabase/server";
 import { requireFeature, HttpError } from "@/lib/server/auth";
-import { MANUAL_RECEIPT_SELECT_COLUMNS } from "../columns";
+import { MANUAL_RECEIPT_PATCH_RETURN_COLUMNS } from "../columns";
 
 const PAYMENT_METHODS = [
   "Cash",
@@ -44,64 +43,6 @@ const UpdateSchema = z.object({
   creator: z.string().optional().nullable(),
   imgLink: z.string().optional().nullable(),
 });
-
-type DbManualReceipt = {
-  id: string;
-  slip_no: number;
-  first_name: string;
-  last_name: string;
-  full_name: string | null;
-  phone: string;
-  email: string | null;
-  address: string | null;
-  city: string | null;
-  pancard: string | null;
-  aadhar_card: string | null;
-  dob: string | null;
-  amount: number;
-  payment_method: string;
-  transaction_id: string | null;
-  note: string | null;
-  status: string;
-  by_hand: string | null;
-  creator: string | null;
-  img_link: string | null;
-  trust: string | null;
-  donation_type: string | null;
-  donation_in: string | null;
-  payment_mode: string | null;
-  created_at: string;
-};
-
-function mapRow(row: DbManualReceipt): ManualReceipt {
-  return {
-    id: row.id,
-    slipNo: row.slip_no,
-    firstName: row.first_name,
-    lastName: row.last_name,
-    fullName: row.full_name,
-    phone: row.phone,
-    email: row.email,
-    address: row.address,
-    city: row.city,
-    pancard: row.pancard,
-    aadharCard: row.aadhar_card,
-    dob: row.dob,
-    amount: Number(row.amount),
-    paymentMethod: row.payment_method,
-    transactionId: row.transaction_id,
-    note: row.note,
-    status: row.status,
-    byHand: row.by_hand,
-    creator: row.creator,
-    imgLink: row.img_link,
-    trust: row.trust,
-    donationType: row.donation_type,
-    donationIn: row.donation_in,
-    paymentMode: row.payment_mode,
-    createdAt: row.created_at,
-  };
-}
 
 export async function PATCH(
   request: Request,
@@ -150,7 +91,7 @@ export async function PATCH(
       .from("manual_receipts")
       .update(updates)
       .eq("id", id)
-      .select(MANUAL_RECEIPT_SELECT_COLUMNS)
+      .select(MANUAL_RECEIPT_PATCH_RETURN_COLUMNS)
       .maybeSingle();
 
     if (error) {
@@ -165,9 +106,7 @@ export async function PATCH(
       return NextResponse.json({ message: "Receipt not found" }, { status: 404 });
     }
 
-    return NextResponse.json({
-      data: mapRow(data as unknown as DbManualReceipt),
-    });
+    return NextResponse.json({ data: { id: data.id } });
   } catch (error) {
     if (error instanceof HttpError) {
       return NextResponse.json({ message: error.message }, { status: error.status });

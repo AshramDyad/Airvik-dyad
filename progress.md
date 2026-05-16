@@ -3073,6 +3073,159 @@
 - Command: `date`
 - Result: `Wed May 13 01:56:01 IST 2026`.
 
+## 2026-05-16 18:43 IST - Reservation Detail Global Fallback Full Test
+
+- Command: `pnpm test`
+- Result: passed, 171 files / 467 tests.
+
+## 2026-05-16 18:44 IST - Reservation Detail Global Fallback Build
+
+- Command: `pnpm build`
+- Result: passed; Next.js generated 88 static pages. `/admin/calendar` remains 1.39 kB route size / 106 kB first-load JS, and `/admin/reservations/[id]` remains 1.57 kB route size / 107 kB first-load JS.
+
+## 2026-05-16 18:44 IST - Reservation Detail Global Fallback Scans
+
+- Commands:
+  - `rg -n "select\\([^\\n]*\\*|select\\(\\)" src/app/api src/lib src/server -S`
+  - `rg -n "reservations\\.find|bookings\\.flatMap|isolatedBookingReservations\\.length > 0 \\? isolatedBookingReservations : reservations|\\breservations,|\\bbookings," 'src/app/admin/reservations/[id]/reservation-details-client.tsx' -S`
+  - `rg -n "LegacyAvailabilityCalendar|useLegacyView|Use legacy view|reservations, guests, rooms" src/components/shared/availability-calendar.tsx src/app/admin/calendar/page.tsx src/app/admin/calendar/calendar-panel.tsx -S`
+- Result: all scans clean.
+
+## 2026-05-16 18:47 IST - Dashboard Sticky Notes Startup Egress Red Tests
+
+- Analysis:
+  - `/admin/dashboard` still included `stickyNotes` in the app-data startup plan even though dashboard summary, tables, and calendar already use narrower route-backed data.
+  - `DashboardStickyNotes` read `stickyNotes` from context without triggering an on-demand fetch, forcing the dashboard app-data load to include the sticky-notes query.
+- Added failing checks:
+  - Dashboard plan should only include `property`.
+  - `useAppData()` should not call `api.getStickyNotes()` during dashboard startup.
+  - `useAppData().refetchStickyNotes()` should load sticky notes on demand.
+  - `DashboardStickyNotes` should call `refetchStickyNotes()`.
+- Command: `pnpm vitest run src/hooks/app-data-load-plan.test.ts src/hooks/use-app-data.load-plan.test.tsx src/app/admin/dashboard/dashboard-code-splitting.test.ts`
+- Result: failed as intended on the existing dashboard sticky-notes startup dependency.
+
+## 2026-05-16 18:49 IST - Dashboard Sticky Notes Startup Egress Implementation
+
+- Changed `ADMIN_DASHBOARD_PLAN` to load only `property`.
+- Added `refetchStickyNotes()` to `useAppData()` and `DataContext`.
+- Updated `DashboardStickyNotes` to call `refetchStickyNotes()` on mount, so sticky notes load from the widget path instead of dashboard startup.
+- Command: `pnpm vitest run src/hooks/app-data-load-plan.test.ts src/hooks/use-app-data.load-plan.test.tsx src/app/admin/dashboard/dashboard-code-splitting.test.ts`
+- Result: passed, 3 files / 109 tests.
+
+## 2026-05-16 18:49 IST - Dashboard Sticky Notes Typecheck Failure
+
+- Command: `pnpm exec tsc --noEmit`
+- Result: failed on a test mock inference issue: `apiMock.getStickyNotes` defaulted to `never[]`, rejecting the new `StickyNote[]` fixture.
+
+## 2026-05-16 18:50 IST - Dashboard Sticky Notes Typecheck
+
+- Fix: typed the `apiMock.getStickyNotes` default return as `StickyNote[]`.
+- Command: `pnpm exec tsc --noEmit`
+- Result: passed.
+
+## 2026-05-16 18:50 IST - Dashboard Sticky Notes Full Test
+
+- Command: `pnpm test`
+- Result: passed, 171 files / 469 tests.
+
+## 2026-05-16 18:51 IST - Dashboard Sticky Notes Build
+
+- Command: `pnpm build`
+- Result: passed; Next.js generated 88 static pages. `/admin/dashboard` remains 1.47 kB route size / 106 kB first-load JS, and `/admin/calendar` remains 1.39 kB route size / 106 kB first-load JS.
+
+## 2026-05-16 18:52 IST - Dashboard Sticky Notes Scan Follow-Up
+
+- Commands:
+  - `rg -n "select\\([^\\n]*\\*|select\\(\\)" src/app/api src/lib src/server -S`
+  - `rg -n "datasets: \\[\\\"property\\\", \\\"stickyNotes\\\"\\]|expectDatasets\\(plan\\.datasets, \\[\\\"property\\\", \\\"stickyNotes\\\"\\]\\)|getStickyNotes\\)\\.toHaveBeenCalledTimes\\(1\\)|getStickyNotes\\(userId\\)" src/hooks src/app/admin/dashboard -S`
+  - `rg -n "LegacyAvailabilityCalendar|useLegacyView|Use legacy view|reservations, guests, rooms" src/components/shared/availability-calendar.tsx src/app/admin/calendar/page.tsx src/app/admin/calendar/calendar-panel.tsx -S`
+- Result: broad select and calendar scans were clean; dashboard scan found the old guarded startup `getStickyNotes(userId)` path still present in `fetchData()`, plus the new explicit `refetchStickyNotes()` path.
+
+## 2026-05-16 18:53 IST - Dashboard Sticky Notes Startup Path Cleanup
+
+- Removed `stickyNotes` from the app-data dataset union.
+- Removed the `canLoad("stickyNotes") ? api.getStickyNotes(userId)` startup branch and the associated `setStickyNotes(stickyNotesRes.data || [])` assignment from `fetchData()`.
+- Sticky notes now load through the explicit `refetchStickyNotes()` path only.
+
+## 2026-05-16 18:54 IST - Dashboard Sticky Notes Cleanup Focused Gates
+
+- Command: `pnpm vitest run src/hooks/app-data-load-plan.test.ts src/hooks/use-app-data.load-plan.test.tsx src/app/admin/dashboard/dashboard-code-splitting.test.ts`
+- Result: passed, 3 files / 109 tests.
+- Command: `pnpm exec tsc --noEmit`
+- Result: passed.
+
+## 2026-05-16 18:54 IST - Dashboard Sticky Notes Cleanup Full Test
+
+- Command: `pnpm test`
+- Result: passed, 171 files / 469 tests.
+
+## 2026-05-16 18:55 IST - Dashboard Sticky Notes Cleanup Build
+
+- Command: `pnpm build`
+- Result: passed; Next.js generated 88 static pages. `/admin/dashboard` remains 1.47 kB route size / 106 kB first-load JS, and `/admin/calendar` remains 1.39 kB route size / 106 kB first-load JS.
+
+## 2026-05-16 18:56 IST - Dashboard Sticky Notes Cleanup Scans
+
+- Commands:
+  - `rg -n "select\\([^\\n]*\\*|select\\(\\)" src/app/api src/lib src/server -S`
+  - `rg -n "canLoad\\(\\\"stickyNotes\\\"\\)|stickyNotesRes|datasets: \\[\\\"property\\\", \\\"stickyNotes\\\"\\]|expectDatasets\\(plan\\.datasets, \\[\\\"property\\\", \\\"stickyNotes\\\"\\]\\)" src/hooks/app-data-load-plan.ts src/hooks/app-data-load-plan.test.ts src/hooks/use-app-data.ts src/hooks/use-app-data.load-plan.test.tsx -S`
+  - `rg -n "LegacyAvailabilityCalendar|useLegacyView|Use legacy view|reservations, guests, rooms" src/components/shared/availability-calendar.tsx src/app/admin/calendar/page.tsx src/app/admin/calendar/calendar-panel.tsx -S`
+  - `rg -n "reservations\\.find|bookings\\.flatMap|isolatedBookingReservations\\.length > 0 \\? isolatedBookingReservations : reservations|\\breservations,|\\bbookings," 'src/app/admin/reservations/[id]/reservation-details-client.tsx' -S`
+- Result: all cleanup scans clean. The only remaining `api.getStickyNotes(userId)` call is the intentional `refetchStickyNotes()` on-demand path.
+
+## 2026-05-16 18:57 IST - Dashboard Sticky Notes Research Refresh
+
+- Sources checked:
+  - React official docs for `useEffect` synchronization with external systems.
+  - Supabase official JavaScript select/query docs for explicit column selection.
+- Result: the widget-level `useEffect(() => void refetchStickyNotes(), [refetchStickyNotes])` matches React's synchronization guidance, and the existing sticky-note query remains column-scoped through `STICKY_NOTE_SELECT_COLUMNS`.
+
+## 2026-05-16 18:58 IST - Public Home Room Section Audit
+
+- Commands:
+  - `rg -n "OurRoomsSection|RoomsShowcaseSection|useRoomTypePreview|roomTypes, isLoading" src/app src/components -S`
+  - `sed -n '1,180p' src/components/marketing/home/OurRoomsSection.tsx`
+  - `sed -n '1,180p' src/components/marketing/home/RoomsShowcaseSection.tsx`
+  - `rg -n "OurRoomsSection" src -S`
+- Result:
+  - `OurRoomsSection` still reads `roomTypes` from `DataContext`, but it is not referenced anywhere in `src`.
+  - The active home route uses `RoomsShowcaseSection`, which already calls the route-backed `useRoomTypePreview()` hook.
+- Decision: no runtime egress change needed for this unused component in this pass.
+
+## 2026-05-16 19:01 IST - Reservation Edit Conflict Egress Red Tests
+
+- Analysis:
+  - `ReservationEditClient` still fell back to `reservations.find()` and `bookings.flatMap()` after the route-backed booking lookup.
+  - `ReservationEditForm` still fell back from `activeBookingReservations` to global `reservations` and scanned `reservations.some()` with interval overlap checks for available rooms.
+  - The existing `/api/admin/availability/conflicts` route can be extended with an `excludeBookingId` query parameter so edit flows can reuse the bounded conflict query while excluding the booking being edited.
+- Added failing checks across:
+  - `src/app/admin/reservations/[id]/edit/reservation-edit-egress.test.ts`
+  - `src/hooks/use-admin-room-conflicts.test.tsx`
+  - `src/app/api/admin/availability/conflicts/route.test.ts`
+  - `src/lib/server/reservation-conflicts.test.ts`
+- Command: `pnpm vitest run 'src/app/admin/reservations/[id]/edit/reservation-edit-egress.test.ts' src/hooks/use-admin-room-conflicts.test.tsx src/app/api/admin/availability/conflicts/route.test.ts src/lib/server/reservation-conflicts.test.ts`
+- Result: failed as intended on old edit fallbacks and missing `excludeBookingId` propagation.
+
+## 2026-05-16 19:03 IST - Reservation Edit Conflict Egress Implementation
+
+- Extended `useAdminRoomConflicts()` with `excludeBookingId` and included it in the request key and query string.
+- Extended `/api/admin/availability/conflicts` to pass `excludeBookingId` into `getAdminReservationConflictingRoomIds()`.
+- Extended the server conflict query to add `.neq("booking_id", excludeBookingId)` when editing an existing booking.
+- Removed `reservations.find()` / `bookings.flatMap()` fallbacks from `ReservationEditClient`.
+- Updated `ReservationEditForm` to use `useAdminRoomConflicts({ excludeBookingId: reservation.bookingId })`, remove the global `reservations.some()` overlap scan, and disable save while conflicts load.
+- Command: `pnpm vitest run 'src/app/admin/reservations/[id]/edit/reservation-edit-egress.test.ts' src/hooks/use-admin-room-conflicts.test.tsx src/app/api/admin/availability/conflicts/route.test.ts src/lib/server/reservation-conflicts.test.ts`
+- Result: passed, 4 files / 8 tests.
+
+## 2026-05-16 19:04 IST - Reservation Edit Conflict Egress Typecheck
+
+- Command: `pnpm exec tsc --noEmit`
+- Result: passed.
+
+## 2026-05-16 19:05 IST - Reservation Edit Conflict Egress Full Test
+
+- Command: `pnpm test`
+- Result: passed, 171 files / 470 tests.
+
 ## 2026-05-13 23:01 IST - Post Event Banner Remaining Client/API Fetch Surface Audit
 
 - Command: `date`
@@ -6079,6 +6232,2639 @@
 - Result: `2026-05-14 15:41:43 IST`.
 - Command: `rg -n "select\([^\n]*\*|select\(\)" src/app/api src/lib src/server -S`
 - Result: clean; command exited 1 with no matches.
+
+## 2026-05-14 21:52 IST - Direct Guest Create Mutation Analysis
+
+- Command: `date`
+- Result: `2026-05-14 21:52:52 IST`.
+- Web research source: Supabase JavaScript select modifier docs, "Return data after inserting" (`https://supabase.com/docs/reference/javascript/db-modifiers-select`).
+- Relevant Supabase behavior: mutation rows are not returned by default; chaining `.select()` returns modified rows, and the `columns` parameter controls which columns are retrieved.
+- Findings:
+  - `api.addGuest()` inserts into `guests`, chains `.select(GUEST_SELECT_COLUMNS).single()`, and maps the full returned row with `fromDbGuest()`.
+  - `useAppData().addGuest()` uses the returned guest for local state, activity logging, and as the value returned to callers such as `GuestFormDialog`.
+  - `GuestFormDialog` passes raw form values to `addGuest()`; `toDbGuest()` trims names and converts blank optional text fields to `null`, while `fromDbGuest()` maps returned nulls to empty strings.
+  - An id-only create path is safe only if the hook constructs the local `Guest` with the same normalization semantics as the insert mapping.
+  - The row-returning `addGuest()` helper should remain as a compatibility fallback; the direct hook create path can use a new id-only helper plus local normalization.
+- Next step: add red coverage proving guest creation can select only `id` and the hook preserves normalized local guest behavior without calling the full-row helper.
+
+## 2026-05-14 21:54 IST - Direct Guest Create Mutation Red Test Change
+
+- Command: `date`
+- Result: `2026-05-14 21:54:53 IST`.
+- Changed tests:
+  - `src/lib/api/index.test.ts` now expects `addGuestIdOnly()` to insert normalized guest columns, select only `id`, and perform a single-row read of only that id.
+  - `src/hooks/use-app-data.load-plan.test.tsx` now expects `useAppData().addGuest()` to call `api.addGuestIdOnly()`, avoid `api.addGuest()`, return a locally constructed normalized guest, and preserve activity logging from the normalized payload and returned id.
+- Expected red result: the id-only helper is not implemented/exported yet, and the hook still calls the row-returning guest create helper.
+
+## 2026-05-14 21:55 IST - Direct Guest Create Mutation Red Gate
+
+- Command: `date`
+- Result: `2026-05-14 21:55:18 IST`.
+- Command: `pnpm vitest run src/lib/api/index.test.ts src/hooks/use-app-data.load-plan.test.tsx`
+- Result: failed as expected, 2 failed / 84 passed / 86 total tests.
+- Intended failures:
+  - `src/lib/api/index.test.ts`: `addGuestIdOnly` is currently undefined.
+  - `src/hooks/use-app-data.load-plan.test.tsx`: `apiMock.addGuestIdOnly` received zero calls because `useAppData().addGuest()` still calls the row-returning `api.addGuest()`.
+
+## 2026-05-14 21:56 IST - Direct Guest Create Mutation Implementation
+
+- Command: `date`
+- Result: `2026-05-14 21:56:05 IST`.
+- Changed `src/lib/api/index.ts`:
+  - Added `addGuestIdOnly()` for `guests` inserts.
+  - The helper maps the app guest payload through `toDbGuest()`, selects only `id`, unwraps `data.id`, and preserves `error` plus response metadata.
+  - Kept the existing row-returning `addGuest()` helper as a fallback.
+- Changed `src/hooks/use-app-data.ts`:
+  - Added local guest normalization that trims submitted text fields and maps blank nullable fields to empty strings, matching the current `toDbGuest()` plus `fromDbGuest()` behavior.
+  - `useAppData().addGuest()` now calls `api.addGuestIdOnly()`.
+  - It builds the local `Guest` from the returned id and normalized submitted guest payload, then uses that guest for state, activity metadata, and the returned value.
+
+## 2026-05-14 21:56 IST - Direct Guest Create Mutation Focused Green
+
+- Command: `date`
+- Result: `2026-05-14 21:56:30 IST`.
+- Command: `pnpm vitest run src/lib/api/index.test.ts src/hooks/use-app-data.load-plan.test.tsx`
+- Result: passed, 2 files / 86 tests.
+
+## 2026-05-14 21:56 IST - Direct Guest Create Mutation Typecheck
+
+- Command: `date`
+- Result: `2026-05-14 21:56:53 IST`.
+- Command: `pnpm exec tsc --noEmit`
+- Result: passed.
+
+## 2026-05-14 21:57 IST - Direct Guest Create Mutation Full Test
+
+- Command: `date`
+- Result: `2026-05-14 21:57:41 IST`.
+- Command: `pnpm test`
+- Result: passed, 166 files / 428 tests.
+
+## 2026-05-14 21:58 IST - Direct Guest Create Mutation Build
+
+- Command: `date`
+- Result: `2026-05-14 21:58:41 IST`.
+- Command: `pnpm build`
+- Result: passed.
+
+## 2026-05-14 21:58 IST - Direct Guest Create Mutation Select Scan
+
+- Command: `date`
+- Result: `2026-05-14 21:58:56 IST`.
+- Command: `rg -n "select\([^\n]*\*|select\(\)" src/app/api src/lib src/server -S`
+- Result: clean; command exited 1 with no matches.
+
+## 2026-05-14 21:59 IST - Direct Folio Item Create Mutation Analysis
+
+- Command: `date`
+- Result: `2026-05-14 21:59:16 IST`.
+- Web research source: Supabase JavaScript select modifier docs, "Return data after inserting" (`https://supabase.com/docs/reference/javascript/db-modifiers-select`).
+- Relevant Supabase behavior: mutation rows are not returned by default; chaining `.select()` returns modified rows, and the `columns` parameter controls which columns are retrieved.
+- Findings:
+  - `api.addFolioItem()` inserts into `folio_items`, chains `.select(FOLIO_ITEM_SELECT_COLUMNS).single()`, and returns the full folio item row after every charge/payment.
+  - `useAppData().addFolioItem()` uses returned row data to append a folio item to reservations, bookings, and active booking reservations, then records activity.
+  - The submitted payload already contains description, amount, payment method, transaction id, and external identifiers/metadata, while `api.addFolioItem()` supplies stable defaults for internal source and empty metadata.
+  - The timestamp is the only server-generated field besides id that affects immediate UI ordering in billing cards, so selecting only `id, timestamp` keeps server-time semantics while avoiding the full folio row payload.
+  - The row-returning `addFolioItem()` helper should remain as a compatibility fallback; the direct hook create path can use a new minimal-return helper.
+- Next step: add red coverage proving folio item creation selects only `id, timestamp` and the hook no longer calls the full-row helper.
+
+## 2026-05-14 22:04 IST - Direct Folio Item Create Mutation Red Test Change
+
+- Command: `date`
+- Result: `2026-05-14 22:04:35 IST`.
+- Changed tests:
+  - `src/lib/api/index.test.ts` now expects `addFolioItemIdAndTimestamp()` to insert normalized folio columns, select only `id, timestamp`, and avoid the full `FOLIO_ITEM_SELECT_COLUMNS` row payload.
+  - `src/hooks/use-app-data.load-plan.test.tsx` now expects `useAppData().addFolioItem()` to call the minimal-return helper, avoid `api.addFolioItem()`, construct the local folio item from submitted values plus the returned server timestamp, and preserve activity logging.
+- Expected red result: the minimal helper is not implemented/exported yet, and the hook still calls the row-returning folio create helper.
+
+## 2026-05-14 22:04 IST - Direct Folio Item Create Mutation Red Gate
+
+- Command: `date`
+- Result: `2026-05-14 22:04:55 IST`.
+- Command: `pnpm vitest run src/lib/api/index.test.ts src/hooks/use-app-data.load-plan.test.tsx`
+- Result: failed as expected, 2 failed / 86 passed / 88 total tests.
+- Intended failures:
+  - `src/lib/api/index.test.ts`: `addFolioItemIdAndTimestamp` is currently undefined.
+  - `src/hooks/use-app-data.load-plan.test.tsx`: `apiMock.addFolioItemIdAndTimestamp` received zero calls because `useAppData().addFolioItem()` still calls the row-returning `api.addFolioItem()`.
+
+## 2026-05-14 22:05 IST - Direct Folio Item Create Mutation Implementation
+
+- Command: `date`
+- Result: `2026-05-14 22:05:35 IST`.
+- Changed `src/lib/api/index.ts`:
+  - Added a shared folio insert payload mapper so both create helpers preserve the same defaults for `external_source`, `external_reference`, `external_metadata`, and optional timestamp override.
+  - Added `addFolioItemIdAndTimestamp()` for `folio_items` inserts.
+  - The helper selects only `id, timestamp`, unwraps the minimal row, and preserves `error` plus response metadata.
+- Changed `src/hooks/use-app-data.ts`:
+  - `useAppData().addFolioItem()` now calls `api.addFolioItemIdAndTimestamp()`.
+  - It builds the local `FolioItem` from the returned id/server timestamp plus the submitted description, amount, payment, transaction, and external fields.
+  - The existing row-returning `addFolioItem()` helper remains available as a compatibility fallback.
+
+## 2026-05-14 22:05 IST - Direct Folio Item Create Mutation Focused Green
+
+- Command: `date`
+- Result: `2026-05-14 22:05:55 IST`.
+- Command: `pnpm vitest run src/lib/api/index.test.ts src/hooks/use-app-data.load-plan.test.tsx`
+- Result: passed, 2 files / 88 tests.
+
+## 2026-05-14 22:06 IST - Direct Folio Item Create Mutation Typecheck
+
+- Command: `date`
+- Result: `2026-05-14 22:06:14 IST`.
+- Command: `pnpm exec tsc --noEmit`
+- Result: passed.
+
+## 2026-05-14 22:06 IST - Direct Folio Item Create Mutation Full Test
+
+- Command: `date`
+- Result: `2026-05-14 22:06:59 IST`.
+- Command: `pnpm test`
+- Result: passed, 166 files / 430 tests.
+
+## 2026-05-14 22:07 IST - Direct Folio Item Create Mutation Build
+
+- Command: `date`
+- Result: `2026-05-14 22:07:55 IST`.
+- Command: `pnpm build`
+- Result: passed.
+
+## 2026-05-14 22:08 IST - Direct Folio Item Create Mutation Select Scan
+
+- Command: `date`
+- Result: `2026-05-14 22:08:06 IST`.
+- Command: `rg -n "select\([^\n]*\*|select\(\)" src/app/api src/lib src/server -S`
+- Result: clean; command exited 1 with no matches.
+
+## 2026-05-14 22:08 IST - Direct Property Create Mutation Analysis
+
+- Command: `date`
+- Result: `2026-05-14 22:08:31 IST`.
+- Web research source: Supabase JavaScript select modifier docs, "Return data after inserting" (`https://supabase.com/docs/reference/javascript/db-modifiers-select`).
+- Relevant Supabase behavior: mutation rows are not returned by default; chaining `.select()` returns modified rows, and the `columns` parameter controls which columns are retrieved.
+- Findings:
+  - `api.createProperty()` inserts into `properties`, chains `.select(PROPERTY_SELECT_COLUMNS).single()`, and returns the full property row.
+  - `useAppData().updateProperty()` reaches this create path only when the current property is the in-memory default placeholder.
+  - `PropertySettingsForm` submits the editable settings fields directly, including text/contact fields, photos, currency, tax fields, and legal registration fields.
+  - The settings form does not submit `timezone`, `allowSameDayTurnover`, `showPartialDays`, or `defaultUnitsView`.
+  - The baseline schema gives DB defaults for `allow_same_day_turnover`, `show_partial_days`, and `default_units_view`, while `timezone` has no default and can retain the existing local default.
+  - A create helper can safely avoid the full property row by returning only `id` plus the DB-populated settings fields that are not submitted by the form: `allowSameDayTurnover`, `showPartialDays`, and `defaultUnitsView`.
+- Next step: add red coverage for a minimal-return property create helper and for the hook building the created property locally without calling the full-row `createProperty()` fallback.
+
+## 2026-05-14 22:12 IST - Direct Property Create Mutation Red Test Change
+
+- Command: `date`
+- Result: `2026-05-14 22:12:08 IST`.
+- Changed tests:
+  - `src/lib/api/index.test.ts` now expects `createPropertyIdAndDefaults()` to insert the submitted property payload, select only `PROPERTY_CREATE_RETURN_COLUMNS`, avoid `PROPERTY_SELECT_COLUMNS`, and return only `id`, `allowSameDayTurnover`, `showPartialDays`, and `defaultUnitsView`.
+  - `src/hooks/use-app-data.load-plan.test.tsx` now covers the placeholder-property create path and expects `useAppData().updateProperty()` to call the minimal-return helper, avoid the full-row `api.createProperty()`, merge submitted settings locally, apply the DB default fields returned by the helper, and preserve creation activity logging.
+- Expected red result: the minimal helper/column constant are not implemented/exported yet, and the hook still calls the row-returning property create helper.
+
+## 2026-05-14 22:12 IST - Direct Property Create Mutation Red Gate
+
+- Command: `date`
+- Result: `2026-05-14 22:12:30 IST`.
+- Command: `pnpm vitest run src/lib/api/index.test.ts src/hooks/use-app-data.load-plan.test.tsx`
+- Result: failed as expected, 2 failed / 88 passed / 90 total tests.
+- Intended failures:
+  - `src/lib/api/index.test.ts`: `createPropertyIdAndDefaults` is currently undefined.
+  - `src/hooks/use-app-data.load-plan.test.tsx`: `apiMock.createPropertyIdAndDefaults` received zero calls because `useAppData().updateProperty()` still calls the row-returning `api.createProperty()` on the placeholder-property create path.
+
+## 2026-05-14 22:13 IST - Direct Property Create Mutation Implementation
+
+- Command: `date`
+- Result: `2026-05-14 22:13:15 IST`.
+- Changed `src/lib/api/index.ts`:
+  - Added `PROPERTY_CREATE_RETURN_COLUMNS` with only `id`, `allowSameDayTurnover`, `showPartialDays`, and `defaultUnitsView`.
+  - Added `createPropertyIdAndDefaults()` for `properties` inserts.
+  - The helper preserves the submitted insert payload, selects only the minimal create return columns, unwraps the minimal row, and keeps the existing row-returning `createProperty()` helper as a fallback.
+- Changed `src/hooks/use-app-data.ts`:
+  - The placeholder-property create branch in `updateProperty()` now calls `api.createPropertyIdAndDefaults()`.
+  - It builds the local property from `defaultProperty`, the submitted settings payload, and the returned id/default fields before updating state and activity metadata.
+
+## 2026-05-14 22:13 IST - Direct Property Create Mutation Focused Green
+
+- Command: `date`
+- Result: `2026-05-14 22:13:35 IST`.
+- Command: `pnpm vitest run src/lib/api/index.test.ts src/hooks/use-app-data.load-plan.test.tsx`
+- Result: passed, 2 files / 90 tests.
+
+## 2026-05-14 22:14 IST - Direct Property Create Mutation Typecheck Fix
+
+- Command: `date`
+- Result: `2026-05-14 22:14:08 IST`.
+- Command: `pnpm exec tsc --noEmit`
+- Result: failed on `src/hooks/use-app-data.load-plan.test.tsx` because the `apiMock.getProperty()` test mock was inferred as always returning a non-null property, while the new property-create test needs the existing null-property startup path.
+- Next step: widen the mock return type for `getProperty()` and rerun typecheck.
+
+## 2026-05-14 22:14 IST - Direct Property Create Mutation Typecheck
+
+- Command: `date`
+- Result: `2026-05-14 22:14:27 IST`.
+- Fix: widened the `apiMock.getProperty()` test mock data type to `Property | null`.
+- Command: `pnpm exec tsc --noEmit`
+- Result: passed.
+
+## 2026-05-14 22:15 IST - Direct Property Create Mutation Full Test
+
+- Command: `date`
+- Result: `2026-05-14 22:15:41 IST`.
+- Command: `pnpm test`
+- Result: passed, 166 files / 432 tests.
+
+## 2026-05-14 22:16 IST - Direct Property Create Mutation Build
+
+- Command: `date`
+- Result: `2026-05-14 22:16:41 IST`.
+- Command: `pnpm build`
+- Result: passed.
+
+## 2026-05-14 22:16 IST - Direct Property Create Mutation Select Scan
+
+- Command: `date`
+- Result: `2026-05-14 22:16:55 IST`.
+- Command: `rg -n "select\([^\n]*\*|select\(\)" src/app/api src/lib src/server -S`
+- Result: clean; command exited 1 with no matches.
+
+## 2026-05-14 22:17 IST - Direct Room Type Upsert Mutation Analysis
+
+- Command: `date`
+- Result: `2026-05-14 22:17:13 IST`.
+- Web research sources:
+  - Supabase JavaScript select modifier docs, "Return data after inserting" (`https://supabase.com/docs/reference/javascript/db-modifiers-select`).
+  - Supabase JavaScript RPC docs, "Call a Postgres function" (`https://supabase.com/docs/reference/javascript/rpc`).
+- Relevant Supabase behavior:
+  - Plain mutations can control returned rows by chaining `.select(columns)`.
+  - RPC calls return the Postgres function result, so the egress shape for a JSON-returning RPC is controlled by the SQL function body.
+- Findings:
+  - `api.upsertRoomType()` calls `upsert_room_type_with_amenities`, then `.single()`, and the SQL function returns `row_to_json(result_room_type)` after selecting `rt.*` plus aggregated amenity ids.
+  - `useAppData().addRoomType()` and `useAppData().updateRoomType()` use that returned full row only to recover the id and then map fields already present in the submitted payload.
+  - The room type form submits name, description, max occupancy, bed types, price, amenities, photos, main photo, and visibility.
+  - Existing DB defaults not submitted by the form include `min_occupancy` and `max_children`; the update path can retain existing local values, while the create path should receive those defaulted fields from the database to avoid changing immediate local state semantics.
+  - A narrow RPC returning id plus default-only room type fields can reduce the upsert response while preserving the server-side amenity replacement transaction and the existing full-row RPC fallback.
+- Next step: add red coverage for a minimal room type upsert RPC helper and for the hook create/update paths constructing local room types without calling the full-row `upsertRoomType()` fallback.
+
+## 2026-05-14 22:20 IST - Direct Room Type Upsert Mutation Red Test Change
+
+- Command: `date`
+- Result: `2026-05-14 22:20:47 IST`.
+- Changed tests:
+  - `src/lib/api/index.test.ts` now expects `upsertRoomTypeMinimal()` to call `upsert_room_type_with_amenities_minimal`, pass the existing room type RPC parameter shape, avoid client-side `.select()`, and map only `id`, `minOccupancy`, `maxChildren`, and `categoryId`.
+  - `src/hooks/use-app-data.load-plan.test.tsx` now expects room type create/update to call the minimal helper, avoid `api.upsertRoomType()`, construct local room types from submitted/merged payloads plus returned default fields, and preserve activity logging.
+- Expected red result: the minimal RPC helper is not implemented/exported yet, and both hook paths still call the full-row `api.upsertRoomType()` fallback.
+
+## 2026-05-14 22:21 IST - Direct Room Type Upsert Mutation Red Gate
+
+- Command: `date`
+- Result: `2026-05-14 22:21:12 IST`.
+- Command: `pnpm vitest run src/lib/api/index.test.ts src/hooks/use-app-data.load-plan.test.tsx`
+- Result: failed as expected, 3 failed / 90 passed / 93 total tests.
+- Intended failures:
+  - `src/lib/api/index.test.ts`: `upsertRoomTypeMinimal` is currently undefined.
+  - `src/hooks/use-app-data.load-plan.test.tsx`: both `addRoomType()` and `updateRoomType()` still call the row-returning `api.upsertRoomType()` instead of the minimal helper.
+
+## 2026-05-14 22:22 IST - Direct Room Type Upsert Mutation Implementation
+
+- Command: `date`
+- Result: `2026-05-14 22:22:48 IST`.
+- Changed `supabase/migrations/20260514172100_room_type_upsert_minimal_return.sql`:
+  - Added `upsert_room_type_with_amenities_minimal()` with the same room type upsert and amenity replacement transaction as the existing full-row RPC.
+  - The new RPC returns only a JSON object with `id`, `min_occupancy`, `max_children`, and `category_id`.
+  - Granted the function to `anon`, `authenticated`, and `service_role`, matching the existing RPC accessibility pattern.
+- Changed `src/lib/api/index.ts`:
+  - Added a shared room type RPC parameter mapper.
+  - Added `upsertRoomTypeMinimal()` to call the minimal RPC and map the returned default fields to app field names.
+  - Kept the existing row-returning `upsertRoomType()` helper as a fallback.
+- Changed `src/hooks/use-app-data.ts`:
+  - Added local room type construction from submitted payload plus returned default fields.
+  - `addRoomType()` and `updateRoomType()` now call `api.upsertRoomTypeMinimal()`.
+  - The update payload now carries existing `minOccupancy`, `maxChildren`, and `categoryId` forward so local state keeps values that the form does not edit.
+
+## 2026-05-14 22:23 IST - Direct Room Type Upsert Mutation Focused Green
+
+- Command: `date`
+- Result: `2026-05-14 22:23:12 IST`.
+- Command: `pnpm vitest run src/lib/api/index.test.ts src/hooks/use-app-data.load-plan.test.tsx`
+- Result: passed, 2 files / 93 tests.
+
+## 2026-05-14 22:23 IST - Direct Room Type Upsert Mutation Typecheck Fix
+
+- Command: `date`
+- Result: `2026-05-14 22:23:49 IST`.
+- Command: `pnpm exec tsc --noEmit`
+- Result: failed on test typing only:
+  - `src/lib/api/index.test.ts` passed `id: null` where the client input type represents creates by omitting `id`.
+  - `src/hooks/use-app-data.load-plan.test.tsx` inferred the minimal room type mock `categoryId` as only `null`, but the update test needs a string category id.
+- Next step: adjust the tests to match the production input type and widen the mock return type.
+
+## 2026-05-14 22:24 IST - Direct Room Type Upsert Mutation Typecheck
+
+- Command: `date`
+- Result: `2026-05-14 22:24:20 IST`.
+- Fixes:
+  - Omitted `id` in the room type create API test while still asserting the RPC receives `p_id: null`.
+  - Widened the minimal room type API mock return type to allow string or null `categoryId`.
+- Command: `pnpm exec tsc --noEmit`
+- Result: passed.
+
+## 2026-05-14 22:25 IST - Direct Room Type Upsert Mutation Full Test
+
+- Command: `date`
+- Result: `2026-05-14 22:25:10 IST`.
+- Command: `pnpm test`
+- Result: passed, 166 files / 435 tests.
+
+## 2026-05-14 22:26 IST - Direct Room Type Upsert Mutation Build
+
+- Command: `date`
+- Result: `2026-05-14 22:26:08 IST`.
+- Command: `pnpm build`
+- Result: passed.
+
+## 2026-05-14 22:26 IST - Direct Room Type Upsert Mutation Select Scan
+
+- Command: `date`
+- Result: `2026-05-14 22:26:22 IST`.
+- Command: `rg -n "select\([^\n]*\*|select\(\)" src/app/api src/lib src/server -S`
+- Result: clean; command exited 1 with no matches.
+
+## 2026-05-14 22:27 IST - Direct Reservation Create Mutation Analysis
+
+- Command: `date`
+- Result: `2026-05-14 22:27:06 IST`.
+- Web research sources:
+  - Supabase JavaScript RPC docs, "Call a Postgres function" (`https://supabase.com/docs/reference/javascript/rpc`).
+  - Supabase JavaScript select modifier docs, "Return data after inserting" (`https://supabase.com/docs/reference/javascript/db-modifiers-select`).
+- Relevant Supabase behavior:
+  - RPC calls return the Postgres function result.
+  - When an RPC returns table/composite rows, the result can be projected with a select modifier, so the client can request only the needed result columns.
+- Findings:
+  - `createReservationsWithTotal()` calls the `create_reservations_with_total` RPC, which returns `SETOF reservations` via `returning *`.
+  - `useAppData().addReservation()` and `addRoomsToBooking()` currently receive full reservation rows, then immediately derive local reservations and, for multi-room creates, apply per-room occupancy corrections.
+  - The hook already has the submitted guest, room ids, rate plan, dates, status, notes, source, payment method, guest counts, and tax snapshot values.
+  - The server-generated or server-calculated values needed for local state are only `id`, generated/shared `booking_id`, `room_id`, `total_amount`, and `booking_date`.
+  - A minimal RPC projection can keep the existing pricing/conflict/booking-code logic while reducing the create response from full reservation rows to those five fields.
+- Next step: add red coverage for a minimal `createReservationsWithTotal` helper and for the hook reservation-create path using it without calling the full-row helper.
+
+## 2026-05-14 22:30 IST - Direct Reservation Create Mutation Red Test Change
+
+- Command: `date`
+- Result: `2026-05-14 22:30:03 IST`.
+- Changed tests:
+  - `src/lib/api/index.test.ts` now expects `createReservationsWithTotalMinimal()` to call the existing `create_reservations_with_total` RPC, project only `RESERVATION_CREATE_RETURN_COLUMNS`, and map `id`, `bookingId`, `roomId`, `totalAmount`, and `bookingDate`.
+  - `src/hooks/use-app-data.load-plan.test.tsx` now expects `useAppData().addReservation()` to call the minimal helper, avoid the full-row `api.createReservationsWithTotal()`, construct local reservations from the submitted payload plus minimal returned rows, and preserve room-occupancy normalization.
+- Expected red result: the minimal helper/column constant are not implemented/exported yet, and the hook still calls the full-row reservation create helper.
+
+## 2026-05-14 22:30 IST - Direct Reservation Create Mutation Red Gate
+
+- Command: `date`
+- Result: `2026-05-14 22:30:36 IST`.
+- Command: `pnpm vitest run src/lib/api/index.test.ts src/hooks/use-app-data.load-plan.test.tsx`
+- Result: failed as expected, 2 failed / 92 passed / 94 total tests.
+- Intended failures:
+  - `src/lib/api/index.test.ts`: `createReservationsWithTotalMinimal` is currently undefined.
+  - `src/hooks/use-app-data.load-plan.test.tsx`: `apiMock.createReservationsWithTotalMinimal` received zero calls because `useAppData().addReservation()` still calls the full-row `api.createReservationsWithTotal()`.
+
+## 2026-05-14 22:31 IST - Direct Reservation Create Mutation Implementation
+
+- Command: `date`
+- Result: `2026-05-14 22:31:56 IST`.
+- Changed `src/lib/api/index.ts`:
+  - Added `RESERVATION_CREATE_RETURN_COLUMNS` for `id`, `booking_id`, `room_id`, `total_amount`, and `booking_date`.
+  - Factored `create_reservations_with_total` argument validation/normalization into a shared helper.
+  - Added `createReservationsWithTotalMinimal()` to call the existing RPC with the same normalized arguments and project only the minimal create columns.
+  - Kept the existing full-row `createReservationsWithTotal()` helper as a fallback.
+- Changed `src/hooks/use-app-data.ts`:
+  - Added local reservation construction from minimal returned rows plus submitted payload/tax fields.
+  - `addReservation()` and `addRoomsToBooking()` now call `api.createReservationsWithTotalMinimal()`.
+  - Existing occupancy normalization still runs after local construction so per-room adult/child/guest counts are preserved.
+
+## 2026-05-14 22:33 IST - Direct Reservation Create Mutation Focused Green
+
+- Command: `date`
+- Result: `2026-05-14 22:33 IST`.
+- Command: `pnpm vitest run src/lib/api/index.test.ts src/hooks/use-app-data.load-plan.test.tsx`
+- Result: passed, 2 files / 94 tests.
+
+## 2026-05-14 22:33 IST - Direct Reservation Create Mutation Typecheck
+
+- Command: `date`
+- Result: `2026-05-14 22:33:59 IST`.
+- Command: `pnpm typecheck`
+- Result: failed before typechecking because the script/command is not defined in this repo (`ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL Command "typecheck" not found`).
+- Command: `pnpm exec tsc --noEmit`
+- Result: passed with no TypeScript errors.
+
+## 2026-05-14 22:35 IST - Direct Reservation Create Mutation Full Test
+
+- Command: `date`
+- Result: `2026-05-14 22:35:09 IST`.
+- Command: `pnpm test`
+- Result: passed, 166 files / 436 tests.
+
+## 2026-05-14 22:36 IST - Direct Reservation Create Mutation Build
+
+- Command: `date`
+- Result: `2026-05-14 22:36:25 IST`.
+- Command: `pnpm build`
+- Result: passed. Next.js compiled successfully, type validation passed, and 88 static pages generated.
+
+## 2026-05-14 22:36 IST - Direct Reservation Create Mutation Broad Scan
+
+- Command: `date`
+- Result: `2026-05-14 22:36:42 IST`.
+- Command: `rg -n "select\([^\n]*\*|select\(\)" src/app/api src/lib src/server -S`
+- Result: clean; no full-star or empty Supabase `select()` calls found in the scanned source paths.
+
+## 2026-05-14 22:38 IST - Public Booking Create Mutation Analysis
+
+- Command: `date`
+- Result: `2026-05-14 22:38:13 IST`.
+- Reviewed `src/lib/server/public-booking.ts`, `src/app/api/bookings/public/route.ts`, and public booking tests.
+- Finding: `createPublicBooking()` calls the existing `create_reservations_with_total` RPC and maps full `DbReservation` rows, but the route/client only require `confirmationReservationId`; the returned `reservations` array can be preserved by reconstructing local `Reservation` objects from submitted booking fields plus generated `id`, `booking_id`, `room_id`, `total_amount`, and `booking_date`.
+- Research:
+  - Supabase JavaScript RPC docs confirm Postgres functions are called through `.rpc(fn, args)`.
+  - Supabase JavaScript select modifier docs confirm `.select(columns)` performs a SELECT on query results and controls returned columns; inserts/updates/upserts/deletes return no modified rows unless `.select()` is called.
+- Plan: add a red server test asserting the booking RPC chains `.select("id, booking_id, room_id, total_amount, booking_date")`, then change `createPublicBooking()` to reconstruct returned reservations locally while keeping the API response shape intact.
+
+## 2026-05-14 22:39 IST - Public Booking Create Mutation Red Gate
+
+- Command: `date`
+- Result: `2026-05-14 22:39:33 IST`.
+- Changed `src/lib/server/public-booking.test.ts` to make the reservation-create RPC return only generated columns and assert local reservation reconstruction plus the minimal `.select("id, booking_id, room_id, total_amount, booking_date")` projection.
+- Command: `pnpm vitest run src/lib/server/public-booking.test.ts`
+- Result: failed as expected, 1 failed / 1 total test.
+- Intended failure: `createPublicBooking()` still maps the RPC response as full `DbReservation` rows, leaving locally-known fields such as `guestId`, dates, counts, source, payment method, and tax snapshot missing when only generated columns are returned.
+
+## 2026-05-14 22:40 IST - Public Booking Create Mutation Implementation
+
+- Command: `date`
+- Result: `2026-05-14 22:40:46 IST`.
+- Changed `src/lib/server/public-booking.ts`:
+  - Added `PUBLIC_BOOKING_RESERVATION_CREATE_SELECT` for `id`, `booking_id`, `room_id`, `total_amount`, and `booking_date`.
+  - Projected the `create_reservations_with_total` RPC result with that column list.
+  - Reconstructed returned `Reservation` objects from validated booking input, selected room ids, guest id, rate plan id, tax snapshot, and generated RPC values instead of requiring full reservation rows from Supabase.
+- Command: `pnpm vitest run src/lib/server/public-booking.test.ts`
+- Result: passed, 1 file / 1 test.
+
+## 2026-05-14 22:41 IST - Public Booking Create Mutation Typecheck
+
+- Command: `date`
+- Result: `2026-05-14 22:41:08 IST`.
+- Command: `pnpm exec tsc --noEmit`
+- Result: passed with no TypeScript errors.
+
+## 2026-05-14 22:41 IST - Public Booking Create Mutation Full Test
+
+- Command: `date`
+- Result: `2026-05-14 22:41:54 IST`.
+- Command: `pnpm test`
+- Result: passed, 166 files / 436 tests.
+
+## 2026-05-14 22:42 IST - Public Booking Create Mutation Build
+
+- Command: `date`
+- Result: `2026-05-14 22:42:43 IST`.
+- Command: `pnpm build`
+- Result: passed. Next.js compiled successfully, type validation passed, and 88 static pages generated.
+
+## 2026-05-14 22:42 IST - Public Booking Create Mutation Broad Scan
+
+- Command: `date`
+- Result: `2026-05-14 22:42:55 IST`.
+- Command: `rg -n "select\([^\n]*\*|select\(\)" src/app/api src/lib src/server -S`
+- Result: clean; no full-star or empty Supabase `select()` calls found in the scanned source paths.
+
+## 2026-05-14 22:44 IST - Admin Event Create Mutation Analysis
+
+- Command: `date`
+- Result: `2026-05-14 22:44:02 IST`.
+- Reviewed `src/lib/server/events.ts`, `src/app/api/admin/events/route.ts`, `src/components/admin/events/event-form.tsx`, and event tests.
+- Finding: both event create paths insert into `event_banners` and select `EVENT_SELECT_COLUMNS` even though the create form ignores the server-action return value and both paths only need the generated `id` for optional `toggle_event_banner`; `created_at` and `updated_at` are sufficient to preserve current returned object shapes.
+- Research: Supabase JavaScript select modifier docs confirm `.insert()` does not return rows unless `.select()` is chained, and the `columns` argument controls which returned columns are selected.
+- Plan: add red tests requiring create inserts to select only `id, created_at, updated_at`, then locally reconstruct the returned server action and API payloads from validated form data plus those generated fields.
+
+## 2026-05-14 22:45 IST - Admin Event Create Mutation Red Gate
+
+- Command: `date`
+- Result: `2026-05-14 22:45:00 IST`.
+- Changed `src/lib/server/events.test.ts` and `src/app/api/admin/events/route.test.ts` to make event creates return only generated fields and assert `.select("id, created_at, updated_at")`.
+- Command: `pnpm vitest run src/lib/server/events.test.ts src/app/api/admin/events/route.test.ts`
+- Result: failed as expected, 2 failed / 5 passed / 7 total tests.
+- Intended failures:
+  - `createEvent()` still parses the partial generated row as a full event banner row.
+  - `src/app/api/admin/events/route.ts` still selects `EVENT_SELECT_COLUMNS` after insert.
+
+## 2026-05-14 22:46 IST - Admin Event Create Mutation Implementation
+
+- Command: `date`
+- Result: `2026-05-14 22:46:06 IST`.
+- Changed `src/lib/server/cache-config.ts` to add `EVENT_CREATE_RETURN_COLUMNS = "id, created_at, updated_at"`.
+- Changed `src/lib/server/events.ts`:
+  - `createEvent()` now selects only generated id/timestamps after insert.
+  - The returned `EventBanner` is reconstructed from the validated form payload, auth user id, and generated id/timestamps.
+  - The optional activation RPC still receives the generated event id.
+- Changed `src/app/api/admin/events/route.ts`:
+  - POST now selects only generated id/timestamps after insert.
+  - The response payload preserves the previous DB-shaped event object by reconstructing fields from the validated request and generated values.
+- Command: `pnpm vitest run src/lib/server/events.test.ts src/app/api/admin/events/route.test.ts`
+- Result: passed, 2 files / 7 tests.
+
+## 2026-05-14 22:46 IST - Admin Event Create Mutation Typecheck
+
+- Command: `date`
+- Result: `2026-05-14 22:46:30 IST`.
+- Command: `pnpm exec tsc --noEmit`
+- Result: passed with no TypeScript errors.
+
+## 2026-05-14 22:47 IST - Admin Event Create Mutation Full Test
+
+- Command: `date`
+- Result: `2026-05-14 22:47:12 IST`.
+- Command: `pnpm test`
+- Result: passed, 166 files / 437 tests.
+
+## 2026-05-14 22:48 IST - Admin Event Create Mutation Build
+
+- Command: `date`
+- Result: `2026-05-14 22:48:02 IST`.
+- Command: `pnpm build`
+- Result: passed. Next.js compiled successfully, type validation passed, and 88 static pages generated.
+
+## 2026-05-14 22:48 IST - Admin Event Create Mutation Broad Scan
+
+- Command: `date`
+- Result: `2026-05-14 22:48:14 IST`.
+- Command: `rg -n "select\([^\n]*\*|select\(\)" src/app/api src/lib src/server -S`
+- Result: clean; no full-star or empty Supabase `select()` calls found in the scanned source paths.
+
+## 2026-05-14 22:48 IST - Admin Review Create Mutation Analysis
+
+- Command: `date`
+- Result: `2026-05-14 22:48:48 IST`.
+- Reviewed `src/lib/server/reviews.ts`, `src/components/admin/reviews/review-form.tsx`, and review tests.
+- Finding: `createReview()` inserts into `testimonials` and selects `REVIEW_SELECT_COLUMNS`, while the create form ignores the returned value; preserving the server action return shape only requires generated `id`, `created_at`, and `updated_at` because the rest is already present in the validated form payload and auth user.
+- Research: Supabase JavaScript select modifier docs confirm `.insert()` returns modified rows only when `.select()` is called and that the column list controls returned fields.
+- Plan: add a red server test requiring `.select("id, created_at, updated_at")` and local `Review` reconstruction, then update `createReview()` accordingly.
+
+## 2026-05-14 22:49 IST - Admin Review Create Mutation Red Gate
+
+- Command: `date`
+- Result: `2026-05-14 22:49:32 IST`.
+- Changed `src/lib/server/reviews.test.ts` to make review create return only generated fields and assert `.select("id, created_at, updated_at")` plus local `Review` reconstruction.
+- Command: `pnpm vitest run src/lib/server/reviews.test.ts`
+- Result: failed as expected, 1 failed / 2 passed / 3 total tests.
+- Intended failure: `createReview()` still parses the generated-only insert response as a full review row.
+
+## 2026-05-14 22:50 IST - Admin Review Create Mutation Implementation
+
+- Command: `date`
+- Result: `2026-05-14 22:50:12 IST`.
+- Changed `src/lib/server/cache-config.ts` to add `REVIEW_CREATE_RETURN_COLUMNS = "id, created_at, updated_at"`.
+- Changed `src/lib/server/reviews.ts` so `createReview()` selects only generated id/timestamps after insert and reconstructs the returned `Review` from the validated payload, auth user id, and generated fields.
+- Command: `pnpm vitest run src/lib/server/reviews.test.ts`
+- Result: passed, 1 file / 3 tests.
+
+## 2026-05-14 22:50 IST - Admin Review Create Mutation Typecheck
+
+- Command: `date`
+- Result: `2026-05-14 22:50:37 IST`.
+- Command: `pnpm exec tsc --noEmit`
+- Result: passed with no TypeScript errors.
+
+## 2026-05-14 22:51 IST - Admin Review Create Mutation Full Test
+
+- Command: `date`
+- Result: `2026-05-14 22:51:25 IST`.
+- Command: `pnpm test`
+- Result: passed, 166 files / 438 tests.
+
+## 2026-05-14 22:52 IST - Admin Review Create Mutation Build
+
+- Command: `date`
+- Result: `2026-05-14 22:52:17 IST`.
+- Command: `pnpm build`
+- Result: passed. Next.js compiled successfully, type validation passed, and 88 static pages generated.
+
+## 2026-05-14 22:52 IST - Admin Review Create Mutation Broad Scan
+
+- Command: `date`
+- Result: `2026-05-14 22:52:32 IST`.
+- Command: `rg -n "select\([^\n]*\*|select\(\)" src/app/api src/lib src/server -S`
+- Result: clean; no full-star or empty Supabase `select()` calls found in the scanned source paths.
+
+## 2026-05-14 22:53 IST - Manual Receipt Create Mutation Analysis
+
+- Command: `date`
+- Result: `2026-05-14 22:53:32 IST`.
+- Reviewed `src/app/api/admin/manual-receipts/route.ts`, `src/app/api/admin/manual-receipts/[id]/route.ts`, the manual receipt create/history clients, and manual receipt API tests.
+- Finding: manual receipt POST selects `MANUAL_RECEIPT_SELECT_COLUMNS` after insert, but the create route can reconstruct the returned `ManualReceipt` from validated input, derived names/payment method, and generated `id`, `slip_no`, and `created_at`.
+- Scope decision: leave PATCH full-row for now because the API supports partial updates and the server cannot always reconstruct untouched fields from a partial payload without an additional read. Optimize POST only in this pass.
+- Research: Supabase JavaScript select modifier docs confirm `.insert()` only returns rows when `.select()` is chained and the column list controls the returned fields.
+- Plan: add a red POST test requiring `.select("id, slip_no, created_at")` and a full locally reconstructed response, then update the POST handler.
+
+## 2026-05-14 22:54 IST - Manual Receipt Create Mutation Red Gate
+
+- Command: `date`
+- Result: `2026-05-14 22:54:17 IST`.
+- Changed `src/app/api/admin/manual-receipts/route.test.ts` so POST returns only generated fields from Supabase and still expects the full `ManualReceipt` response.
+- Command: `pnpm vitest run src/app/api/admin/manual-receipts/route.test.ts`
+- Result: failed as expected, 1 failed / 1 passed / 2 total tests.
+- Intended failure: POST still selects `MANUAL_RECEIPT_SELECT_COLUMNS` after insert instead of generated fields only.
+
+## 2026-05-14 22:55 IST - Manual Receipt Create Mutation Implementation
+
+- Command: `date`
+- Result: `2026-05-14 22:55:18 IST`.
+- Changed `src/app/api/admin/manual-receipts/columns.ts` to add `MANUAL_RECEIPT_CREATE_RETURN_COLUMNS = "id, slip_no, created_at"`.
+- Changed `src/app/api/admin/manual-receipts/route.ts` so POST inserts a named payload, selects only generated `id`, `slip_no`, and `created_at`, and reconstructs the full `ManualReceipt` response from the payload plus generated fields.
+- Command: `pnpm vitest run src/app/api/admin/manual-receipts/route.test.ts`
+- Result: passed, 1 file / 2 tests.
+
+## 2026-05-14 22:55 IST - Manual Receipt Create Mutation Typecheck
+
+- Command: `date`
+- Result: `2026-05-14 22:55:46 IST`.
+- Command: `pnpm exec tsc --noEmit`
+- Result: passed with no TypeScript errors.
+
+## 2026-05-14 22:56 IST - Manual Receipt Create Mutation Full Test
+
+- Command: `date`
+- Result: `2026-05-14 22:56:41 IST`.
+- Command: `pnpm test`
+- Result: passed, 166 files / 438 tests.
+
+## 2026-05-14 22:57 IST - Manual Receipt Create Mutation Build
+
+- Command: `date`
+- Result: `2026-05-14 22:57:42 IST`.
+- Command: `pnpm build`
+- Result: passed. Next.js compiled successfully, type validation passed, and 88 static pages generated.
+
+## 2026-05-14 22:57 IST - Manual Receipt Create Mutation Broad Scan
+
+- Command: `date`
+- Result: `2026-05-14 22:57:56 IST`.
+- Command: `rg -n "select\([^\n]*\*|select\(\)" src/app/api src/lib src/server -S`
+- Result: clean; no full-star or empty Supabase `select()` calls found in the scanned source paths.
+
+## 2026-05-14 22:59 IST - Manual Receipt Patch Mutation Analysis
+
+- Command: `date`
+- Result: `2026-05-14 22:59:33 IST`.
+- Reviewed `src/app/api/admin/manual-receipts/[id]/route.ts`, `src/app/admin/manual-receipt/manual-receipt-history.tsx`, and manual receipt PATCH tests.
+- Finding: PATCH currently updates `manual_receipts`, selects the full receipt row, and returns it. The only caller is the manual receipt history client, which already holds the full `editingReceipt` and submits the complete edit form values, so it can reconstruct the updated receipt locally after the API confirms the id.
+- Scope: preserve the GET and POST response shapes; optimize only PATCH by returning `{ data: { id } }` and moving full receipt reconstruction into a tested client-side helper.
+- Research: Supabase JavaScript update/select docs confirm update/delete/insert/upsert do not return modified rows by default; avoiding `.select()` prevents returning full modified rows.
+- Plan: add red tests for PATCH returning id-only without `.select()` and for local merge reconstruction, then update the route and manual receipt history client.
+
+## 2026-05-14 23:00 IST - Manual Receipt Patch Mutation Red Gate
+
+- Command: `date`
+- Result: `2026-05-14 23:00:41 IST`.
+- Changed `src/app/api/admin/manual-receipts/[id]/route.test.ts` to require PATCH to return `{ data: { id } }` without `.select()`/`.maybeSingle()`.
+- Added `src/app/admin/manual-receipt/manual-receipt-utils.test.ts` for local edit-value merging.
+- Command: `pnpm vitest run 'src/app/api/admin/manual-receipts/[id]/route.test.ts' src/app/admin/manual-receipt/manual-receipt-utils.test.ts`
+- Result: failed as expected, 2 failed test files.
+- Intended failures:
+  - PATCH still selects `MANUAL_RECEIPT_SELECT_COLUMNS`.
+  - `manual-receipt-utils.ts` does not exist yet.
+
+## 2026-05-14 23:01 IST - Manual Receipt Patch Mutation Plan Refinement
+
+- Command: `date`
+- Result: `2026-05-14 23:01:09 IST`.
+- Refined the PATCH implementation plan before coding: a zero-return update would lose the existing 404 behavior for missing receipt ids. The safer optimization is to select only `id` and keep `.maybeSingle()`, reducing egress while preserving not-found detection.
+
+## 2026-05-14 23:02 IST - Manual Receipt Patch Mutation Implementation
+
+- Command: `date`
+- Result: `2026-05-14 23:02:26 IST`.
+- Changed `src/app/api/admin/manual-receipts/columns.ts` to add `MANUAL_RECEIPT_PATCH_RETURN_COLUMNS = "id"`.
+- Changed `src/app/api/admin/manual-receipts/[id]/route.ts` so PATCH selects only `id`, preserves `.maybeSingle()` not-found behavior, and returns `{ data: { id } }`.
+- Added `src/app/admin/manual-receipt/manual-receipt-utils.ts` with `mergeManualReceiptUpdate()` to reconstruct edited receipts locally while preserving untouched fields.
+- Updated `src/app/admin/manual-receipt/manual-receipt-history.tsx` to consume the id-only PATCH response and merge the edited receipt locally.
+- Command: `pnpm vitest run 'src/app/api/admin/manual-receipts/[id]/route.test.ts' src/app/admin/manual-receipt/manual-receipt-utils.test.ts`
+- Result: passed, 2 files / 2 tests.
+
+## 2026-05-14 23:02 IST - Manual Receipt Patch Mutation Typecheck
+
+- Command: `date`
+- Result: `2026-05-14 23:02:53 IST`.
+- Command: `pnpm exec tsc --noEmit`
+- Result: passed with no TypeScript errors.
+
+## 2026-05-14 23:03 IST - Manual Receipt Patch Mutation Full Test
+
+- Command: `date`
+- Result: `2026-05-14 23:03:47 IST`.
+- Command: `pnpm test`
+- Result: passed, 167 files / 439 tests.
+
+## 2026-05-14 23:04 IST - Manual Receipt Patch Mutation Build
+
+- Command: `date`
+- Result: `2026-05-14 23:04:40 IST`.
+- Command: `pnpm build`
+- Result: passed. Next.js compiled successfully, type validation passed, and 88 static pages generated.
+
+## 2026-05-14 23:04 IST - Manual Receipt Patch Mutation Broad Scan
+
+- Command: `date`
+- Result: `2026-05-14 23:04:52 IST`.
+- Command: `rg -n "select\([^\n]*\*|select\(\)" src/app/api src/lib src/server -S`
+- Result: clean; no full-star or empty Supabase `select()` calls found in the scanned source paths.
+
+## 2026-05-14 23:05 IST - Admin Feedback Patch Mutation Analysis
+
+- Command: `date`
+- Result: `2026-05-14 23:05:54 IST`.
+- Reviewed `src/app/api/admin/feedback/[id]/route.ts`, `src/app/admin/feedback/feedback-panel.tsx`, and feedback route tests.
+- Finding: feedback PATCH selects the full admin feedback row after updating `status`/`internal_note`. The client already holds the full feedback item and only needs changed status/note/timestamp to merge locally.
+- Logging constraint: the route uses returned `name`/`email` for activity labels, so the safe minimal projection is `id, name, email, status, internal_note, updated_at`.
+- Research: Supabase JavaScript update/select docs confirm update calls do not return rows unless `.select()` is chained, and the select column list controls response payload.
+- Plan: write red tests requiring the minimal PATCH projection plus a local feedback merge helper, then update route and client.
+
+## 2026-05-14 23:06 IST - Admin Feedback Patch Mutation Red Gate
+
+- Command: `date`
+- Result: `2026-05-14 23:06:42 IST`.
+- Changed `src/app/api/admin/feedback/[id]/route.test.ts` to require `id, name, email, status, internal_note, updated_at` after PATCH.
+- Added `src/app/admin/feedback/feedback-panel-utils.test.ts` for compact update merging.
+- Command: `pnpm vitest run 'src/app/api/admin/feedback/[id]/route.test.ts' src/app/admin/feedback/feedback-panel-utils.test.ts`
+- Result: failed as expected, 2 failed test files.
+- Intended failures:
+  - PATCH still selects `ADMIN_FEEDBACK_SELECT_COLUMNS`.
+  - `feedback-panel-utils.ts` does not exist yet.
+
+## 2026-05-14 23:08 IST - Admin Feedback Patch Mutation Implementation
+
+- Command: `date`
+- Result: `2026-05-14 23:08:14 IST`.
+- Changed `src/app/api/admin/feedback/columns.ts` to add `ADMIN_FEEDBACK_PATCH_RETURN_COLUMNS = "id, name, email, status, internal_note, updated_at"`.
+- Changed `src/app/api/admin/feedback/[id]/route.ts` so PATCH selects only compact update/log fields, keeps `.maybeSingle()` not-found behavior, logs activity from compact fields, and returns `{ id, status, internalNote, updatedAt }`.
+- Added `src/app/admin/feedback/feedback-panel-utils.ts` with `mergeFeedbackUpdate()`.
+- Updated `src/app/admin/feedback/feedback-panel.tsx` to merge compact PATCH responses into existing list/detail feedback state.
+- Command: `pnpm vitest run 'src/app/api/admin/feedback/[id]/route.test.ts' src/app/admin/feedback/feedback-panel-utils.test.ts`
+- Result: passed, 2 files / 3 tests.
+
+## 2026-05-14 23:08 IST - Admin Feedback Patch Mutation Typecheck
+
+- Command: `date`
+- Result: `2026-05-14 23:08:49 IST`.
+- Command: `pnpm exec tsc --noEmit`
+- Result: passed with no TypeScript errors.
+
+## 2026-05-14 23:09 IST - Admin Feedback Patch Mutation Full Test
+
+- Command: `date`
+- Result: `2026-05-14 23:09:42 IST`.
+- Command: `pnpm test`
+- Result: passed, 168 files / 441 tests.
+
+## 2026-05-14 23:10 IST - Admin Feedback Patch Mutation Build
+
+- Command: `date`
+- Result: `2026-05-14 23:10:38 IST`.
+- Command: `pnpm build`
+- Result: passed. Next.js compiled successfully, type validation passed, and 88 static pages generated.
+
+## 2026-05-14 23:10 IST - Admin Feedback Patch Mutation Broad Scan
+
+- Command: `date`
+- Result: `2026-05-14 23:10:51 IST`.
+- Command: `rg -n "select\([^\n]*\*|select\(\)" src/app/api src/lib src/server -S`
+- Result: clean; no full-star or empty Supabase `select()` calls found in the scanned source paths.
+
+## 2026-05-14 23:11 IST - Donation Create Mutation Analysis
+
+- Command: `date`
+- Result: `2026-05-14 23:11:33 IST`.
+- Reviewed `src/lib/api/donations.ts`, `src/app/api/donations/create-order/route.ts`, `src/app/api/donations/verify-payment/route.ts`, and donation API tests.
+- Finding: `createDonationRecord()` inserts a new donation and selects `DONATION_SELECT_COLUMNS`, but the public create-order route already has every submitted donation field and only needs generated `id`, `created_at`, and `updated_at`.
+- Scope decision: optimize donation create now. Leave `updateDonationRecord()` for a separate pass because it is a generic partial update helper; the current verify-payment caller has a base donation, but changing the generic helper safely needs a separate red-test/design pass.
+- Research: Supabase JavaScript insert/select docs confirm insert returns no rows by default and `.select(columns)` controls returned modified-row columns.
+- Plan: add a red donation API test requiring create to select `id, created_at, updated_at` and reconstruct the full returned `Donation` locally.
+
+## 2026-05-14 23:13 IST - Donation Create Mutation Red Gate
+
+- Command: `date`
+- Result: `2026-05-14 23:13:30 IST`.
+- Changed `src/lib/api/donations.test.ts` so `createDonationRecord()` receives only generated fields from Supabase and still expects a full locally reconstructed `Donation`.
+- Command: `pnpm vitest run src/lib/api/donations.test.ts`
+- Result: failed as expected, 1 failed / 4 passed / 5 total tests.
+- Intended failure: `createDonationRecord()` still parses the generated-only insert response as a full donation row, so submitted donation fields are returned as `undefined`.
+
+## 2026-05-14 23:14 IST - Donation Create Mutation Implementation
+
+- Command: `date`
+- Result: `2026-05-14 23:14:07 IST`.
+- Changed `src/lib/api/donations.ts`:
+  - Added `DONATION_CREATE_RETURN_COLUMNS = "id, created_at, updated_at"`.
+  - Changed `createDonationRecord()` to insert a named donation payload and select only generated id/timestamps.
+  - Reconstructed the returned `Donation` from the inserted payload plus generated fields, preserving the previous helper return shape without requesting the full row.
+
+## 2026-05-14 23:14 IST - Donation Create Mutation Focused Green
+
+- Command: `date`
+- Result: `2026-05-14 23:14:24 IST`.
+- Command: `pnpm vitest run src/lib/api/donations.test.ts`
+- Result: passed, 1 file / 5 tests.
+
+## 2026-05-14 23:14 IST - Donation Create Mutation Typecheck
+
+- Command: `date`
+- Result: `2026-05-14 23:14:40 IST`.
+- Command: `pnpm exec tsc --noEmit`
+- Result: passed with no TypeScript errors.
+
+## 2026-05-14 23:15 IST - Donation Create Mutation Full Test
+
+- Command: `date`
+- Result: `2026-05-14 23:15:23 IST`.
+- Command: `pnpm test`
+- Result: passed, 168 files / 441 tests.
+
+## 2026-05-14 23:16 IST - Donation Create Mutation Build
+
+- Command: `date`
+- Result: `2026-05-14 23:16:08 IST`.
+- Command: `pnpm build`
+- Result: passed. Next.js compiled successfully, type validation passed, and 88 static pages generated.
+
+## 2026-05-14 23:16 IST - Donation Create Mutation Broad Scan
+
+- Command: `date`
+- Result: `2026-05-14 23:16:18 IST`.
+- Command: `rg -n "select\([^\n]*\*|select\(\)" src/app/api src/lib src/server -S`
+- Result: clean; no full-star or empty Supabase `select()` calls found in the scanned source paths.
+
+## 2026-05-14 23:16 IST - Donation Verify Payment Update Mutation Analysis
+
+- Command: `date`
+- Result: `2026-05-14 23:16:57 IST`.
+- Reviewed `src/app/api/donations/verify-payment/route.ts`, `src/lib/api/donations.ts`, donation API tests, and in-repo callers of `updateDonationRecord()`.
+- Findings:
+  - The verify-payment route already loads the full donation with `getDonationById()` before signature verification.
+  - After verification it calls `updateDonationRecord()`, which updates a few payment fields but selects the full donation row again.
+  - The response receipt needs amount, currency, frequency, email, and message from the already loaded donation, the verified payment id from the request, and the database-generated update timestamp.
+  - A compact update helper can select only `updated_at` while preserving the receipt timestamp semantics; keep the existing full-row `updateDonationRecord()` helper as a compatibility fallback.
+- Web research source: Supabase JavaScript select modifier docs (`https://supabase.com/docs/reference/javascript/db-modifiers-select`) and update docs (`https://supabase.com/docs/reference/javascript/update`).
+- Relevant Supabase behavior: `.update()` does not return modified rows by default; chaining `.select(columns)` returns modified rows and the column list controls the returned fields.
+- Plan: add red coverage for a timestamp-only donation update helper and make the verify-payment route build its receipt locally without calling the full-row update helper.
+
+## 2026-05-14 23:17 IST - Donation Verify Payment Update Mutation Red Test Change
+
+- Command: `date`
+- Result: `2026-05-14 23:17:38 IST`.
+- Changed tests:
+  - `src/lib/api/donations.test.ts` now expects `updateDonationRecordTimestampOnly()` to update donation payment fields and select only `updated_at`.
+  - `src/app/api/donations/verify-payment/route.test.ts` now expects verify-payment to call the timestamp-only helper, avoid `updateDonationRecord()`, and build the receipt from the loaded donation plus verified payment id and returned timestamp.
+- Expected red result: the timestamp-only helper/column constant are not implemented/exported yet, and the route still calls the full-row update helper.
+
+## 2026-05-14 23:17 IST - Donation Verify Payment Update Mutation Red Gate
+
+- Command: `date`
+- Result: `2026-05-14 23:17:55 IST`.
+- Command: `pnpm vitest run src/lib/api/donations.test.ts src/app/api/donations/verify-payment/route.test.ts`
+- Result: failed as expected, 2 failed / 5 passed / 7 total tests.
+- Intended failures:
+  - `updateDonationRecordTimestampOnly` is not implemented/exported yet.
+  - Verify-payment still calls `updateDonationRecord()` instead of the timestamp-only update helper.
+
+## 2026-05-14 23:18 IST - Donation Verify Payment Update Mutation Implementation
+
+- Command: `date`
+- Result: `2026-05-14 23:18:26 IST`.
+- Changed `src/lib/api/donations.ts`:
+  - Added `DONATION_UPDATE_TIMESTAMP_COLUMNS = "updated_at"`.
+  - Added `updateDonationRecordTimestampOnly()` to update a donation and return only the database `updated_at` value.
+  - Kept `updateDonationRecord()` as the full-row compatibility fallback.
+- Changed `src/app/api/donations/verify-payment/route.ts`:
+  - The payment verification update now calls the timestamp-only helper.
+  - The receipt is composed from the already loaded donation, the verified payment id, and the returned update timestamp.
+
+## 2026-05-14 23:18 IST - Donation Verify Payment Update Mutation Focused Green
+
+- Command: `date`
+- Result: `2026-05-14 23:18:41 IST`.
+- Command: `pnpm vitest run src/lib/api/donations.test.ts src/app/api/donations/verify-payment/route.test.ts`
+- Result: passed, 2 files / 7 tests.
+
+## 2026-05-14 23:18 IST - Donation Verify Payment Update Mutation Typecheck
+
+- Command: `date`
+- Result: `2026-05-14 23:18:58 IST`.
+- Command: `pnpm exec tsc --noEmit`
+- Result: passed with no TypeScript errors.
+
+## 2026-05-14 23:19 IST - Donation Verify Payment Update Mutation Full Test
+
+- Command: `date`
+- Result: `2026-05-14 23:19:51 IST`.
+- Command: `pnpm test`
+- Result: passed, 168 files / 442 tests.
+
+## 2026-05-14 23:20 IST - Donation Verify Payment Update Mutation Build
+
+- Command: `date`
+- Result: `2026-05-14 23:20:42 IST`.
+- Command: `pnpm build`
+- Result: passed. Next.js compiled successfully, type validation passed, and 88 static pages generated.
+
+## 2026-05-14 23:20 IST - Donation Verify Payment Update Mutation Broad Scan
+
+- Command: `date`
+- Result: `2026-05-14 23:20:52 IST`.
+- Command: `rg -n "select\([^\n]*\*|select\(\)" src/app/api src/lib src/server -S`
+- Result: clean; no full-star or empty Supabase `select()` calls found in the scanned source paths.
+
+## 2026-05-14 23:22 IST - VikBooking Import Job Ignored Update Mutation Analysis
+
+- Command: `date`
+- Result: `2026-05-14 23:22:09 IST`.
+- Reviewed `src/lib/importers/vikbooking/jobs.ts`, `src/app/api/admin/import/vikbooking/route.ts`, and import route tests.
+- Findings:
+  - `updateImportJob()` updates `import_jobs`, selects `IMPORT_JOB_SELECT_COLUMNS`, and returns the full mapped job.
+  - Several import route calls use `updateImportJob()` only for side effects: marking the job `running`, recording skipped-row progress, and marking a failed job inside the RPC catch.
+  - The completion branch still needs the full updated job for the API response, so the full-row helper should remain for that path.
+  - A no-return update helper can share the existing patch-to-DB payload behavior and eliminate full job row egress from ignored update calls.
+- Web research source: Supabase JavaScript select modifier docs (`https://supabase.com/docs/reference/javascript/db-modifiers-select`) and update docs (`https://supabase.com/docs/reference/javascript/update`).
+- Relevant Supabase behavior: updated rows are not returned by default; only chaining `.select()` after filters returns modified rows.
+- Plan: add red coverage for an import job no-return update helper and for the import run route using it for the ignored `running` status update while preserving full-row completion/fetch behavior.
+
+## 2026-05-14 23:23 IST - VikBooking Import Job Ignored Update Mutation Red Test Change
+
+- Command: `date`
+- Result: `2026-05-14 23:23:02 IST`.
+- Changed tests:
+  - Added `src/lib/importers/vikbooking/jobs.test.ts` expecting `updateImportJobWithoutReturning()` to update import job fields without calling `.select()` or `.single()`.
+  - Extended `src/app/api/admin/import/vikbooking/route.test.ts` to cover a non-dry-run import and require the `running` status transition to use the no-return helper while preserving the final job response from `fetchJobById()`.
+- Expected red result: the no-return helper is not implemented/exported yet, and the route still calls `updateImportJob()` for the ignored `running` update.
+
+## 2026-05-14 23:23 IST - VikBooking Import Job Ignored Update Mutation Red Gate
+
+- Command: `date`
+- Result: `2026-05-14 23:23:20 IST`.
+- Command: `pnpm vitest run src/lib/importers/vikbooking/jobs.test.ts src/app/api/admin/import/vikbooking/route.test.ts`
+- Result: failed as expected, 2 failed / 1 passed / 3 total tests.
+- Intended failures:
+  - `updateImportJobWithoutReturning` is not implemented/exported yet.
+  - The import route still calls full-row `updateImportJob()` for the ignored `running` status update.
+
+## 2026-05-14 23:24 IST - VikBooking Import Job Ignored Update Mutation Implementation
+
+- Command: `date`
+- Result: `2026-05-14 23:24:12 IST`.
+- Changed `src/lib/importers/vikbooking/jobs.ts`:
+  - Extracted shared import-job patch mapping into `toImportJobUpdatePayload()`.
+  - Added `updateImportJobWithoutReturning()` to update `import_jobs` without chaining `.select()` or `.single()`.
+  - Kept `updateImportJob()` for call sites that need the full mapped job response.
+- Changed `src/app/api/admin/import/vikbooking/route.ts`:
+  - The ignored `running`, skipped-row progress, and failed-job updates now use the no-return helper.
+  - The completion branch still uses `updateImportJob()` because the updated job is returned in the API response.
+
+## 2026-05-14 23:24 IST - VikBooking Import Job Ignored Update Mutation Focused Green
+
+- Command: `date`
+- Result: `2026-05-14 23:24:28 IST`.
+- Command: `pnpm vitest run src/lib/importers/vikbooking/jobs.test.ts src/app/api/admin/import/vikbooking/route.test.ts`
+- Result: passed, 2 files / 3 tests.
+
+## 2026-05-14 23:24 IST - VikBooking Import Job Ignored Update Mutation Typecheck
+
+- Command: `date`
+- Result: `2026-05-14 23:24:45 IST`.
+- Command: `pnpm exec tsc --noEmit`
+- Result: passed with no TypeScript errors.
+
+## 2026-05-14 23:25 IST - VikBooking Import Job Ignored Update Mutation Full Test
+
+- Command: `date`
+- Result: `2026-05-14 23:25:31 IST`.
+- Command: `pnpm test`
+- Result: passed, 169 files / 444 tests.
+
+## 2026-05-14 23:26 IST - VikBooking Import Job Ignored Update Mutation Build
+
+- Command: `date`
+- Result: `2026-05-14 23:26:23 IST`.
+- Command: `pnpm build`
+- Result: passed. Next.js compiled successfully, type validation passed, and 88 static pages generated.
+
+## 2026-05-14 23:26 IST - VikBooking Import Job Ignored Update Mutation Broad Scan
+
+- Command: `date`
+- Result: `2026-05-14 23:26:35 IST`.
+- Command: `rg -n "select\([^\n]*\*|select\(\)" src/app/api src/lib src/server -S`
+- Result: clean; no full-star or empty Supabase `select()` calls found in the scanned source paths.
+
+## 2026-05-14 23:27 IST - VikBooking Import Job Create Mutation Analysis
+
+- Command: `date`
+- Result: `2026-05-14 23:27:04 IST`.
+- Reviewed `createImportJobRecord()` in `src/lib/importers/vikbooking/jobs.ts` and the dry-run import route caller.
+- Finding: import job creation inserts source/status/file metadata/summary values provided by the route, then selects `IMPORT_JOB_SELECT_COLUMNS` to return the full job.
+- Egress opportunity: the route needs the created job response and id for entry inserts, but all non-generated fields are known from the create args or fixed initial defaults. Selecting only generated `id` and `created_at` preserves the returned `ImportJob` shape without reading the full row.
+- Web research source: Supabase JavaScript select modifier docs (`https://supabase.com/docs/reference/javascript/db-modifiers-select`) and insert docs (`https://supabase.com/docs/reference/javascript/insert`).
+- Relevant Supabase behavior: inserted rows are not returned by default; chaining `.select(columns)` returns only the requested modified-row columns.
+- Plan: add a red data-access test requiring `createImportJobRecord()` to select only generated fields and reconstruct the full import job locally, then update the helper.
+
+## 2026-05-14 23:27 IST - VikBooking Import Job Create Mutation Red Test Change
+
+- Command: `date`
+- Result: `2026-05-14 23:27:35 IST`.
+- Changed `src/lib/importers/vikbooking/jobs.test.ts` so `createImportJobRecord()` receives only generated `id` and `created_at` from Supabase, selects `IMPORT_JOB_CREATE_RETURN_COLUMNS`, and still returns the full locally reconstructed `ImportJob`.
+- Expected red result: `IMPORT_JOB_CREATE_RETURN_COLUMNS` is not implemented/exported yet, and `createImportJobRecord()` still parses the generated-only row as a full import job.
+
+## 2026-05-14 23:27 IST - VikBooking Import Job Create Mutation Red Gate
+
+- Command: `date`
+- Result: `2026-05-14 23:27:50 IST`.
+- Command: `pnpm vitest run src/lib/importers/vikbooking/jobs.test.ts`
+- Result: failed as expected, 1 failed / 1 passed / 2 total tests.
+- Intended failure: `createImportJobRecord()` still maps the generated-only insert response as a full import job row, so submitted/defaulted fields are returned as `undefined`.
+
+## 2026-05-14 23:28 IST - VikBooking Import Job Create Mutation Implementation
+
+- Command: `date`
+- Result: `2026-05-14 23:28:36 IST`.
+- Changed `src/lib/importers/vikbooking/jobs.ts`:
+  - Added `IMPORT_JOB_CREATE_RETURN_COLUMNS = "id, created_at"`.
+  - Changed `createImportJobRecord()` to insert a named payload and select only generated id/creation timestamp.
+  - Reconstructed the initial `ImportJob` from the insert payload plus default initial counters/null fields and generated values.
+
+## 2026-05-14 23:28 IST - VikBooking Import Job Create Mutation Focused Green
+
+- Command: `date`
+- Result: `2026-05-14 23:28:52 IST`.
+- Command: `pnpm vitest run src/lib/importers/vikbooking/jobs.test.ts`
+- Result: passed, 1 file / 2 tests.
+
+## 2026-05-14 23:29 IST - VikBooking Import Job Create Mutation Typecheck
+
+- Command: `date`
+- Result: `2026-05-14 23:29:11 IST`.
+- Command: `pnpm exec tsc --noEmit`
+- Result: passed with no TypeScript errors.
+
+## 2026-05-14 23:30 IST - VikBooking Import Job Create Mutation Full Test
+
+- Command: `date`
+- Result: `2026-05-14 23:30:05 IST`.
+- Command: `pnpm test`
+- Result: passed, 169 files / 445 tests.
+
+## 2026-05-14 23:30 IST - VikBooking Import Job Create Mutation Build
+
+- Command: `date`
+- Result: `2026-05-14 23:30:54 IST`.
+- Command: `pnpm build`
+- Result: passed. Next.js compiled successfully, type validation passed, and 88 static pages generated.
+
+## 2026-05-14 23:31 IST - VikBooking Import Job Create Mutation Broad Scan
+
+- Command: `date`
+- Result: `2026-05-14 23:31:06 IST`.
+- Command: `rg -n "select\([^\n]*\*|select\(\)" src/app/api src/lib src/server -S`
+- Result: clean; no full-star or empty Supabase `select()` calls found in the scanned source paths.
+
+## 2026-05-14 23:32 IST - VikBooking Import Job Completion Mutation Analysis
+
+- Command: `date`
+- Result: `2026-05-14 23:32:38 IST`.
+- Reviewed the remaining `updateImportJob()` caller in `src/app/api/admin/import/vikbooking/route.ts` and confirmed it is only used when all rows are skipped and the route marks the job completed.
+- Finding: the completion branch has the loaded base `job`, current `summaryState`, `processedRowTally`, and exact `completedAt` timestamp. The API response can be reconstructed from those local values after a no-return update.
+- Existing `updateImportJob()` can remain as a compatibility helper, but this route no longer needs to select `IMPORT_JOB_SELECT_COLUMNS` for completion.
+- Web research source: Supabase JavaScript select modifier docs (`https://supabase.com/docs/reference/javascript/db-modifiers-select`) and update docs (`https://supabase.com/docs/reference/javascript/update`).
+- Relevant Supabase behavior: updated rows are not returned by default; returning modified rows requires chaining `.select()`, so using the no-return helper avoids full-row egress.
+- Plan: add red coverage for a local import-job patch merge helper and for the all-skipped completion route branch using no-return update while preserving the response shape.
+
+## 2026-05-14 23:33 IST - VikBooking Import Job Completion Mutation Red Test Change
+
+- Command: `date`
+- Result: `2026-05-14 23:33:26 IST`.
+- Changed tests:
+  - `src/lib/importers/vikbooking/jobs.test.ts` now expects `mergeImportJobPatch()` to locally merge status, summary, processed-row count, completion timestamp, and last error fields.
+  - `src/app/api/admin/import/vikbooking/route.test.ts` now covers the all-skipped import branch and expects completion to use `updateImportJobWithoutReturning()`, avoid full-row `updateImportJob()`, and return a locally merged completed job.
+- Expected red result: `mergeImportJobPatch()` is not implemented/exported yet, and the route still calls full-row `updateImportJob()` for the all-skipped completion response.
+
+## 2026-05-14 23:33 IST - VikBooking Import Job Completion Mutation Red Gate
+
+- Command: `date`
+- Result: `2026-05-14 23:33:45 IST`.
+- Command: `pnpm vitest run src/lib/importers/vikbooking/jobs.test.ts src/app/api/admin/import/vikbooking/route.test.ts`
+- Result: failed as expected, 2 failed / 4 passed / 6 total tests.
+- Intended failures:
+  - `mergeImportJobPatch` is not implemented/exported yet.
+  - The all-skipped completion branch still calls full-row `updateImportJob()`.
+
+## 2026-05-14 23:34 IST - VikBooking Import Job Completion Mutation Implementation
+
+- Command: `date`
+- Result: `2026-05-14 23:34:12 IST`.
+- Changed `src/lib/importers/vikbooking/jobs.ts`:
+  - Exported `ImportJobPatch`.
+  - Added `mergeImportJobPatch()` to locally apply import job patches after no-return updates.
+- Changed `src/app/api/admin/import/vikbooking/route.ts`:
+  - The all-skipped completion branch now builds a completion patch, calls `updateImportJobWithoutReturning()`, and returns `mergeImportJobPatch(job, completionPatch)`.
+  - `updateImportJob()` no longer has in-repo callers; it remains exported as a compatibility helper.
+
+## 2026-05-14 23:34 IST - VikBooking Import Job Completion Mutation Focused Test Harness Fix
+
+- Command: `date`
+- Result: `2026-05-14 23:34:33 IST`.
+- Command: `pnpm vitest run src/lib/importers/vikbooking/jobs.test.ts src/app/api/admin/import/vikbooking/route.test.ts`
+- Result: failed, 1 failed / 5 passed / 6 total tests.
+- Finding: the production helper test passed, but the route test mocked `@/lib/importers/vikbooking/jobs` without the newly imported `mergeImportJobPatch` export, causing the route to return 500 inside the test harness.
+- Next step: add the merge helper to the route test mock and rerun focused tests.
+
+## 2026-05-14 23:34 IST - VikBooking Import Job Completion Mutation Focused Green
+
+- Command: `date`
+- Result: `2026-05-14 23:34:56 IST`.
+- Fix: added `mergeImportJobPatch` to the route test jobs-module mock.
+- Command: `pnpm vitest run src/lib/importers/vikbooking/jobs.test.ts src/app/api/admin/import/vikbooking/route.test.ts`
+- Result: passed, 2 files / 6 tests.
+
+## 2026-05-14 23:35 IST - VikBooking Import Job Completion Mutation Typecheck
+
+- Command: `date`
+- Result: `2026-05-14 23:35:18 IST`.
+- Command: `pnpm exec tsc --noEmit`
+- Result: passed with no TypeScript errors.
+
+## 2026-05-14 23:36 IST - VikBooking Import Job Completion Mutation Full Test
+
+- Command: `date`
+- Result: `2026-05-14 23:36:11 IST`.
+- Command: `pnpm test`
+- Result: passed, 169 files / 447 tests.
+
+## 2026-05-14 23:36 IST - VikBooking Import Job Completion Mutation Build
+
+- Command: `date`
+- Result: `2026-05-14 23:36:58 IST`.
+- Command: `pnpm build`
+- Result: passed. Next.js compiled successfully, type validation passed, and 88 static pages generated.
+
+## 2026-05-14 23:37 IST - VikBooking Import Job Completion Mutation Broad Scan
+
+- Command: `date`
+- Result: `2026-05-14 23:37:10 IST`.
+- Command: `rg -n "select\([^\n]*\*|select\(\)" src/app/api src/lib src/server -S`
+- Result: clean; no full-star or empty Supabase `select()` calls found in the scanned source paths.
+
+## 2026-05-14 23:37 IST - VikBooking Job Status Skipped Entries Analysis
+
+- Command: `date`
+- Result: `2026-05-14 23:37:56 IST`.
+- Reviewed `src/app/api/admin/import/vikbooking/jobs/[id]/route.ts`, its test, `SkipReportEntry`, and the CSV import panel polling client.
+- Findings:
+  - The job status route correctly uses count-only head queries for per-status counts and a compact recent-error query.
+  - It still calls `fetchAllSkippedEntries()` on every poll, selecting `payload` JSON for every skipped row in pages of 500.
+  - The import execution route already appends normalized `SkipReportEntry[]` to `job.summary.skippedRows` whenever rows are skipped.
+  - For jobs with `summary.skippedRows`, the status route can return those entries directly and avoid the per-poll skipped-entry payload query. The DB fallback should remain for older jobs without summary skip reports.
+- Web research source: Supabase JavaScript select modifier docs (`https://supabase.com/docs/reference/javascript/db-modifiers-select`) and limit docs (`https://supabase.com/docs/reference/javascript/limit`).
+- Relevant Supabase behavior: selecting fewer columns and avoiding unnecessary queries reduces returned database payload; `limit()` constrains row count but each selected JSON payload still contributes to egress.
+- Plan: add red route coverage proving `summary.skippedRows` bypasses the skipped-entry payload query while preserving response shape, then update the status route.
+
+## 2026-05-14 23:38 IST - VikBooking Job Status Skipped Entries Red Test Change
+
+- Command: `date`
+- Result: `2026-05-14 23:38:29 IST`.
+- Changed `src/app/api/admin/import/vikbooking/jobs/[id]/route.test.ts` so the status route receives `job.summary.skippedRows`, must return that skip report, and must not issue the skipped-entry payload query selecting `payload`.
+- Expected red result: the route still always calls `fetchAllSkippedEntries()`, so the response ignores summary skip rows and the payload query is still made.
+
+## 2026-05-14 23:38 IST - VikBooking Job Status Skipped Entries Red Gate
+
+- Command: `date`
+- Result: `2026-05-14 23:38:48 IST`.
+- Command: `pnpm vitest run 'src/app/api/admin/import/vikbooking/jobs/[id]/route.test.ts'`
+- Result: failed as expected, 1 failed / 0 passed / 1 total test.
+- Intended failure: the status route ignored `job.summary.skippedRows` and returned an empty `skippedEntries` array from the fallback skipped-entry query.
+
+## 2026-05-14 23:39 IST - VikBooking Job Status Skipped Entries Implementation
+
+- Command: `date`
+- Result: `2026-05-14 23:39:19 IST`.
+- Changed `src/app/api/admin/import/vikbooking/jobs/[id]/route.ts`:
+  - Added `getSummarySkippedEntries()` and `isSkipReportEntry()` to safely read normalized skip reports from `job.summary.skippedRows`.
+  - Moved legacy skipped-entry row mapping into `mapSkippedEntryRow()`.
+  - The status route now returns summary skip reports directly when present and only falls back to the payload-heavy skipped-entry query for older jobs without summary skip reports.
+
+## 2026-05-14 23:39 IST - VikBooking Job Status Skipped Entries Focused Green
+
+- Command: `date`
+- Result: `2026-05-14 23:39:40 IST`.
+- Command: `pnpm vitest run 'src/app/api/admin/import/vikbooking/jobs/[id]/route.test.ts'`
+- Result: passed, 1 file / 1 test.
+
+## 2026-05-14 23:40 IST - VikBooking Job Status Skipped Entries Typecheck
+
+- Command: `date`
+- Result: `2026-05-14 23:40:04 IST`.
+- Command: `pnpm exec tsc --noEmit`
+- Result: passed with no TypeScript errors.
+
+## 2026-05-14 23:41 IST - VikBooking Job Status Skipped Entries Full Test
+
+- Command: `date`
+- Result: `2026-05-14 23:41:02 IST`.
+- Command: `pnpm test`
+- Result: passed, 169 files / 447 tests.
+
+## 2026-05-14 23:42 IST - VikBooking Job Status Skipped Entries Build
+
+- Command: `date`
+- Result: `2026-05-14 23:42:07 IST`.
+- Command: `pnpm build`
+- Result: passed. Next.js compiled successfully, type validation passed, and 88 static pages generated.
+
+## 2026-05-14 23:42 IST - VikBooking Job Status Skipped Entries Broad Scan
+
+- Command: `date`
+- Result: `2026-05-14 23:42:22 IST`.
+- Command: `rg -n "select\([^\n]*\*|select\(\)" src/app/api src/lib src/server -S`
+- Result: clean; no full-star or empty Supabase `select()` calls found in the scanned source paths.
+
+## 2026-05-14 23:43 IST - Admin Review Update Mutation Analysis
+
+- Command: `date`
+- Result: `2026-05-14 23:43:07 IST`.
+- Reviewed `src/lib/server/reviews.ts`, `src/components/admin/reviews/review-form.tsx`, and review server tests.
+- Web research source: Supabase JavaScript select modifier docs (`https://supabase.com/docs/reference/javascript/db-modifiers-select`).
+- Findings:
+  - `updateReview()` already updates `testimonials` without chaining `.select()`, and the review form ignores a return value.
+  - `toggleReviewPublish()` also updates without returning rows.
+  - `createReview()` was already optimized in an earlier pass to select only generated fields and reconstruct locally.
+- Decision: no code change for this pass; the admin review update/publish mutations are already in the desired no-return shape.
+
+## 2026-05-14 23:43 IST - Admin Event Update Mutation Analysis
+
+- Command: `date`
+- Result: `2026-05-14 23:43:56 IST`.
+- Reviewed `src/lib/server/events.ts`, `src/components/admin/events/event-form.tsx`, and event server tests.
+- Web research source: Supabase JavaScript select modifier docs (`https://supabase.com/docs/reference/javascript/db-modifiers-select`).
+- Findings:
+  - `updateEvent()` updates `event_banners` without chaining `.select()`, and the form ignores a return value.
+  - `deleteEvent()` deletes without returning rows.
+  - `toggleEventBanner()` delegates to an RPC whose return shape is controlled by the SQL function, not a client-side `.select()`.
+  - `createEvent()` was already optimized in an earlier pass to select only generated fields and reconstruct locally.
+- Decision: no code change for this pass; event create/update/delete paths are already avoiding full mutation rows on the client side.
+
+## 2026-05-14 23:46 IST - Guest Update Fallback Egress Analysis
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-14 23:46:18 IST`.
+- Research refresh:
+  - Official Supabase JavaScript docs state mutation methods do not return modified rows by default.
+  - The same docs state chaining `.select()` on insert/update/upsert/delete returns modified rows in `data`, so avoiding `.select()` removes response-row egress when the caller can merge locally.
+- Analysis:
+  - `src/app/admin/guests/components/guest-form-dialog.tsx` passes the existing guest into `updateGuest()`, so normal admin guest edits already take the no-return path.
+  - `src/hooks/use-app-data.ts` still has a fallback branch that calls `api.updateGuest()` and returns the full guest row when no local guest is found.
+  - If no local guest exists, the current `setGuests(prev => prev.map(...))` cannot actually add or update any local item; the returned row is only used for activity labeling.
+  - Safer egress target: keep the fallback command behavior but call `updateGuestWithoutReturning()` and derive the activity label from the submitted patch plus the guest id.
+
+## 2026-05-14 23:47 IST - Guest Update Fallback Red Test Added
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-14 23:47:11 IST`.
+- Change: added a test in `src/hooks/use-app-data.load-plan.test.tsx` for updating a guest without an existing local guest.
+- Expected red behavior: current code still calls `api.updateGuest()` and consumes a full returned guest row; the new test requires `api.updateGuestWithoutReturning()` and activity metadata built from the submitted patch.
+
+## 2026-05-14 23:47 IST - Guest Update Fallback Red Test Run
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-14 23:47:30 IST`.
+- Command: `pnpm vitest run src/hooks/use-app-data.load-plan.test.tsx`
+- Result: failed as expected, 1 failed / 52 passed.
+- Failure: new test expected `api.updateGuestWithoutReturning("guest-1", updatedGuest)`, but the current fallback made zero no-return calls because it still uses `api.updateGuest()`.
+
+## 2026-05-14 23:47 IST - Guest Update Fallback Implementation
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-14 23:47:58 IST`.
+- Change: updated the no-local-guest fallback in `src/hooks/use-app-data.ts` to call `api.updateGuestWithoutReturning()`.
+- Behavior: since no local guest exists to merge into state, the branch now logs the activity from submitted guest fields with the requested guest id, avoiding the full returned guest row.
+
+## 2026-05-14 23:48 IST - Guest Update Fallback Focused Test
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-14 23:48:17 IST`.
+- Command: `pnpm vitest run src/hooks/use-app-data.load-plan.test.tsx`
+- Result: passed, 1 file / 53 tests.
+
+## 2026-05-14 23:48 IST - Guest Update Fallback Typecheck
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-14 23:48:43 IST`.
+- Command: `pnpm exec tsc --noEmit`
+- Result: passed.
+
+## 2026-05-14 23:49 IST - Guest Update Fallback Full Test
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-14 23:49:34 IST`.
+- Command: `pnpm test`
+- Result: passed, 169 files / 448 tests.
+
+## 2026-05-14 23:50 IST - Guest Update Fallback Build
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-14 23:50:25 IST`.
+- Command: `pnpm build`
+- Result: passed; Next.js generated 88 static pages.
+
+## 2026-05-14 23:50 IST - Guest Update Fallback Broad Scan
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-14 23:50:36 IST`.
+- Command: `rg -n "select\([^\n]*\*|select\(\)" src/app/api src/lib src/server -S`
+- Result: clean; no full-star or empty Supabase `select()` calls found in the scanned source paths.
+
+## 2026-05-14 23:50 IST - Rate Plan Update Fallback Egress Analysis
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-14 23:50:58 IST`.
+- Research refresh:
+  - Official Supabase JavaScript update docs state updated rows are not returned by default.
+  - Official Supabase select modifier docs state chaining `.select()` on mutations returns modified rows in `data`.
+- Analysis:
+  - `src/app/admin/rates/components/rate-plan-form-dialog.tsx` passes the existing rate plan into `updateRatePlan()`, so normal admin rate-plan edits already use `updateRatePlanWithoutReturning()`.
+  - `src/hooks/use-app-data.ts` still has a no-local-rate-plan fallback that calls `api.updateRatePlan()` and receives the full rate plan row.
+  - As with guests, the fallback cannot update local state when the local rate plan is missing; the returned row is only used for activity labeling.
+  - Safer egress target: switch this fallback to `api.updateRatePlanWithoutReturning()` and derive the label from `updatedData.name` or the rate plan id.
+
+## 2026-05-14 23:51 IST - Rate Plan Update Fallback Red Test Added
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-14 23:51:24 IST`.
+- Change: added a test in `src/hooks/use-app-data.load-plan.test.tsx` for updating a rate plan when no local rate plan is available.
+- Expected red behavior: current code still calls `api.updateRatePlan()` and consumes a full returned rate-plan row; the new test requires `api.updateRatePlanWithoutReturning()`.
+
+## 2026-05-14 23:51 IST - Rate Plan Update Fallback Red Test Run
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-14 23:51:45 IST`.
+- Command: `pnpm vitest run src/hooks/use-app-data.load-plan.test.tsx`
+- Result: failed as expected, 1 failed / 53 passed.
+- Failure: new rate-plan fallback test expected `api.updateRatePlanWithoutReturning("rate-1", updatedRatePlan)`, but the current fallback made zero no-return calls because it still uses `api.updateRatePlan()`.
+
+## 2026-05-14 23:52 IST - Rate Plan Update Fallback Implementation
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-14 23:52:03 IST`.
+- Change: updated the no-local-rate-plan fallback in `src/hooks/use-app-data.ts` to call `api.updateRatePlanWithoutReturning()`.
+- Behavior: since no local rate plan exists to merge into state, the branch now logs from `updatedData.name` or the rate plan id, avoiding the full returned rate-plan row.
+
+## 2026-05-14 23:52 IST - Rate Plan Update Fallback Focused Test
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-14 23:52:24 IST`.
+- Command: `pnpm vitest run src/hooks/use-app-data.load-plan.test.tsx`
+- Result: passed, 1 file / 54 tests.
+
+## 2026-05-14 23:52 IST - Rate Plan Update Fallback Typecheck
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-14 23:52:41 IST`.
+- Command: `pnpm exec tsc --noEmit`
+- Result: passed.
+
+## 2026-05-14 23:53 IST - Rate Plan Update Fallback Full Test
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-14 23:53:45 IST`.
+- Command: `pnpm test`
+- Result: passed, 169 files / 449 tests.
+
+## 2026-05-14 23:54 IST - Rate Plan Update Fallback Build
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-14 23:54:42 IST`.
+- Command: `pnpm build`
+- Result: passed; Next.js generated 88 static pages.
+
+## 2026-05-14 23:54 IST - Rate Plan Update Fallback Broad Scan
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-14 23:54:55 IST`.
+- Command: `rg -n "select\([^\n]*\*|select\(\)" src/app/api src/lib src/server -S`
+- Result: clean; no full-star or empty Supabase `select()` calls found in the scanned source paths.
+
+## 2026-05-14 23:55 IST - Room Update Fallback Egress Analysis
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-14 23:55:13 IST`.
+- Research refresh:
+  - Official Supabase JavaScript update docs state updated rows are not returned by default.
+  - Official Supabase select modifier docs state chaining `.select()` on mutations returns modified rows in `data`.
+- Analysis:
+  - `src/app/admin/rooms/components/room-form-dialog.tsx` passes the existing room into `updateRoom()`, and `src/app/admin/housekeeping/housekeeping-panel.tsx` also passes the existing room for status changes.
+  - `src/hooks/use-app-data.ts` still has a no-local-room fallback that calls `api.updateRoom()` and receives the full room row.
+  - If no local room exists, the returned row cannot replace anything in state; it is only used to produce an activity label.
+  - Safer egress target: switch this fallback to `api.updateRoomWithoutReturning()` and derive the label from `updatedData.roomNumber` or the room id.
+
+## 2026-05-14 23:55 IST - Room Update Fallback Red Test Added
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-14 23:55:40 IST`.
+- Change: added a test in `src/hooks/use-app-data.load-plan.test.tsx` for updating a room when no local room is available.
+- Expected red behavior: current code still calls `api.updateRoom()` and consumes a full returned room row; the new test requires `api.updateRoomWithoutReturning()`.
+
+## 2026-05-14 23:56 IST - Room Update Fallback Red Test Run
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-14 23:56:01 IST`.
+- Command: `pnpm vitest run src/hooks/use-app-data.load-plan.test.tsx`
+- Result: failed as expected, 1 failed / 54 passed.
+- Failure: new room fallback test expected `api.updateRoomWithoutReturning("room-1", updatedRoom)`, but the current fallback made zero no-return calls because it still uses `api.updateRoom()`.
+
+## 2026-05-14 23:56 IST - Room Update Fallback Implementation
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-14 23:56:18 IST`.
+- Change: updated the no-local-room fallback in `src/hooks/use-app-data.ts` to call `api.updateRoomWithoutReturning()`.
+- Behavior: since no local room exists to merge into state, the branch now logs from `updatedData.roomNumber` or the room id, avoiding the full returned room row.
+
+## 2026-05-14 23:56 IST - Room Update Fallback Focused Test
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-14 23:56:40 IST`.
+- Command: `pnpm vitest run src/hooks/use-app-data.load-plan.test.tsx`
+- Result: passed, 1 file / 55 tests.
+
+## 2026-05-14 23:56 IST - Room Update Fallback Typecheck
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-14 23:56:59 IST`.
+- Command: `pnpm exec tsc --noEmit`
+- Result: passed.
+
+## 2026-05-14 23:58 IST - Room Update Fallback Full Test
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-14 23:58:00 IST`.
+- Command: `pnpm test`
+- Result: passed, 169 files / 450 tests.
+
+## 2026-05-14 23:59 IST - Room Update Fallback Build
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-14 23:59:01 IST`.
+- Command: `pnpm build`
+- Result: passed; Next.js generated 88 static pages.
+
+## 2026-05-14 23:59 IST - Room Update Fallback Broad Scan
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-14 23:59:13 IST`.
+- Command: `rg -n "select\([^\n]*\*|select\(\)" src/app/api src/lib src/server -S`
+- Result: clean; no full-star or empty Supabase `select()` calls found in the scanned source paths.
+
+## 2026-05-14 23:59 IST - Room Category Update Fallback Egress Analysis
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-14 23:59:32 IST`.
+- Research refresh:
+  - Official Supabase JavaScript docs state mutation methods do not return modified rows by default.
+  - Chaining `.select()` on a mutation returns modified rows in `data`, so avoiding it removes response-row egress when callers can merge or log locally.
+- Analysis:
+  - `src/app/admin/room-categories/components/room-category-form-dialog.tsx` passes the existing category into `updateRoomCategory()`, so normal category edits already use `updateRoomCategoryWithoutReturning()`.
+  - `src/hooks/use-app-data.ts` still has a no-local-room-category fallback that calls `api.updateRoomCategory()` and receives the full category row.
+  - If no local category exists, the returned row cannot replace anything in state; it is only used for activity labeling.
+  - Safer egress target: switch this fallback to `api.updateRoomCategoryWithoutReturning()` and derive the label from `updatedData.name` or the category id.
+
+## 2026-05-15 00:00 IST - Room Category Update Fallback Red Test Added
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-15 00:00:01 IST`.
+- Change: added a test in `src/hooks/use-app-data.load-plan.test.tsx` for updating a room category when no local category is available.
+- Expected red behavior: current code still calls `api.updateRoomCategory()` and consumes a full returned category row; the new test requires `api.updateRoomCategoryWithoutReturning()`.
+
+## 2026-05-15 00:00 IST - Room Category Update Fallback Red Test Run
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-15 00:00:24 IST`.
+- Command: `pnpm vitest run src/hooks/use-app-data.load-plan.test.tsx`
+- Result: failed as expected, 1 failed / 55 passed.
+- Failure: new room-category fallback test expected `api.updateRoomCategoryWithoutReturning("category-1", updatedCategory)`, but the current fallback made zero no-return calls because it still uses `api.updateRoomCategory()`.
+
+## 2026-05-15 00:00 IST - Room Category Update Fallback Implementation
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-15 00:00:44 IST`.
+- Change: updated the no-local-room-category fallback in `src/hooks/use-app-data.ts` to call `api.updateRoomCategoryWithoutReturning()`.
+- Behavior: since no local category exists to merge into state, the branch now logs from `updatedData.name` or the category id, avoiding the full returned category row.
+
+## 2026-05-15 00:01 IST - Room Category Update Fallback Focused Test
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-15 00:01:05 IST`.
+- Command: `pnpm vitest run src/hooks/use-app-data.load-plan.test.tsx`
+- Result: passed, 1 file / 56 tests.
+
+## 2026-05-15 00:01 IST - Room Category Update Fallback Typecheck
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-15 00:01:26 IST`.
+- Command: `pnpm exec tsc --noEmit`
+- Result: passed.
+
+## 2026-05-15 00:02 IST - Room Category Update Fallback Full Test
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-15 00:02:28 IST`.
+- Command: `pnpm test`
+- Result: passed, 169 files / 451 tests.
+
+## 2026-05-15 00:03 IST - Room Category Update Fallback Build
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-15 00:03:23 IST`.
+- Command: `pnpm build`
+- Result: passed; Next.js generated 88 static pages.
+
+## 2026-05-15 00:03 IST - Room Category Update Fallback Broad Scan
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-15 00:03:36 IST`.
+- Command: `rg -n "select\([^\n]*\*|select\(\)" src/app/api src/lib src/server -S`
+- Result: clean; no full-star or empty Supabase `select()` calls found in the scanned source paths.
+
+## 2026-05-15 00:03 IST - Seasonal Price Update Fallback Egress Analysis
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-15 00:03:57 IST`.
+- Research refresh:
+  - Official Supabase JavaScript docs state mutation methods do not return modified rows by default.
+  - Chaining `.select()` on a mutation returns modified rows in `data`, so avoiding it removes response-row egress when callers can merge or log locally.
+- Analysis:
+  - `src/app/admin/rates/components/seasonal-price-form-dialog.tsx` passes the existing seasonal price into `updateSeasonalPrice()`, so normal admin seasonal-price edits already use `updateSeasonalPriceWithoutReturning()`.
+  - `src/hooks/use-app-data.ts` still has a no-local-seasonal-price fallback that calls `api.updateSeasonalPrice()` and receives the full seasonal-price row.
+  - If no local seasonal price exists, the returned row cannot replace anything in state; it is only used for activity labeling.
+  - Safer egress target: switch this fallback to `api.updateSeasonalPriceWithoutReturning()` and derive the label from `updatedData.name` or the seasonal-price id.
+
+## 2026-05-15 00:04 IST - Seasonal Price Update Fallback Red Test Added
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-15 00:04:31 IST`.
+- Change: added a test in `src/hooks/use-app-data.load-plan.test.tsx` for updating a seasonal price when no local seasonal price is available.
+- Expected red behavior: current code still calls `api.updateSeasonalPrice()` and consumes a full returned seasonal-price row; the new test requires `api.updateSeasonalPriceWithoutReturning()`.
+
+## 2026-05-15 00:04 IST - Seasonal Price Update Fallback Red Test Run
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-15 00:04:54 IST`.
+- Command: `pnpm vitest run src/hooks/use-app-data.load-plan.test.tsx`
+- Result: failed as expected, 1 failed / 56 passed.
+- Failure: new seasonal-price fallback test expected `api.updateSeasonalPriceWithoutReturning("seasonal-1", updatedSeasonalPrice)`, but the current fallback made zero no-return calls because it still uses `api.updateSeasonalPrice()`.
+
+## 2026-05-15 00:05 IST - Seasonal Price Update Fallback Implementation
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-15 00:05:14 IST`.
+- Change: updated the no-local-seasonal-price fallback in `src/hooks/use-app-data.ts` to call `api.updateSeasonalPriceWithoutReturning()`.
+- Behavior: since no local seasonal price exists to merge into state, the branch now logs from `updatedData.name` or the seasonal-price id, avoiding the full returned seasonal-price row.
+
+## 2026-05-15 00:05 IST - Seasonal Price Update Fallback Focused Test
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-15 00:05:35 IST`.
+- Command: `pnpm vitest run src/hooks/use-app-data.load-plan.test.tsx`
+- Result: passed, 1 file / 57 tests.
+
+## 2026-05-15 00:06 IST - Seasonal Price Update Fallback Typecheck
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-15 00:06:05 IST`.
+- Command: `pnpm exec tsc --noEmit`
+- Result: passed.
+
+## 2026-05-15 00:07 IST - Seasonal Price Update Fallback Full Test
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-15 00:07:24 IST`.
+- Command: `pnpm test`
+- Result: passed, 169 files / 452 tests.
+
+## 2026-05-15 00:08 IST - Seasonal Price Update Fallback Build
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-15 00:08:57 IST`.
+- Command: `pnpm build`
+- Result: passed; Next.js generated 88 static pages.
+
+## 2026-05-15 00:09 IST - Seasonal Price Update Fallback Broad Scan
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-15 00:09:12 IST`.
+- Command: `rg -n "select\([^\n]*\*|select\(\)" src/app/api src/lib src/server -S`
+- Result: clean; no full-star or empty Supabase `select()` calls found in the scanned source paths.
+
+## 2026-05-15 00:10 IST - Remaining Hook Mutation Fallback Inventory
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-15 00:10:09 IST`.
+- Command: `rg -n "const \{ data.*= await api\.(update|add|create)|await api\.(update|add|create)[A-Za-z]+\(" src/hooks/use-app-data.ts -S`
+- Findings:
+  - Recently optimized fallbacks now call no-return helpers for guests, rooms, room categories, rate plans, and seasonal prices.
+  - Remaining full-row hook fallback candidates include property closures, roles, user profiles, amenities, sticky notes, and reservation/status fallbacks.
+  - Next safe target: property closure update fallback, because the settings form passes the existing closure and the no-local fallback only needs a label.
+
+## 2026-05-15 00:10 IST - Property Closure Update Fallback Egress Analysis
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-15 00:10:32 IST`.
+- Web research:
+  - Supabase JavaScript `.update()` does not return modified rows unless a `.select()` modifier is chained.
+  - Supabase recommends selecting only needed columns when rows are returned.
+  - References: https://supabase.com/docs/reference/javascript/update and https://supabase.com/docs/reference/javascript/db-modifiers-select
+- Local findings:
+  - `src/app/admin/settings/components/property-closure-form-dialog.tsx` passes the existing closure into `updatePropertyClosure()` on edits, so the common edit path can merge locally.
+  - `src/hooks/use-app-data.ts` already uses `api.updatePropertyClosureWithoutReturning()` when an existing closure is available.
+  - The no-local fallback still calls `api.updatePropertyClosure()` for a full updated row, but then maps over local state; if the local closure is missing, there is no row to replace.
+  - The fallback only needs submitted dates/reason or the id for the activity label/details, so it can use the no-return update helper and avoid the full-row response.
+
+## 2026-05-15 00:12 IST - Property Closure Update Fallback Red Test Added
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-15 00:12:12 IST`.
+- Change:
+  - Added `updates property closures without returning rows when no local closure is available` to `src/hooks/use-app-data.load-plan.test.tsx`.
+  - The test covers the generic no-local fallback and expects `api.updatePropertyClosureWithoutReturning()` with activity details derived from the submitted dates.
+
+## 2026-05-15 00:12 IST - Property Closure Update Fallback Red Test Run
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-15 00:12:32 IST`.
+- Command: `pnpm vitest run src/hooks/use-app-data.load-plan.test.tsx`
+- Result: failed as expected before implementation; 1 failed / 57 passed in `src/hooks/use-app-data.load-plan.test.tsx`.
+- Failure:
+  - `updates property closures without returning rows when no local closure is available` expected `api.updatePropertyClosureWithoutReturning("closure-1", updatedClosure)`, but it was not called because the fallback still uses the full-row `api.updatePropertyClosure()` path.
+
+## 2026-05-15 00:12 IST - Property Closure Update Fallback Implementation
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-15 00:12:54 IST`.
+- Change:
+  - Updated the no-local `updatePropertyClosure()` fallback in `src/hooks/use-app-data.ts` to call `api.updatePropertyClosureWithoutReturning()`.
+  - Removed the unreachable local replacement in that fallback because there is no local closure row to replace.
+  - Activity labels/details are now derived from submitted `reason`, `startDate`, and `endDate`, with the closure id as the final fallback.
+
+## 2026-05-15 00:13 IST - Property Closure Update Fallback Focused Test
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-15 00:13:15 IST`.
+- Command: `pnpm vitest run src/hooks/use-app-data.load-plan.test.tsx`
+- Result: passed; 1 file / 58 tests.
+
+## 2026-05-15 00:13 IST - Property Closure Update Fallback Typecheck
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-15 00:13:31 IST`.
+- Command: `pnpm exec tsc --noEmit`
+- Result: passed.
+
+## 2026-05-15 00:14 IST - Property Closure Update Fallback Full Test
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-15 00:14:15 IST`.
+- Command: `pnpm test`
+- Result: passed; 169 files / 453 tests.
+
+## 2026-05-15 00:15 IST - Property Closure Update Fallback Build
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-15 00:15:44 IST`.
+- Command: `pnpm build`
+- Result: passed; Next.js generated 88 static pages.
+
+## 2026-05-15 00:15 IST - Property Closure Update Fallback Broad Scan
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-15 00:15:55 IST`.
+- Command: `rg -n "select\([^\n]*\*|select\(\)" src/app/api src/lib src/server -S`
+- Result: clean; no full-star or empty Supabase `select()` calls found in the scanned source paths.
+
+## 2026-05-15 00:16 IST - Role Update Fallback Egress Analysis
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-15 00:16:18 IST`.
+- Web research:
+  - Supabase JavaScript `.update()` does not return modified rows unless `.select()` is chained.
+  - The `.select()` modifier returns modified rows in `data` and accepts a column list, so avoiding it avoids response-row egress when the caller already has enough state.
+  - References: https://supabase.com/docs/reference/javascript/update and https://supabase.com/docs/reference/javascript/db-modifiers-select
+- Local findings:
+  - `src/app/admin/settings/components/role-form-dialog.tsx` passes the existing role into `updateRole()` for normal edits.
+  - `src/hooks/use-app-data.ts` already uses `api.updateRoleWithoutReturning()` when an existing role is available and merges the submitted payload locally.
+  - The no-local fallback still calls `api.updateRole()`, maps the returned row, and then maps local state by id; if the role is not local, this replacement is a no-op.
+  - The fallback can use the submitted role name or the role id for activity logging and keep `extractChangedFields(undefined, updatedData)` for metadata.
+
+## 2026-05-15 00:17 IST - Role Update Fallback Red Test Added
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-15 00:17:10 IST`.
+- Change:
+  - Added `updates roles without returning rows when no local role is available` to `src/hooks/use-app-data.load-plan.test.tsx`.
+  - The test expects the generic role fallback to call `api.updateRoleWithoutReturning()` and derive activity details from the submitted role payload.
+
+## 2026-05-15 00:17 IST - Role Update Fallback Red Test Run
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-15 00:17:30 IST`.
+- Command: `pnpm vitest run src/hooks/use-app-data.load-plan.test.tsx`
+- Result: failed as expected before implementation; 1 failed / 58 passed in `src/hooks/use-app-data.load-plan.test.tsx`.
+- Failure:
+  - `updates roles without returning rows when no local role is available` expected `api.updateRoleWithoutReturning("role-1", updatedRole)`, but it was not called because the fallback still uses the full-row `api.updateRole()` path.
+
+## 2026-05-15 00:17 IST - Role Update Fallback Implementation
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-15 00:17:51 IST`.
+- Change:
+  - Updated the no-local `updateRole()` fallback in `src/hooks/use-app-data.ts` to call `api.updateRoleWithoutReturning()`.
+  - Removed returned-row mapping and local state replacement from that fallback because a missing local role cannot be replaced in the current state array.
+  - Activity labels/details now use the submitted role `name` with the role id as a fallback, while preserving changed-field metadata.
+
+## 2026-05-15 00:18 IST - Role Update Fallback Focused Test
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-15 00:18:13 IST`.
+- Command: `pnpm vitest run src/hooks/use-app-data.load-plan.test.tsx`
+- Result: passed; 1 file / 59 tests.
+
+## 2026-05-15 00:18 IST - Role Update Fallback Typecheck
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-15 00:18:30 IST`.
+- Command: `pnpm exec tsc --noEmit`
+- Result: passed.
+
+## 2026-05-15 00:19 IST - Role Update Fallback Full Test
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-15 00:19:16 IST`.
+- Command: `pnpm test`
+- Result: passed; 169 files / 454 tests.
+
+## 2026-05-15 00:20 IST - Role Update Fallback Build
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-15 00:20:09 IST`.
+- Command: `pnpm build`
+- Result: passed; Next.js generated 88 static pages.
+
+## 2026-05-15 00:20 IST - Role Update Fallback Broad Scan
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-15 00:20:23 IST`.
+- Command: `rg -n "select\([^\n]*\*|select\(\)" src/app/api src/lib src/server -S`
+- Result: clean; no full-star or empty Supabase `select()` calls found in the scanned source paths.
+
+## 2026-05-15 00:20 IST - User Profile Update Fallback Egress Analysis
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-15 00:20:40 IST`.
+- Web research:
+  - Supabase JavaScript `.update()` does not return modified rows unless `.select()` is chained.
+  - The `.select()` modifier returns modified rows in `data` and accepts a column list; avoiding it is appropriate when the hook already has enough payload data for state/activity.
+  - References: https://supabase.com/docs/reference/javascript/update and https://supabase.com/docs/reference/javascript/db-modifiers-select
+- Local findings:
+  - `src/app/admin/settings/components/user-form-dialog.tsx` passes the existing user into `updateUser()` on normal edits and then calls `refetchUsers()`.
+  - `src/hooks/use-app-data.ts` already uses `api.updateUserProfileWithoutReturning()` when an existing local user is available.
+  - The no-local fallback still calls `api.updateUserProfile()`, uses the returned profile row for activity labels, and maps local users by id; if the local user is missing, that state update cannot replace anything.
+  - The fallback can use the submitted `name` or user id for activity logging and preserve changed-field metadata from the payload.
+
+## 2026-05-15 00:21 IST - User Profile Update Fallback Red Test Added
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-15 00:21:17 IST`.
+- Change:
+  - Added `updates users without returning profile rows when no local user is available` to `src/hooks/use-app-data.load-plan.test.tsx`.
+  - The test expects `api.updateUserProfileWithoutReturning()` for the generic fallback and activity details derived from the submitted profile payload.
+
+## 2026-05-15 00:21 IST - User Profile Update Fallback Red Test Run
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-15 00:21:38 IST`.
+- Command: `pnpm vitest run src/hooks/use-app-data.load-plan.test.tsx`
+- Result: failed as expected before implementation; 1 failed / 59 passed in `src/hooks/use-app-data.load-plan.test.tsx`.
+- Failure:
+  - `updates users without returning profile rows when no local user is available` expected `api.updateUserProfileWithoutReturning("user-2", updatedUser)`, but it was not called because the fallback still uses `api.updateUserProfile()` with a selected profile row.
+
+## 2026-05-15 00:22 IST - User Profile Update Fallback Implementation
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-15 00:22:01 IST`.
+- Change:
+  - Updated the no-local `updateUser()` profile fallback in `src/hooks/use-app-data.ts` to call `api.updateUserProfileWithoutReturning()`.
+  - Removed returned profile mapping and local state replacement from that fallback because a missing local user cannot be replaced in the current state array.
+  - Activity labels/details now use the submitted profile `name` with the user id as a fallback, while preserving changed-field metadata.
+
+## 2026-05-15 00:22 IST - User Profile Update Fallback Focused Test
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-15 00:22:22 IST`.
+- Command: `pnpm vitest run src/hooks/use-app-data.load-plan.test.tsx`
+- Result: passed; 1 file / 60 tests.
+
+## 2026-05-15 00:22 IST - User Profile Update Fallback Typecheck
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-15 00:22:42 IST`.
+- Command: `pnpm exec tsc --noEmit`
+- Result: passed.
+
+## 2026-05-15 00:23 IST - User Profile Update Fallback Full Test
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-15 00:23:32 IST`.
+- Command: `pnpm test`
+- Result: passed; 169 files / 455 tests.
+
+## 2026-05-15 00:24 IST - User Profile Update Fallback Build
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-15 00:24:20 IST`.
+- Command: `pnpm build`
+- Result: passed; Next.js generated 88 static pages.
+
+## 2026-05-15 00:24 IST - User Profile Update Fallback Broad Scan
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-15 00:24:32 IST`.
+- Command: `rg -n "select\([^\n]*\*|select\(\)" src/app/api src/lib src/server -S`
+- Result: clean; no full-star or empty Supabase `select()` calls found in the scanned source paths.
+
+## 2026-05-15 00:24 IST - Amenity Update Fallback Egress Analysis
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-15 00:24:53 IST`.
+- Web research:
+  - Supabase JavaScript `.update()` does not return modified rows unless `.select()` is chained.
+  - The `.select()` modifier returns modified rows in `data`; avoiding it reduces response-row egress when the submitted payload is sufficient.
+  - References: https://supabase.com/docs/reference/javascript/update and https://supabase.com/docs/reference/javascript/db-modifiers-select
+- Local findings:
+  - `src/app/admin/settings/components/amenity-form-dialog.tsx` passes the existing amenity into `updateAmenity()` for normal edits.
+  - `src/hooks/use-app-data.ts` already uses `api.updateAmenityWithoutReturning()` when an existing amenity is available.
+  - The no-local fallback still calls `api.updateAmenity()`, uses the returned row for activity labels, and maps local amenities by id; if the amenity is missing locally, the replacement is a no-op.
+  - The fallback can use the submitted amenity `name` or amenity id for activity logging and preserve changed-field metadata from the payload.
+
+## 2026-05-15 08:07 IST - Amenity Update Fallback Red Test Added
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-15 08:07:36 IST`.
+- Change:
+  - Added `updates amenities without returning rows when no local amenity is available` to `src/hooks/use-app-data.load-plan.test.tsx`.
+  - The test expects `api.updateAmenityWithoutReturning()` for the generic fallback and activity details derived from the submitted amenity payload.
+
+## 2026-05-15 09:20 IST - Amenity Update Fallback Red Test Run
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-15 09:20:46 IST`.
+- Command: `pnpm vitest run src/hooks/use-app-data.load-plan.test.tsx`
+- Result: failed as expected before implementation; 1 failed / 60 passed in `src/hooks/use-app-data.load-plan.test.tsx`.
+- Failure:
+  - `updates amenities without returning rows when no local amenity is available` expected `api.updateAmenityWithoutReturning("amenity-1", updatedAmenity)`, but it was not called because the fallback still uses `api.updateAmenity()` with a selected amenity row.
+
+## 2026-05-15 09:21 IST - Amenity Update Fallback Implementation
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-15 09:21:08 IST`.
+- Change:
+  - Updated the no-local `updateAmenity()` fallback in `src/hooks/use-app-data.ts` to call `api.updateAmenityWithoutReturning()`.
+  - Removed returned amenity mapping and local state replacement from that fallback because a missing local amenity cannot be replaced in the current state array.
+  - Activity labels/details now use the submitted amenity `name` with the amenity id as a fallback, while preserving changed-field metadata.
+
+## 2026-05-15 09:21 IST - Amenity Update Fallback Focused Test
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-15 09:21:33 IST`.
+- Command: `pnpm vitest run src/hooks/use-app-data.load-plan.test.tsx`
+- Result: passed; 1 file / 61 tests.
+
+## 2026-05-15 09:21 IST - Amenity Update Fallback Typecheck
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-15 09:21:58 IST`.
+- Command: `pnpm exec tsc --noEmit`
+- Result: passed.
+
+## 2026-05-15 16:50 IST - Amenity Update Fallback Full Test Failed
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-15 16:50:56 IST`.
+- Command: `pnpm test`
+- Result: failed; 167 files passed, 2 files failed during shared test setup, 454 tests passed, 2 tests skipped.
+- Failure:
+  - `src/lib/server/booking-search.test.ts` and `src/app/admin/manual-receipt/manual-receipt-utils.test.ts` failed before their tests ran because `src/test/setup.ts` `beforeAll` timed out while starting the test server.
+  - No assertion failure was reported for the amenity fallback behavior; rerunning the failed suites directly is required before continuing the gate chain.
+
+## 2026-05-15 18:14 IST - Amenity Update Fallback Failed Suites Rerun
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-15 18:14:07 IST`.
+- Command: `pnpm vitest run src/lib/server/booking-search.test.ts src/app/admin/manual-receipt/manual-receipt-utils.test.ts`
+- Result: passed; 2 files / 2 tests.
+- Finding:
+  - The previously failed files passed in isolation, confirming the earlier full-suite failure was in the shared setup/server startup path rather than an assertion regression in these tests.
+  - A full test rerun is still required before this pass can be considered fully gated.
+
+## 2026-05-16 00:02 IST - Amenity Update Fallback Full Test Rerun Failed
+
+- Command: `pnpm test`
+- Result: failed again; 167 files passed, 2 files failed during shared test setup, 447 tests passed, 9 tests skipped.
+- Failure:
+  - `src/app/(public)/about-rishikesh/about-rishikesh-code-splitting.test.ts` and `src/app/(public)/book/rooms/[id]/room-detail-code-splitting.test.ts` failed before their tests ran because `src/test/setup.ts` `beforeAll` timed out.
+  - The previous failed suites passed on rerun and this failure moved to different files, so the evidence points to shared test setup instability rather than an amenity fallback regression.
+
+## 2026-05-16 00:02 IST - Vitest MSW Setup Stability Analysis
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-16 00:02:31 IST`.
+- Web research:
+  - Vitest setup files run before each test file in the same process, and setup work participates in lifecycle timing.
+  - Vitest lifecycle hooks time out after 10 seconds by default when an async hook promise does not resolve.
+  - MSW's Node `server.listen()` is synchronous and the official Vitest example imports `server` statically, then uses synchronous `beforeAll(() => server.listen())`, `afterEach(() => server.resetHandlers())`, and `afterAll(() => server.close())`.
+  - References: https://vitest.dev/api/hooks.html, https://main.vitest.dev/config/setupfiles, and https://mswjs.io/docs/integrations/node
+- Local findings:
+  - `src/test/setup.ts` currently performs an async dynamic import in `beforeAll`, `afterEach`, and `afterAll` via `ensureServer()`.
+  - The repeated failures occur in that async `beforeAll` path, not in individual test assertions.
+  - A narrow stability fix is to statically import `server` and make the MSW setup/teardown hooks synchronous, matching MSW's documented Vitest setup and removing dynamic import work from every test file's `beforeAll`.
+
+## 2026-05-16 10:15 IST - Vitest MSW Setup Stability Fix
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-16 10:15:02 IST`.
+- Change:
+  - Updated `src/test/setup.ts` to statically import `server` from `src/test/server.ts`.
+  - Converted MSW `beforeAll`, `afterEach`, and `afterAll` hooks from async dynamic-import wrappers to synchronous `server.listen()`, `server.resetHandlers()`, and `server.close()` calls.
+  - Kept `vi.clearAllMocks()` in `afterEach`.
+
+## 2026-05-16 10:15 IST - Vitest MSW Setup Targeted Gate Command Error
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-16 10:15:31 IST`.
+- Command: `pnpm vitest run src/hooks/use-app-data.load-plan.test.tsx src/app/(public)/about-rishikesh/about-rishikesh-code-splitting.test.ts src/app/(public)/book/rooms/[id]/room-detail-code-splitting.test.ts src/lib/server/booking-search.test.ts src/app/admin/manual-receipt/manual-receipt-utils.test.ts`
+- Result: command did not run because zsh treated the unquoted `(public)` path as a glob pattern and returned `no matches found`.
+- Next step:
+  - Rerun the same targeted gate with the grouped route paths quoted.
+
+## 2026-05-16 10:16 IST - Vitest MSW Setup Targeted Gate
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-16 10:16:15 IST`.
+- Command: `pnpm vitest run src/hooks/use-app-data.load-plan.test.tsx 'src/app/(public)/about-rishikesh/about-rishikesh-code-splitting.test.ts' 'src/app/(public)/book/rooms/[id]/room-detail-code-splitting.test.ts' src/lib/server/booking-search.test.ts src/app/admin/manual-receipt/manual-receipt-utils.test.ts`
+- Result: passed; 5 files / 72 tests.
+- Finding:
+  - The two suites that failed in the latest full-suite setup timeout and the two suites that failed in the prior full-suite setup timeout all pass with the synchronous MSW setup.
+
+## 2026-05-16 10:16 IST - Vitest MSW Setup Typecheck
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-16 10:16:54 IST`.
+- Command: `pnpm exec tsc --noEmit`
+- Result: passed.
+
+## 2026-05-16 10:18 IST - Amenity Update Fallback Full Test
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-16 10:18:03 IST`.
+- Command: `pnpm test`
+- Result: passed; 169 files / 456 tests.
+- Finding:
+  - The synchronous MSW setup removed the previous moving `beforeAll` timeout failures from the full suite.
+
+## 2026-05-16 10:19 IST - Amenity Update Fallback Build
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-16 10:19:02 IST`.
+- Command: `pnpm build`
+- Result: passed; Next.js generated 88 static pages.
+
+## 2026-05-16 10:19 IST - Amenity Update Fallback Broad Scan
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-16 10:19:25 IST`.
+- Command: `rg -n "select\([^\n]*\*|select\(\)" src/app/api src/lib src/server -S`
+- Result: clean; no full-star or empty Supabase `select()` calls found in the scanned source paths.
+
+## 2026-05-16 10:19 IST - Sticky Note Update Fallback Egress Analysis
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-16 10:19:51 IST`.
+- Web research:
+  - Supabase JavaScript `.update()` does not return modified rows unless `.select()` is chained.
+  - The `.select()` modifier returns modified rows in `data`; avoiding it reduces response-row egress when the submitted payload is sufficient.
+  - References: https://supabase.com/docs/reference/javascript/update and https://supabase.com/docs/reference/javascript/db-modifiers-select
+- Local findings:
+  - `src/app/admin/dashboard/components/StickyNoteFormDialog.tsx` passes the existing note into `updateStickyNote()` for normal edits.
+  - `src/hooks/use-app-data.ts` already uses `api.updateStickyNoteWithoutReturning()` when an existing note is available.
+  - The no-local fallback still calls `api.updateStickyNote()`, uses the returned row for activity labels, and maps local notes by id; if the note is missing locally, the replacement is a no-op.
+  - The fallback can use the submitted note `title` or note id for activity logging and preserve changed-field metadata from the payload.
+
+## 2026-05-16 10:20 IST - Sticky Note Update Fallback Red Test Added
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-16 10:20:40 IST`.
+- Change:
+  - Added `updates sticky notes without returning rows when no local note is available` to `src/hooks/use-app-data.load-plan.test.tsx`.
+  - The test expects `api.updateStickyNoteWithoutReturning()` for the generic fallback and activity details derived from the submitted sticky note payload.
+
+## 2026-05-16 10:21 IST - Sticky Note Update Fallback Red Test Run
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-16 10:21:15 IST`.
+- Command: `pnpm vitest run src/hooks/use-app-data.load-plan.test.tsx`
+- Result: failed as expected before implementation; 1 failed / 61 passed in `src/hooks/use-app-data.load-plan.test.tsx`.
+- Failure:
+  - `updates sticky notes without returning rows when no local note is available` expected `api.updateStickyNoteWithoutReturning("note-1", updatedNote)`, but it was not called because the fallback still uses `api.updateStickyNote()` with a selected note row.
+
+## 2026-05-16 10:21 IST - Sticky Note Update Fallback Implementation
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-16 10:21:48 IST`.
+- Change:
+  - Updated the no-local `updateStickyNote()` fallback in `src/hooks/use-app-data.ts` to call `api.updateStickyNoteWithoutReturning()`.
+  - Removed returned note mapping and local state replacement from that fallback because a missing local note cannot be replaced in the current state array.
+  - Activity labels/details now use the submitted note `title` with the note id as a fallback, while preserving changed-field metadata.
+
+## 2026-05-16 10:22 IST - Sticky Note Update Fallback Focused Test
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-16 10:22:19 IST`.
+- Command: `pnpm vitest run src/hooks/use-app-data.load-plan.test.tsx`
+- Result: passed; 1 file / 62 tests.
+
+## 2026-05-16 10:22 IST - Sticky Note Update Fallback Typecheck
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-16 10:22:54 IST`.
+- Command: `pnpm exec tsc --noEmit`
+- Result: passed.
+
+## 2026-05-16 10:23 IST - Sticky Note Update Fallback Full Test
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-16 10:23:58 IST`.
+- Command: `pnpm test`
+- Result: passed; 169 files / 457 tests.
+
+## 2026-05-16 13:26 IST - Sticky Note Update Fallback Build
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-16 13:26:59 IST`.
+- Command: `pnpm build`
+- Result: passed; Next.js generated 88 static pages.
+
+## 2026-05-16 13:27 IST - Sticky Note Update Fallback Broad Scan
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-16 13:27:23 IST`.
+- Command: `rg -n "select\([^\n]*\*|select\(\)" src/app/api src/lib src/server -S`
+- Result: clean; no full-star or empty Supabase `select()` calls found in the scanned source paths.
+
+## 2026-05-16 13:27 IST - Remaining Hook Mutation Fallback Inventory
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-16 13:27:45 IST`.
+- Commands:
+  - `rg -n "const \{ data.*= await api\.(update|add|create)|await api\.(update|add|create)[A-Za-z]+\(" src/hooks/use-app-data.ts -S`
+  - `rg -n "api\.update[A-Za-z]+\(" src/hooks/use-app-data.ts -S`
+- Findings:
+  - Recently optimized hook fallback updates now call no-return helpers for guests, rooms, room categories, rate plans, seasonal prices, property closures, roles, user profiles, amenities, and sticky notes.
+  - Remaining row-returning update candidates in `src/hooks/use-app-data.ts` are reservation update fallback (`api.updateReservation`) and booking reservation status fallback (`api.updateBookingReservationsStatus`).
+  - Next target: reservation update fallback, because the active reservation update path already uses `api.updateReservationWithoutReturning()` when local reservation data is available.
+
+## 2026-05-16 14:35 IST - Reservation Update Fallback Egress Analysis
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-16 14:35:22 IST`.
+- Research refresh:
+  - Supabase JavaScript update docs: `https://supabase.com/docs/reference/javascript/update`
+  - Supabase JavaScript modifier docs: `https://supabase.com/docs/reference/javascript/db-modifiers-select`
+  - Current Supabase behavior remains that updated rows are not returned by default; chaining `.select()` after update requests row data back.
+- Commands:
+  - `sed -n '1028,1100p' src/hooks/use-app-data.ts`
+  - `sed -n '2330,2395p' src/hooks/use-app-data.load-plan.test.tsx`
+  - `sed -n '820,880p' src/app/admin/reservations/components/reservation-edit-form.tsx`
+  - `sed -n '1215,1230p' src/lib/api/index.ts`
+- Findings:
+  - `updateReservation()` already uses `api.updateReservationWithoutReturning()` and local merge state when a reservation exists in `reservations` or `activeBookingReservations`.
+  - The no-local fallback still calls row-returning `api.updateReservation()`, which chains `.select(RESERVATION_SELECT_COLUMNS).single()` in `src/lib/api/index.ts`.
+  - That fallback maps returned data into local reservation arrays, but those maps are no-ops when no local reservation was found.
+  - The fallback only needs mutation success, cache revalidation, changed-field metadata, and an activity label; it can use `updatedData.bookingId || reservationId` instead of requesting the row.
+
+## 2026-05-16 14:36 IST - Reservation Update Fallback Red Test Added
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-16 14:36:57 IST`.
+- Change:
+  - Added `updates reservations without returning rows when no local reservation is available` to `src/hooks/use-app-data.load-plan.test.tsx`.
+  - The test calls `updateReservation("reservation-404", { bookingId: "BK-404", status: "Checked-in" })` without loading local reservation data.
+  - Expected contract: call `api.updateReservationWithoutReturning()`, never call row-returning `api.updateReservation()`, and log activity using the submitted booking id.
+
+## 2026-05-16 14:37 IST - Reservation Update Fallback Red Test Run
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-16 14:37:23 IST`.
+- Command: `pnpm vitest run src/hooks/use-app-data.load-plan.test.tsx`
+- Intended red result: failed, 1 failed / 62 passed in the file.
+- Failure:
+  - New test expected `api.updateReservationWithoutReturning("reservation-404", updatedReservation)` but it was never called.
+  - Current no-local fallback still calls row-returning `api.updateReservation()`.
+
+## 2026-05-16 14:37 IST - Reservation Update Fallback Implementation
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-16 14:37:46 IST`.
+- Change:
+  - Updated the no-local `updateReservation()` fallback in `src/hooks/use-app-data.ts` to call `api.updateReservationWithoutReturning()`.
+  - Removed no-op local array maps that depended on returned row data when no matching reservation was present.
+  - Preserved reservation cache revalidation and activity metadata, with `updatedData.bookingId || reservationId` as the activity label.
+
+## 2026-05-16 14:38 IST - Reservation Update Fallback Focused Test
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-16 14:38:14 IST`.
+- Command: `pnpm vitest run src/hooks/use-app-data.load-plan.test.tsx`
+- Result: passed; 1 file / 63 tests.
+
+## 2026-05-16 14:38 IST - Reservation Update Fallback Typecheck
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-16 14:38:39 IST`.
+- Command: `pnpm exec tsc --noEmit`
+- Result: passed.
+
+## 2026-05-16 14:40 IST - Reservation Update Fallback Full Test
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-16 14:40:05 IST`.
+- Command: `pnpm test`
+- Result: passed; 169 files / 458 tests.
+
+## 2026-05-16 14:41 IST - Reservation Update Fallback Build
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-16 14:41:16 IST`.
+- Command: `pnpm build`
+- Result: passed; Next.js generated 88 static pages.
+
+## 2026-05-16 14:41 IST - Reservation Update Fallback Broad Scan
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-16 14:41:33 IST`.
+- Commands:
+  - `rg -n "select\([^\n]*\*|select\(\)" src/app/api src/lib src/server -S`
+  - `rg -n "api\.updateReservation\(|updateReservationWithoutReturning\(" src/hooks/use-app-data.ts -S`
+- Results:
+  - Broad Supabase select scan is clean; no full-star or empty `select()` calls found in scanned source paths.
+  - Targeted hook scan shows `updateReservation()` now uses `api.updateReservationWithoutReturning()` in all hook reservation update paths and has no remaining `api.updateReservation()` calls.
+
+## 2026-05-16 14:57 IST - Booking Reservation Status Fallback Egress Analysis
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-16 14:57:20 IST`.
+- Research refresh:
+  - Supabase JavaScript update docs: `https://supabase.com/docs/reference/javascript/update`
+  - Supabase JavaScript modifier docs: `https://supabase.com/docs/reference/javascript/db-modifiers-select`
+  - Current Supabase behavior remains that updated rows are not returned by default; chaining `.select()` after update requests row data back.
+  - Local installed Supabase/PostgREST package is `@supabase/supabase-js` 2.89.0, whose `PostgrestQueryBuilder.update(values, { count })` supports exact/planned/estimated counts without returning row bodies.
+- Commands:
+  - `sed -n '1100,1225p' src/hooks/use-app-data.ts`
+  - `sed -n '1225,1275p' src/hooks/use-app-data.ts`
+  - `sed -n '1230,1275p' src/lib/api/index.ts`
+  - `sed -n '2435,2505p' src/hooks/use-app-data.load-plan.test.tsx`
+  - `rg -n "updateBookingReservationStatus|updateBookingReservationsStatus" src/hooks src/app src/components src/lib -S`
+- Findings:
+  - `updateBookingReservationStatus()` already calls `api.updateBookingReservationsStatusWithoutReturning()` when it can find affected reservations in local `reservations`, `activeBookingReservations`, or booking `subRows`.
+  - The no-local fallback still calls row-returning `api.updateBookingReservationsStatus()`, which chains `.select(RESERVATION_SELECT_COLUMNS)` in `src/lib/api/index.ts`.
+  - The fallback uses returned rows for per-reservation activity logs and an aggregate count, but local state maps are no-ops when no matching local reservation was found.
+  - The optimized fallback can call `api.updateBookingReservationsStatusWithoutReturning()` with exact count enabled, use the returned count for aggregate activity, and avoid returning full reservation rows.
+
+## 2026-05-16 14:59 IST - Booking Reservation Status Fallback Red Tests Added
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-16 14:59:45 IST`.
+- Changes:
+  - Added `updates booking reservation statuses without returning rows when no local reservations are available` to `src/hooks/use-app-data.load-plan.test.tsx`.
+  - Updated `src/lib/api/index.test.ts` to require `updateBookingReservationsStatusWithoutReturning()` to call Supabase update with `{ count: "exact" }` while still avoiding `.select()`.
+  - The hook test expects the no-local fallback to call the no-return helper, avoid row-returning `api.updateBookingReservationsStatus()`, and log aggregate activity using the exact affected count.
+
+## 2026-05-16 15:29 IST - Booking Reservation Status Fallback Red Test Run
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-16 15:29:15 IST`.
+- Command: `pnpm vitest run src/hooks/use-app-data.load-plan.test.tsx src/lib/api/index.test.ts`
+- Intended red result: failed, 2 failed / 104 passed across the two files.
+- Failures:
+  - Hook no-local status fallback expected `api.updateBookingReservationsStatusWithoutReturning("BK-404", "Cancelled")`, but the helper was not called.
+  - API query-shape test expected `{ count: "exact" }` on the no-return booking status update, but the helper still calls `update({ status })` without count.
+
+## 2026-05-16 15:29 IST - Booking Reservation Status Fallback Implementation
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-16 15:29:49 IST`.
+- Changes:
+  - Updated `updateBookingReservationsStatusWithoutReturning()` in `src/lib/api/index.ts` to use `update({ status }, { count: "exact" })` and still avoid `.select()`.
+  - Updated the no-local `updateBookingReservationStatus()` fallback in `src/hooks/use-app-data.ts` to call the no-return helper, use `count` for aggregate activity, and avoid requesting or merging returned reservation rows.
+  - Preserved cache revalidation and aggregate activity logging when the exact count reports affected reservations.
+
+## 2026-05-16 15:46 IST - Booking Reservation Status Fallback Focused Tests
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-16 15:46:46 IST`.
+- Command: `pnpm vitest run src/hooks/use-app-data.load-plan.test.tsx src/lib/api/index.test.ts`
+- Result: passed; 2 files / 106 tests.
+
+## 2026-05-16 16:22 IST - Booking Reservation Status Fallback Typecheck Failed
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-16 16:22:11 IST`.
+- Command: `pnpm exec tsc --noEmit`
+- Result: failed.
+- Failure:
+  - `src/hooks/use-app-data.load-plan.test.tsx` mocked `updateBookingReservationsStatusWithoutReturning()` as `{ data: null, error: null }`, so the test-specific `count: 2` override was outside the inferred mock result type.
+- Fix direction:
+  - Add `count: null` to the default mock response so the no-row exact-count helper contract is represented in tests.
+
+## 2026-05-16 16:22 IST - Booking Reservation Status Mock Type Fix
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-16 16:22:32 IST`.
+- Change:
+  - Added `count: null as number | null` to the default `apiMock.updateBookingReservationsStatusWithoutReturning()` response in `src/hooks/use-app-data.load-plan.test.tsx`.
+
+## 2026-05-16 16:27 IST - Booking Reservation Status Focused Test Rerun
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-16 16:27:08 IST`.
+- Command: `pnpm vitest run src/hooks/use-app-data.load-plan.test.tsx src/lib/api/index.test.ts`
+- Result: passed; 2 files / 106 tests.
+
+## 2026-05-16 17:48 IST - Booking Reservation Status Typecheck
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-16 17:48:28 IST`.
+- Command: `pnpm exec tsc --noEmit`
+- Result: passed.
+
+## 2026-05-16 17:49 IST - Booking Reservation Status Full Test
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-16 17:49:25 IST`.
+- Command: `pnpm test`
+- Result: passed; 169 files / 459 tests.
+
+## 2026-05-16 17:50 IST - Booking Reservation Status Build
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-16 17:50:30 IST`.
+- Command: `pnpm build`
+- Result: passed; Next.js generated 88 static pages.
+
+## 2026-05-16 17:50 IST - Booking Reservation Status Broad Scan
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-16 17:50:45 IST`.
+- Commands:
+  - `rg -n "select\([^\n]*\*|select\(\)" src/app/api src/lib src/server -S`
+  - `rg -n "api\.updateBookingReservationsStatus\(|updateBookingReservationsStatusWithoutReturning\(" src/hooks/use-app-data.ts src/lib/api/index.ts -S`
+- Results:
+  - Broad Supabase select scan is clean; no full-star or empty `select()` calls found in scanned source paths.
+  - Targeted hook/API scan shows `updateBookingReservationStatus()` now uses `api.updateBookingReservationsStatusWithoutReturning()` in both local-known and no-local branches, with no remaining hook call to row-returning `api.updateBookingReservationsStatus()`.
+
+## 2026-05-16 17:51 IST - Hook Mutation Fallback Inventory
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-16 17:51:06 IST`.
+- Commands:
+  - `rg -n "const \{ data.*= await api\.(update|add|create)|await api\.(update|add|create)[A-Za-z]+\(" src/hooks/use-app-data.ts -S`
+  - `rg -n "api\.update[A-Za-z]+\(" src/hooks/use-app-data.ts -S`
+  - `rg -n "select\([^\n]*\*|select\(\)" src/hooks src/app/api src/lib src/server -S`
+- Findings:
+  - No remaining row-returning update fallback calls are present in `src/hooks/use-app-data.ts`.
+  - Hook update calls now use no-return helpers for property, guests, reservations, booking reservation status, rooms, room categories, rate plans, seasonal prices, property closures, roles, user profiles, amenities, and sticky notes.
+  - Remaining hook `data` writes are expected minimal-return operations such as generated ids, reservation creation summaries, and folio item id/timestamp.
+  - Broad full-star/empty Supabase select scan is clean across scanned hook, API, lib, and server paths.
+
+## 2026-05-16 17:52 IST - Calendar Legacy Fallback Egress Analysis
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-16 17:52:55 IST`.
+- Research refresh:
+  - Next.js lazy-loading guide: `https://nextjs.org/docs/app/guides/lazy-loading`
+  - Current guidance still supports keeping route shells small and deferring heavier client components behind dynamic boundaries.
+- Commands:
+  - `sed -n '1,180p' src/app/admin/calendar/page.tsx`
+  - `sed -n '1,180p' src/app/admin/calendar/calendar-panel.tsx`
+  - `sed -n '600,700p' src/components/shared/availability-calendar.tsx`
+  - `rg -n "LegacyAvailabilityCalendar|useLegacyView|reservations, guests, rooms|calendar-details" src/components/shared/availability-calendar.tsx src/hooks src/app/admin/calendar -S`
+- Findings:
+  - `/admin/calendar` is already a server shell with a dynamic `CalendarPanel`, and the panel dynamically loads `AvailabilityCalendar`.
+  - The active calendar path uses monthly availability APIs plus `useCalendarReservationDetails()` for bounded hover details.
+  - `availability-calendar.tsx` still contains `LegacyAvailabilityCalendar`, which reads global `reservations`, `guests`, and `rooms` from `DataContext`.
+  - That fallback is no longer compatible with the narrowed `/admin/calendar` startup plan and keeps old reservation/guest/room scanning code in the calendar client module.
+  - Low-risk optimization: remove the legacy fallback branch and leave the existing API error retry/dismiss flow, so calendar data continues through the route-backed APIs only.
+
+## 2026-05-16 17:55 IST - Calendar Legacy Fallback Red Test Added
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-16 17:55:00 IST`.
+- Change:
+  - Extended `src/app/admin/calendar/calendar-code-splitting.test.ts` to assert `AvailabilityCalendar` no longer contains `LegacyAvailabilityCalendar`, `useLegacyView`, the global `reservations, guests, rooms` context destructure, or the `Use legacy view` button.
+
+## 2026-05-16 17:55 IST - Calendar Legacy Fallback Red Test Run
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-16 17:55:24 IST`.
+- Command: `pnpm vitest run src/app/admin/calendar/calendar-code-splitting.test.ts`
+- Intended red result: failed, 1 failed / 2 passed.
+- Failure:
+  - `availability-calendar.tsx` still contains `LegacyAvailabilityCalendar`, confirming the fallback and global reservation context path are still present.
+
+## 2026-05-16 17:56 IST - Calendar Legacy Fallback Implementation
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-16 17:56:50 IST`.
+- Change:
+  - Removed `LegacyAvailabilityCalendar` from `src/components/shared/availability-calendar.tsx`.
+  - Removed the `useLegacyView` state/branch and the `Use legacy view` error-action button.
+  - Removed the legacy global `reservations`, `guests`, and `rooms` scan plus unused reservation-status styling imports/helpers.
+  - Kept the active monthly availability API calendar, bounded hover-detail fetches, and error dismiss flow.
+
+## 2026-05-16 17:57 IST - Calendar Legacy Fallback Focused Test
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-16 17:57:31 IST`.
+- Command: `pnpm vitest run src/app/admin/calendar/calendar-code-splitting.test.ts`
+- Result: passed; 1 file / 3 tests.
+- Observation:
+  - `availability-calendar.tsx` shrank from 884 lines to 572 lines after removing the legacy fallback path.
+
+## 2026-05-16 17:57 IST - Calendar Legacy Fallback Typecheck
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-16 17:57:57 IST`.
+- Command: `pnpm exec tsc --noEmit`
+- Result: passed.
+
+## 2026-05-16 17:58 IST - Calendar Legacy Fallback Full Test
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-16 17:58:48 IST`.
+- Command: `pnpm test`
+- Result: passed; 169 files / 459 tests.
+
+## 2026-05-16 17:59 IST - Calendar Legacy Fallback Build
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-16 17:59:59 IST`.
+- Command: `pnpm build`
+- Result: passed; Next.js generated 88 static pages.
+- User follow-up:
+  - Calendar is highly important, so source-level code-splitting tests are not enough.
+  - Next step before closing this pass: add component-level UI tests for calendar render/interaction behavior.
+
+## 2026-05-16 18:19 IST - Branch Isolation
+
+- Command: `date '+%Y-%m-%d %H:%M %Z'`
+- Result: `2026-05-16 18:19 IST`.
+- Command: `git switch -c optimize-egress-performance-calendar-ui-20260516`
+- Result: switched from `main` to `optimize-egress-performance-calendar-ui-20260516`.
+- Note:
+  - The dirty optimization working tree is now isolated on the new branch.
+  - `main` remains pointed at `origin/main`; no commits were made or moved.
+
+## 2026-05-16 18:19 IST - Calendar UI Coverage Follow-Up
+
+- User follow-up:
+  - Calendar is highly important and needs proper UI testing across its functions before this pass is considered safe.
+- Change:
+  - Added component-level tests for `src/components/shared/availability-calendar.tsx`.
+  - Coverage targets route-backed availability rendering, bounded reservation detail fetching, selectable cell toggling, closed-cell disabling, month navigation, fullscreen control wiring, and error dismissal without falling back to global reservations.
+  - Added accessible labels for the previous/next month buttons, month selector, visible-month count selector, units-view selector, and fullscreen button so the UI controls are directly testable.
+
+## 2026-05-16 18:20 IST - Calendar UI Focused Test Red Run
+
+- Command: `pnpm vitest run src/components/shared/availability-calendar.test.tsx src/app/admin/calendar/calendar-code-splitting.test.ts`
+- Result: failed; source guard passed, but the 4 new calendar UI tests failed.
+- Failures:
+  - Duplicate `May 2026` text made a broad text query ambiguous.
+  - Selected-cell assertion expected a standalone `outline` class, while the component applies `outline-2`.
+  - Month-navigation and error-dismissal tests timed out under fake timers.
+- Next action:
+  - Adjust the UI tests to use accessible control/cell queries, assert the actual selected-state class, and remove fake-timer waits where they are not needed.
+
+## 2026-05-16 18:21 IST - Calendar UI Test Stabilization
+
+- Research refresh:
+  - Testing Library `ByRole` docs: `https://testing-library.com/docs/queries/byrole`
+  - Testing Library fake timers docs: `https://testing-library.com/docs/using-fake-timers`
+  - Guidance confirms testing accessible roles/names where possible and restoring/controlling fake timers carefully when tests mock time.
+- Change:
+  - Updated `src/components/shared/availability-calendar.test.tsx` to assert the month through the calendar grid region instead of broad text matching.
+  - Changed the selected-cell expectation to the actual `outline-2` selected state.
+  - Removed async `waitFor`/`findByText` usage from fake-timer tests where calendar state updates are synchronous.
+  - Added an explicit `ReactNode` type import for the mocked reservation hover card.
+
+## 2026-05-16 18:22 IST - Calendar UI Focused Test Rerun
+
+- Command: `pnpm vitest run src/components/shared/availability-calendar.test.tsx src/app/admin/calendar/calendar-code-splitting.test.ts`
+- Result: passed; 2 files / 7 tests.
+- Coverage:
+  - Calendar source guard still prevents the legacy global-reservation fallback from returning.
+  - Component UI coverage now passes for route-backed rendering, bounded reservation details, cell selection/disabled states, month navigation, fullscreen control, and error dismissal.
+
+## 2026-05-16 18:22 IST - Calendar UI Typecheck
+
+- Command: `pnpm exec tsc --noEmit`
+- Result: passed.
+
+## 2026-05-16 18:24 IST - Calendar UI Full Test
+
+- Command: `pnpm test`
+- Result: passed; 170 files / 463 tests.
+
+## 2026-05-16 18:25 IST - Calendar UI Build
+
+- Command: `pnpm build`
+- Result: passed; Next.js generated 88 static pages.
+- Build observation:
+  - `/admin/calendar` remains a small static route shell at 1.39 kB route size and 106 kB first-load JS.
+
+## 2026-05-16 18:26 IST - Calendar UI Expanded Control Coverage
+
+- Change:
+  - Added calendar UI tests for room-row expand/collapse, reservation-detail guest labels in expanded rows, selecting a month from the month dropdown, changing visible month count, and switching between remaining/booked unit views.
+  - Added a local select helper that interacts with the existing accessible Radix combobox controls by role/name.
+
+## 2026-05-16 18:26 IST - Calendar UI Expanded Control Red Run
+
+- Command: `pnpm vitest run src/components/shared/availability-calendar.test.tsx src/app/admin/calendar/calendar-code-splitting.test.ts`
+- Result: failed; 8 tests passed, 2 expanded select-control tests failed.
+- Failure:
+  - Radix Select attempted to call `target.hasPointerCapture`, which jsdom does not implement by default.
+- Next action:
+  - Add a local pointer-capture polyfill in the calendar component test so the test environment can exercise the real select controls.
+
+## 2026-05-16 18:27 IST - Calendar UI Select Test Environment Fix
+
+- Change:
+  - Added local `Element.prototype.hasPointerCapture`, `setPointerCapture`, and `releasePointerCapture` fallbacks in `src/components/shared/availability-calendar.test.tsx`.
+  - Scope is limited to the calendar test file so Radix Select can be exercised in jsdom without changing production code.
+
+## 2026-05-16 18:28 IST - Calendar UI Select Event Fix
+
+- Change:
+  - Added `pointerType: "mouse"` to the select helper's pointer event so Radix Select treats the synthetic event like a real mouse interaction.
+
+## 2026-05-16 18:28 IST - Calendar UI Expanded Focused Test Rerun
+
+- Command: `pnpm vitest run src/components/shared/availability-calendar.test.tsx src/app/admin/calendar/calendar-code-splitting.test.ts`
+- Result: passed; 2 files / 10 tests.
+- Coverage:
+  - Calendar UI tests now cover rendering, bounded reservation details, selectable/disabled cells, room-row expand/collapse, month previous/next navigation, month dropdown selection, visible-month selector, remaining/booked unit view selector, fullscreen button wiring, error dismissal, and legacy fallback removal.
+
+## 2026-05-16 18:28 IST - Calendar UI Expanded Typecheck
+
+- Command: `pnpm exec tsc --noEmit`
+- Result: passed.
+
+## 2026-05-16 18:29 IST - Calendar UI Expanded Full Test
+
+- Command: `pnpm test`
+- Result: passed; 170 files / 466 tests.
+
+## 2026-05-16 18:30 IST - Calendar UI Expanded Build
+
+- Command: `pnpm build`
+- Result: passed; Next.js generated 88 static pages.
+- Build observation:
+  - `/admin/calendar` remains 1.39 kB route size and 106 kB first-load JS.
+
+## 2026-05-16 18:30 IST - Calendar UI Expanded Scans
+
+- Commands:
+  - `rg -n "LegacyAvailabilityCalendar|useLegacyView|Use legacy view|reservations, guests, rooms" src/components/shared/availability-calendar.tsx src/app/admin/calendar/page.tsx src/app/admin/calendar/calendar-panel.tsx -S`
+  - `rg -n "select\([^\n]*\*|select\(\)" src/app/api src/lib src/server -S`
+  - `rg -n "playwright|e2e|test:e2e|cypress|storybook|test:ui" package.json vitest.config.ts -S`
+- Results:
+  - Runtime calendar files are clean; no legacy fallback strings or global reservation/guest/room destructure remain.
+  - Broad Supabase full-star/empty select scan is clean in scanned API/lib/server paths.
+  - No Playwright/Cypress/e2e script is configured; the only UI test script is `test:ui`, which opens Vitest UI interactively and is not a CI-style browser gate.
+
+## 2026-05-16 18:31 IST - Reservation Payment Dialog Egress Analysis
+
+- Command: `date '+%Y-%m-%d %H:%M:%S %Z'`
+- Result: `2026-05-16 18:31:33 IST`.
+- Research refresh:
+  - React props guide: `https://react.dev/learn/passing-props-to-a-component`
+  - React purity guide: `https://react.dev/learn/keeping-components-pure`
+  - Guidance supports passing data from parent to child via props and keeping render behavior derived from explicit inputs, which matches removing the dialog's hidden global reservation dependency.
+- Commands:
+  - `rg -n "\.select\(" src --glob '!**/*.test.*' -S`
+  - `rg -n "const \{[^\n]*(reservations|guests|rooms|roomTypes|roomCategories|ratePlans|seasonalPrices|propertyClosures|roles|users|amenities|stickyNotes|housekeepingAssignments)|useDataContext\(\)" src/app src/components --glob '!**/*.test.*' -S`
+  - `sed -n '1,260p' src/app/admin/reservations/components/record-payment-dialog.tsx`
+  - `sed -n '1,180p' 'src/app/admin/reservations/[id]/components/BillingCard.tsx'`
+- Findings:
+  - Global load plans for reservation detail routes now load booking-scoped reservation data, not the old global `reservations` array.
+  - `BillingCard` already passes booking-scoped `billingSource` and `taxConfig` into `RecordPaymentDialog`.
+  - `RecordPaymentDialog` still reads global `reservations` from `useDataContext()` and blocks submit with `Reservation not found.` when that global array is empty.
+  - This is a correctness bug and a stale dependency on the old global reservation hydration path.
+
+## 2026-05-16 18:32 IST - Reservation Payment Dialog Red Test Added
+
+- Change:
+  - Added `src/app/admin/reservations/components/record-payment-dialog.test.tsx`.
+  - The test attempts to record a cash payment using `billingSource` while `useDataContext()` intentionally returns `reservations: []`.
+  - Expected behavior: the dialog should call `addFolioItem()` and not raise `Reservation not found.`.
+
+## 2026-05-16 18:34 IST - Reservation Payment Dialog Red Test Run
+
+- Command: `pnpm vitest run src/app/admin/reservations/components/record-payment-dialog.test.tsx`
+- Intended red result: failed; 1 failed / 1 total.
+- Failure:
+  - `addFolioItem()` was not called when global `reservations` was empty, confirming the dialog still depends on stale global reservation state despite receiving booking-scoped billing data.
+
+## 2026-05-16 18:35 IST - Reservation Payment Dialog Implementation
+
+- Change:
+  - Updated `RecordPaymentDialog` to require and use the passed `billingSource` and `taxConfig`.
+  - Removed its global `reservations` lookup and the `Reservation not found.` submit gate.
+  - Submit now uses `reservationId` directly for `addFolioItem()`, matching the booking-scoped reservation detail data flow.
+
+## 2026-05-16 18:35 IST - Reservation Payment Dialog Focused Test
+
+- Command: `pnpm vitest run src/app/admin/reservations/components/record-payment-dialog.test.tsx`
+- Result: passed; 1 file / 1 test.
+
+## 2026-05-16 18:35 IST - Reservation Payment Dialog Typecheck And Scan
+
+- Command: `pnpm exec tsc --noEmit`
+- Result: passed.
+- Command: `rg -n "reservations|Reservation not found|resolveReservationTaxConfig|billingSource\?" src/app/admin/reservations/components/record-payment-dialog.tsx src/app/admin/reservations/components/record-payment-dialog.test.tsx -S`
+- Result:
+  - Production dialog source no longer contains the global `reservations` lookup, optional `billingSource` fallback, or `Reservation not found.` gate.
+  - Remaining matches are the test’s intentional `reservations: []` fixture and assertion text plus the import path segment in `@/lib/reservations/calculate-financials`.
+
+## 2026-05-16 18:36 IST - Reservation Payment Dialog Full Test
+
+- Command: `pnpm test`
+- Result: passed; 171 files / 467 tests.
+
+## 2026-05-16 18:37 IST - Reservation Payment Dialog Build
+
+- Command: `pnpm build`
+- Result: passed; Next.js generated 88 static pages.
+
+## 2026-05-16 18:37 IST - Reservation Payment Dialog Broad Scan
+
+- Commands:
+  - `rg -n "select\([^\n]*\*|select\(\)" src/app/api src/lib src/server -S`
+  - `rg -n "const \{[^\n]*reservations|reservations\.find|Reservation not found|resolveReservationTaxConfig|billingSource\?" src/app/admin/reservations/components/record-payment-dialog.tsx -S`
+  - `rg -n "RecordPaymentDialog" src/app/admin/reservations -S`
+- Results:
+  - Broad Supabase full-star/empty select scan remains clean.
+  - `RecordPaymentDialog` has no remaining global reservation lookup, `Reservation not found.` gate, optional billing fallback, or local tax resolution fallback.
+  - The only production caller is `BillingCard`, which passes `billingSource` and `taxConfig`.
+
+## 2026-05-16 18:38 IST - Reservation Detail Global Fallback Red Test Added
+
+- Analysis:
+  - `ReservationDetailsClient` still falls back to `reservations.find(...)`, `bookings.flatMap(...)`, and `(isolatedBookingReservations.length > 0 ? isolatedBookingReservations : reservations)`.
+  - On reservation detail routes, the load plan is booking-scoped and should not rely on dashboard/global reservation hydration.
+- Change:
+  - Extended `src/app/admin/reservations/[id]/reservation-detail-code-splitting.test.ts` to fail if those global fallback patterns return.
+
+## 2026-05-16 18:39 IST - Reservation Detail Global Fallback Red Test Run
+
+- Command: `pnpm vitest run 'src/app/admin/reservations/[id]/reservation-detail-code-splitting.test.ts'`
+- Intended red result: failed; 1 failed / 3 total.
+- Failure:
+  - Source still contains `reservations.find`, confirming the detail client still has the old global reservation fallback path.
+
+## 2026-05-16 18:40 IST - Reservation Detail Global Fallback Implementation
+
+- Change:
+  - Removed `reservations` and `bookings` from `ReservationDetailsClient` context destructuring.
+  - Removed the `reservations.find(...)` and `bookings.flatMap(...)` lookup fallback.
+  - Built booking detail rows directly from `activeBookingReservations`, matching the route-backed booking lookup API.
+
+## 2026-05-16 18:40 IST - Reservation Detail Global Fallback Focused Test
+
+- Command: `pnpm vitest run 'src/app/admin/reservations/[id]/reservation-detail-code-splitting.test.ts'`
+- Result: passed; 1 file / 3 tests.
+
+## 2026-05-16 18:41 IST - Reservation Detail Global Fallback Typecheck And Scan
+
+- Command: `pnpm exec tsc --noEmit`
+- Result: passed.
+- Command: `rg -n "reservations\.find|bookings\.flatMap|isolatedBookingReservations\.length > 0 \? isolatedBookingReservations : reservations|\breservations,|\bbookings," 'src/app/admin/reservations/[id]/reservation-details-client.tsx' -S`
+- Result: clean; removed fallback patterns are absent from the reservation detail client.
 
 ## 2026-05-13 18:53 IST - Admin Guests Index Egress Analysis Resume
 

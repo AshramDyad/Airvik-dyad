@@ -7,6 +7,7 @@ import { authorizedFetch } from "@/lib/auth/client-session";
 type UseAdminRoomConflictsArgs = {
   checkIn?: string;
   checkOut?: string;
+  excludeBookingId?: string;
 };
 
 type ConflictState = {
@@ -17,13 +18,17 @@ type ConflictState = {
 export function useAdminRoomConflicts({
   checkIn,
   checkOut,
+  excludeBookingId,
 }: UseAdminRoomConflictsArgs) {
   const [state, setState] = React.useState<ConflictState>({
     key: null,
     roomIds: new Set(),
   });
   const [isFetching, setIsFetching] = React.useState(false);
-  const requestKey = checkIn && checkOut ? `${checkIn}:${checkOut}` : null;
+  const requestKey =
+    checkIn && checkOut
+      ? `${checkIn}:${checkOut}:${excludeBookingId ?? ""}`
+      : null;
 
   React.useEffect(() => {
     if (!checkIn || !checkOut || !requestKey) {
@@ -34,6 +39,9 @@ export function useAdminRoomConflicts({
 
     const controller = new AbortController();
     const params = new URLSearchParams({ checkIn, checkOut });
+    if (excludeBookingId) {
+      params.set("excludeBookingId", excludeBookingId);
+    }
 
     setIsFetching(true);
 
@@ -74,7 +82,7 @@ export function useAdminRoomConflicts({
     return () => {
       controller.abort();
     };
-  }, [checkIn, checkOut, requestKey]);
+  }, [checkIn, checkOut, excludeBookingId, requestKey]);
 
   const isStale = Boolean(requestKey && state.key !== requestKey);
 

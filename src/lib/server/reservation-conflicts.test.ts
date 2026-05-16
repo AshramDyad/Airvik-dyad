@@ -59,12 +59,14 @@ describe("getAdminReservationConflictingRoomIds", () => {
       getAdminReservationConflictingRoomIds({
         checkIn: "2026-06-10",
         checkOut: "2026-06-12",
+        excludeBookingId: "booking-1",
       }),
     ).resolves.toEqual(["room-2", "room-1"]);
 
     expect(query.select).toHaveBeenCalledWith(RESERVATION_CONFLICT_ROOM_SELECT);
     expect(query.neq).toHaveBeenCalledWith("status", "Cancelled");
     expect(query.neq).toHaveBeenCalledWith("status", "No-show");
+    expect(query.neq).toHaveBeenCalledWith("booking_id", "booking-1");
     expect(query.lt).toHaveBeenCalledWith("check_in_date", "2026-06-12");
     expect(query.gt).toHaveBeenCalledWith("check_out_date", "2026-06-10");
   });

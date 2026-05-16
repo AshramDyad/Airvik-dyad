@@ -169,7 +169,7 @@ describe("getAppDataLoadPlan", () => {
     const plan = getAppDataLoadPlan({ pathname: "/admin/dashboard", userId: "user-1" });
 
     expect(plan.mode).toBe("admin");
-    expectDatasets(plan.datasets, ["property", "stickyNotes"]);
+    expectDatasets(plan.datasets, ["property"]);
     expect(plan.datasets).not.toContain("guests");
     expect(plan.datasets).not.toContain("rooms");
     expect(plan.datasets).not.toContain("roomTypes");
@@ -177,6 +177,7 @@ describe("getAppDataLoadPlan", () => {
     expect(plan.datasets).not.toContain("ratePlans");
     expect(plan.datasets).not.toContain("housekeepingAssignments");
     expect(plan.datasets).not.toContain("dashboardReservations");
+    expect(plan.datasets).not.toContain("stickyNotes");
   });
 
   it("loads calendar hover data without unrelated admin configuration data", () => {

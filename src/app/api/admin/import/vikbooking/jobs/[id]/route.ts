@@ -40,26 +40,9 @@ export async function GET(request: Request, context: RouteContext) {
     const statusCounts = await fetchEntryStatusCounts(supabase, id);
     const errors = await fetchRecentErroredEntries(supabase, id);
 
-    const skippedData = await fetchAllSkippedEntries(supabase, id);
-
-    const skippedEntries: SkipReportEntry[] = skippedData.map((entry) => {
-      const payload = entry.payload ?? undefined;
-      const guestParts = payload
-        ? [payload.guest.firstName, payload.guest.lastName]
-            .map((part) => (part ?? "").trim())
-            .filter(Boolean)
-        : [];
-      return {
-        entryId: entry.id,
-        rowNumber: entry.row_number,
-        bookingId: payload?.bookingId ?? payload?.externalId ?? "Unknown booking",
-        roomLabel: payload?.roomLabelDisplay ?? payload?.roomLabel ?? null,
-        guestName: guestParts.length ? guestParts.join(" ") : undefined,
-        reason: entry.message ?? "Skipped during import",
-        reasonCode: entry.skip_reason_code ?? undefined,
-        skippedAt: entry.updated_at ?? new Date().toISOString(),
-      };
-    });
+    const skippedEntries =
+      getSummarySkippedEntries(job.summary) ??
+      (await fetchAllSkippedEntries(supabase, id)).map(mapSkippedEntryRow);
 
     return noStoreJson({ job, statusCounts, errors, skippedEntries });
   } catch (error) {
@@ -76,6 +59,50 @@ export async function GET(request: Request, context: RouteContext) {
       { status: 500 }
     );
   }
+}
+
+function getSummarySkippedEntries(summary: Record<string, unknown> | undefined): SkipReportEntry[] | null {
+  const skippedRows = summary?.skippedRows;
+  if (!Array.isArray(skippedRows)) {
+    return null;
+  }
+
+  return skippedRows.filter(isSkipReportEntry);
+}
+
+function isSkipReportEntry(value: unknown): value is SkipReportEntry {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const entry = value as Partial<SkipReportEntry>;
+  return (
+    typeof entry.entryId === "string" &&
+    typeof entry.rowNumber === "number" &&
+    typeof entry.bookingId === "string" &&
+    typeof entry.reason === "string" &&
+    typeof entry.skippedAt === "string"
+  );
+}
+
+function mapSkippedEntryRow(entry: SkippedEntryRow): SkipReportEntry {
+  const payload = entry.payload ?? undefined;
+  const guestParts = payload
+    ? [payload.guest.firstName, payload.guest.lastName]
+        .map((part) => (part ?? "").trim())
+        .filter(Boolean)
+    : [];
+
+  return {
+    entryId: entry.id,
+    rowNumber: entry.row_number,
+    bookingId: payload?.bookingId ?? payload?.externalId ?? "Unknown booking",
+    roomLabel: payload?.roomLabelDisplay ?? payload?.roomLabel ?? null,
+    guestName: guestParts.length ? guestParts.join(" ") : undefined,
+    reason: entry.message ?? "Skipped during import",
+    reasonCode: entry.skip_reason_code ?? undefined,
+    skippedAt: entry.updated_at ?? new Date().toISOString(),
+  };
 }
 
 async function fetchEntryStatusCounts(

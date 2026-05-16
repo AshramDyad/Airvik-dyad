@@ -9,7 +9,6 @@ export type AppDataDataset =
   | "propertyClosures"
   | "roles"
   | "amenities"
-  | "stickyNotes"
   | "users"
   | "housekeepers"
   | "housekeepingAssignments"
@@ -80,7 +79,7 @@ const ADMIN_CHROME_PLAN: AppDataLoadPlan = {
 
 const ADMIN_DASHBOARD_PLAN: AppDataLoadPlan = {
   mode: "admin",
-  datasets: ["property", "stickyNotes"],
+  datasets: ["property"],
 };
 
 const ADMIN_RESERVATIONS_PLAN: AppDataLoadPlan = {

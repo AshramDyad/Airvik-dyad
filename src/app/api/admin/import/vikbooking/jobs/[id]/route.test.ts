@@ -141,6 +141,30 @@ describe("VikBooking import job status API", () => {
   it("returns job status using count-only entry queries and no shared caching", async () => {
     const { supabase, queries } = createSupabaseDouble();
     createServerSupabaseClientMock.mockReturnValue(supabase);
+    const skippedEntry = {
+      entryId: "entry-skipped-1",
+      rowNumber: 3,
+      bookingId: "BK-3",
+      roomLabel: "Room 3",
+      guestName: "Asha Visitor",
+      reason: "Booking already imported for Room 3",
+      reasonCode: "already_imported",
+      skippedAt: "2026-05-14T02:00:00.000Z",
+    };
+    jobMocks.fetchJobById.mockResolvedValue({
+      id: "job-1",
+      source: "vikbooking",
+      status: "running",
+      totalRows: 15,
+      processedRows: 4,
+      errorRows: 0,
+      summary: { skippedRows: [skippedEntry] },
+      metadata: {},
+      createdBy: "admin-1",
+      createdAt: "2026-05-14T00:00:00.000Z",
+      completedAt: null,
+      lastError: null,
+    });
 
     const response = await GET(
       new Request("https://airvik.test/api/admin/import/vikbooking/jobs/job-1"),
@@ -155,6 +179,7 @@ describe("VikBooking import job status API", () => {
     expect(payload.errors).toEqual([
       { id: "entry-error-1", rowNumber: 7, message: "Invalid stay" },
     ]);
+    expect(payload.skippedEntries).toEqual([skippedEntry]);
 
     for (const status of ["pending", "imported", "skipped", "error"]) {
       expect(
@@ -184,5 +209,12 @@ describe("VikBooking import job status API", () => {
         ),
     );
     expect(recentErrorQuery?.limit).toHaveBeenCalledWith(10);
+    expect(
+      queries.some(
+        (query) =>
+          query.__state.select?.columns ===
+          "id,row_number,message,payload,updated_at,skip_reason_code",
+      ),
+    ).toBe(false);
   });
 });

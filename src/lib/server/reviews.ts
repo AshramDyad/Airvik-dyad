@@ -17,6 +17,7 @@ import { requirePagePermissions } from "@/lib/server/page-auth";
 import {
   PUBLIC_REVIEW_SELECT_COLUMNS,
   PUBLIC_REVIEWS_MAX_LIMIT,
+  REVIEW_CREATE_RETURN_COLUMNS,
   REVIEW_SELECT_COLUMNS,
   REVIEWS_CACHE_TAG,
   REVIEWS_REVALIDATE_SECONDS,
@@ -153,15 +154,25 @@ export async function createReview(rawData: FormPayload): Promise<Review> {
   const { data, error } = await supabase
     .from("testimonials")
     .insert(insertPayload)
-    .select(REVIEW_SELECT_COLUMNS)
+    .select(REVIEW_CREATE_RETURN_COLUMNS)
     .single();
 
   if (error) {
     throw error;
   }
+  if (!data) {
+    throw new Error("Failed to create review");
+  }
 
   revalidateReviewPaths();
-  return mapReviewRow(reviewRowSchema.parse(data));
+  return mapReviewRow(
+    reviewRowSchema.parse({
+      ...insertPayload,
+      id: data.id,
+      created_at: data.created_at,
+      updated_at: data.updated_at,
+    }),
+  );
 }
 
 export async function updateReview(id: string, rawData: FormPayload): Promise<void> {

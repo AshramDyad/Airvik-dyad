@@ -50,6 +50,7 @@
 //   refetchUsers: () => Promise<void>;
 //   refetchRoles: () => Promise<void>;
 //   refetchAmenities: () => Promise<void>;
+//   refetchStickyNotes: () => Promise<void>;
 //   addAmenity: (amenity: Omit<Amenity, "id">) => void;
 //   updateAmenity: (amenityId: string, updatedData: Partial<Omit<Amenity, "id">>) => void;
 //   deleteAmenity: (amenityId: string) => Promise<boolean>;
@@ -280,6 +281,7 @@ interface DataContextType {
   refetchUsers: () => Promise<void>;
   refetchRoles: () => Promise<void>;
   refetchAmenities: () => Promise<void>;
+  refetchStickyNotes: () => Promise<void>;
   addAmenity: (amenity: Omit<Amenity, "id">) => void;
   updateAmenity: (
     amenityId: string,

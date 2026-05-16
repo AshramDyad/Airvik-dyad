@@ -19,6 +19,17 @@ const jobMocks = vi.hoisted(() => ({
   createImportJobRecord: vi.fn(),
   fetchJobWithEntries: vi.fn(),
   updateImportJob: vi.fn(),
+  updateImportJobWithoutReturning: vi.fn(),
+  mergeImportJobPatch: vi.fn((job, patch) => ({
+    ...job,
+    status: patch.status ?? job.status,
+    summary: typeof patch.summary !== "undefined" ? patch.summary : job.summary,
+    metadata: typeof patch.metadata !== "undefined" ? patch.metadata : job.metadata,
+    processedRows: typeof patch.processedRows === "number" ? patch.processedRows : job.processedRows,
+    errorRows: typeof patch.errorRows === "number" ? patch.errorRows : job.errorRows,
+    completedAt: typeof patch.completedAt !== "undefined" ? patch.completedAt : job.completedAt,
+    lastError: typeof patch.lastError !== "undefined" ? patch.lastError : job.lastError,
+  })),
   insertJobEntries: vi.fn(),
   fetchJobById: vi.fn(),
   extractStoredPayload: vi.fn(),
@@ -93,6 +104,8 @@ describe("VikBooking import API", () => {
       lastError: null,
     });
     jobMocks.insertJobEntries.mockResolvedValue(undefined);
+    jobMocks.updateImportJob.mockResolvedValue(undefined);
+    jobMocks.updateImportJobWithoutReturning.mockResolvedValue(undefined);
     roomNumberMapMocks.fetchRoomNumberMap.mockResolvedValue(new Map());
     roomNumberLinkMocks.fetchRoomNumberLinks.mockResolvedValue([]);
     roomNumberLinkMocks.buildRoomNumberAliasMap.mockReturnValue(new Map());
@@ -147,5 +160,190 @@ describe("VikBooking import API", () => {
         }),
       ]),
     );
+  });
+
+  it("marks import jobs running without returning the updated job row", async () => {
+    const jobId = "00000000-0000-0000-0000-000000000001";
+    const job = {
+      id: jobId,
+      source: "vikbooking",
+      status: "pending",
+      totalRows: 1,
+      processedRows: 0,
+      errorRows: 0,
+      summary: {},
+      metadata: {},
+      createdBy: "admin-1",
+      createdAt: "2026-05-14T00:00:00.000Z",
+      completedAt: null,
+      lastError: null,
+    };
+    const entry = {
+      id: "entry-1",
+      jobId,
+      rowNumber: 1,
+      status: "pending",
+      payload: {},
+      createdAt: "2026-05-14T00:00:00.000Z",
+      updatedAt: "2026-05-14T00:00:00.000Z",
+    };
+    const rpc = vi.fn(async () => ({ error: null }));
+    createServerSupabaseClientMock.mockReturnValue({ rpc });
+    jobMocks.fetchJobWithEntries.mockResolvedValue({ job, entries: [entry] });
+    jobMocks.extractStoredPayload.mockReturnValue({
+      ...buildParsedRow(1),
+      externalId: undefined,
+      roomNumber: "101",
+    });
+    jobMocks.fetchJobById.mockResolvedValue({
+      ...job,
+      status: "completed",
+      processedRows: 1,
+    });
+    roomNumberMapMocks.assignRoomIdsFromNumbers.mockReturnValue(
+      new Map([["entry-1", "room-1"]]),
+    );
+    transformerMocks.buildRpcRows.mockReturnValue([{ rowNumber: 1 }]);
+
+    const response = await POST(
+      new Request("https://airvik.test/api/admin/import/vikbooking", {
+        method: "POST",
+        body: JSON.stringify({ jobId }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(jobMocks.updateImportJobWithoutReturning).toHaveBeenCalledWith(
+      expect.anything(),
+      jobId,
+      { status: "running" },
+    );
+    expect(jobMocks.updateImportJob).not.toHaveBeenCalled();
+    expect(rpc).toHaveBeenCalledWith("import_vikbooking_payload", {
+      p_job_id: jobId,
+      p_rows: [{ rowNumber: 1 }],
+      p_mark_complete: true,
+    });
+    await expect(response.json()).resolves.toEqual({
+      job: { ...job, status: "completed", processedRows: 1 },
+    });
+  });
+
+  it("completes all-skipped import jobs without returning the updated job row", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-14T02:00:00.000Z"));
+
+    try {
+      const jobId = "00000000-0000-0000-0000-000000000001";
+      const job = {
+        id: jobId,
+        source: "vikbooking",
+        status: "pending",
+        totalRows: 1,
+        processedRows: 0,
+        errorRows: 0,
+        summary: {},
+        metadata: {},
+        createdBy: "admin-1",
+        createdAt: "2026-05-14T00:00:00.000Z",
+        completedAt: null,
+        lastError: null,
+      };
+      const entry = {
+        id: "entry-1",
+        jobId,
+        rowNumber: 1,
+        status: "pending",
+        payload: {},
+        createdAt: "2026-05-14T00:00:00.000Z",
+        updatedAt: "2026-05-14T00:00:00.000Z",
+      };
+      const reservationsQuery = {
+        select: vi.fn(() => reservationsQuery),
+        eq: vi.fn(() => reservationsQuery),
+        in: vi.fn(async () => ({
+          data: [{ external_id: "EXT-1", room_id: "room-1" }],
+          error: null,
+        })),
+      };
+      const entryUpdateQuery = {
+        update: vi.fn(() => entryUpdateQuery),
+        eq: vi.fn(async () => ({ error: null })),
+      };
+      const from = vi.fn((table: string) => {
+        if (table === "reservations") return reservationsQuery;
+        if (table === "import_job_entries") return entryUpdateQuery;
+        throw new Error(`Unexpected table ${table}`);
+      });
+      createServerSupabaseClientMock.mockReturnValue({ from });
+      jobMocks.fetchJobWithEntries.mockResolvedValue({ job, entries: [entry] });
+      jobMocks.extractStoredPayload.mockReturnValue({
+        ...buildParsedRow(1),
+        externalId: "EXT-1",
+        roomNumber: "101",
+      });
+      roomNumberMapMocks.assignRoomIdsFromNumbers.mockReturnValue(
+        new Map([["entry-1", "room-1"]]),
+      );
+
+      const response = await POST(
+        new Request("https://airvik.test/api/admin/import/vikbooking", {
+          method: "POST",
+          body: JSON.stringify({ jobId }),
+        }),
+      );
+
+      expect(response.status).toBe(200);
+      expect(jobMocks.updateImportJob).not.toHaveBeenCalled();
+      expect(jobMocks.updateImportJobWithoutReturning).toHaveBeenCalledWith(
+        expect.anything(),
+        jobId,
+        { status: "running" },
+      );
+      expect(jobMocks.updateImportJobWithoutReturning).toHaveBeenCalledWith(
+        expect.anything(),
+        jobId,
+        expect.objectContaining({
+          processedRows: 1,
+          summary: expect.objectContaining({
+            skippedRows: [
+              expect.objectContaining({
+                entryId: "entry-1",
+                rowNumber: 1,
+                reasonCode: "already_imported",
+              }),
+            ],
+          }),
+        }),
+      );
+      expect(jobMocks.updateImportJobWithoutReturning).toHaveBeenCalledWith(
+        expect.anything(),
+        jobId,
+        expect.objectContaining({
+          status: "completed",
+          processedRows: 1,
+          completedAt: "2026-05-14T02:00:00.000Z",
+        }),
+      );
+      await expect(response.json()).resolves.toEqual({
+        job: {
+          ...job,
+          status: "completed",
+          processedRows: 1,
+          summary: {
+            skippedRows: [
+              expect.objectContaining({
+                entryId: "entry-1",
+                rowNumber: 1,
+                reasonCode: "already_imported",
+              }),
+            ],
+          },
+          completedAt: "2026-05-14T02:00:00.000Z",
+        },
+      });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

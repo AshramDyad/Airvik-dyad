@@ -32,6 +32,7 @@ export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const checkIn = url.searchParams.get("checkIn") ?? "";
   const checkOut = url.searchParams.get("checkOut") ?? "";
+  const excludeBookingId = url.searchParams.get("excludeBookingId") ?? undefined;
 
   if (!isValidDate(checkIn) || !isValidDate(checkOut) || checkIn >= checkOut) {
     return NextResponse.json(
@@ -44,6 +45,7 @@ export async function GET(request: NextRequest) {
     const roomIds = await getAdminReservationConflictingRoomIds({
       checkIn,
       checkOut,
+      excludeBookingId,
     });
 
     return NextResponse.json(

@@ -24,6 +24,7 @@ describe("useAdminRoomConflicts", () => {
       useAdminRoomConflicts({
         checkIn: "2026-06-10",
         checkOut: "2026-06-12",
+        excludeBookingId: "booking-1",
       }),
     );
 
@@ -34,7 +35,7 @@ describe("useAdminRoomConflicts", () => {
     );
 
     expect(authorizedFetchMock).toHaveBeenCalledWith(
-      "/api/admin/availability/conflicts?checkIn=2026-06-10&checkOut=2026-06-12",
+      "/api/admin/availability/conflicts?checkIn=2026-06-10&checkOut=2026-06-12&excludeBookingId=booking-1",
       expect.objectContaining({ cache: "no-store" }),
     );
     expect(result.current.isLoading).toBe(false);

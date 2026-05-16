@@ -20,12 +20,14 @@ vi.mock("next/cache", () => cacheMocks);
 vi.mock("@/integrations/supabase/server", () => supabaseMocks);
 
 import {
+  createEvent,
   getHomepageBanner,
   getHomepageModalBanner,
   getUpcomingEvents,
 } from "./events";
 import {
   EVENT_BANNERS_CACHE_TAG,
+  EVENT_CREATE_RETURN_COLUMNS,
   EVENTS_REVALIDATE_SECONDS,
   EVENT_SELECT_COLUMNS,
   PUBLIC_HOMEPAGE_BANNER_SELECT_COLUMNS,
@@ -66,6 +68,15 @@ const createEventsQuery = (response: unknown) => {
     eq: vi.fn(() => query),
     order: vi.fn(() => query),
     limit: vi.fn(async () => response),
+  };
+  return query;
+};
+
+const createInsertQuery = (response: unknown) => {
+  const query = {
+    insert: vi.fn(() => query),
+    select: vi.fn(() => query),
+    single: vi.fn(async () => response),
   };
   return query;
 };
@@ -201,6 +212,67 @@ describe("event server data access", () => {
     expect(query.eq).toHaveBeenCalledWith("is_active", false);
     expect(query.order).toHaveBeenCalledWith("starts_at", {
       ascending: true,
+    });
+  });
+
+  it("creates event banners by returning only generated fields", async () => {
+    const query = createInsertQuery({
+      data: {
+        id: activeRow.id,
+        created_at: activeRow.created_at,
+        updated_at: activeRow.updated_at,
+      },
+      error: null,
+    });
+    const rpc = vi.fn(async () => ({ error: null }));
+    const getUser = vi.fn(async () => ({
+      data: {
+        user: { id: "11111111-1111-4111-8111-111111111111" },
+      },
+    }));
+    const supabase = {
+      auth: { getUser },
+      from: vi.fn(() => query),
+      rpc,
+    };
+    supabaseMocks.createSessionClient.mockResolvedValue(supabase);
+
+    await expect(
+      createEvent({
+        title: "Yoga Camp",
+        description: "Morning practice",
+        imageUrl: "https://example.com/event.jpg",
+        isActive: true,
+        startsAt: "2026-05-12T00:00:00.000Z",
+        endsAt: "2026-05-14T00:00:00.000Z",
+      }),
+    ).resolves.toEqual({
+      id: activeRow.id,
+      title: "Yoga Camp",
+      description: "Morning practice",
+      imageUrl: "https://example.com/event.jpg",
+      isActive: false,
+      startsAt: "2026-05-12T00:00:00.000Z",
+      endsAt: "2026-05-14T00:00:00.000Z",
+      createdAt: activeRow.created_at,
+      updatedAt: activeRow.updated_at,
+      updatedBy: "11111111-1111-4111-8111-111111111111",
+    });
+
+    expect(supabase.from).toHaveBeenCalledWith("event_banners");
+    expect(query.insert).toHaveBeenCalledWith({
+      title: "Yoga Camp",
+      description: "Morning practice",
+      image_url: "https://example.com/event.jpg",
+      is_active: false,
+      starts_at: "2026-05-12T00:00:00.000Z",
+      ends_at: "2026-05-14T00:00:00.000Z",
+      updated_by: "11111111-1111-4111-8111-111111111111",
+    });
+    expect(query.select).toHaveBeenCalledWith(EVENT_CREATE_RETURN_COLUMNS);
+    expect(rpc).toHaveBeenCalledWith("toggle_event_banner", {
+      target_event_id: activeRow.id,
+      new_status: true,
     });
   });
 });

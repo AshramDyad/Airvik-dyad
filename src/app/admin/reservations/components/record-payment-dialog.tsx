@@ -37,7 +37,6 @@ import { useDataContext } from "@/context/data-context";
 import type { Reservation } from "@/data/types";
 import {
   calculateReservationFinancials,
-  resolveReservationTaxConfig,
   type ReservationTaxConfig,
 } from "@/lib/reservations/calculate-financials";
 import { useCurrencyFormatter } from "@/hooks/use-currency";
@@ -74,8 +73,8 @@ const paymentSchema = z
 interface RecordPaymentDialogProps {
   reservationId: string;
   children: React.ReactNode;
-  billingSource?: Pick<Reservation, "folio" | "totalAmount">;
-  taxConfig?: ReservationTaxConfig;
+  billingSource: Pick<Reservation, "folio" | "totalAmount">;
+  taxConfig: ReservationTaxConfig;
 }
 
 export function RecordPaymentDialog({
@@ -85,27 +84,12 @@ export function RecordPaymentDialog({
   taxConfig,
 }: RecordPaymentDialogProps) {
   const [open, setOpen] = React.useState(false);
-  const { addFolioItem, reservations, property } = useDataContext();
+  const { addFolioItem } = useDataContext();
   const formatCurrency = useCurrencyFormatter();
 
-  const reservation = React.useMemo(
-    () => reservations.find((res) => res.id === reservationId),
-    [reservations, reservationId]
-  );
-
-  const derivedTaxConfig = React.useMemo<ReservationTaxConfig>(
-    () =>
-      taxConfig ?? resolveReservationTaxConfig(reservation ?? undefined, property),
-    [property, reservation, taxConfig]
-  );
-
   const { balance } = React.useMemo(() => {
-    const financialSource = billingSource ?? reservation;
-    if (!financialSource) {
-      return { balance: 0 };
-    }
-    return calculateReservationFinancials(financialSource, derivedTaxConfig);
-  }, [billingSource, reservation, derivedTaxConfig]);
+    return calculateReservationFinancials(billingSource, taxConfig);
+  }, [billingSource, taxConfig]);
 
   const outstandingBalance = Math.max(balance, 0);
 
@@ -198,11 +182,6 @@ export function RecordPaymentDialog({
   }, [requiresTransactionId, form]);
 
   async function onSubmit(values: z.infer<typeof paymentSchema>) {
-    if (!reservation) {
-      toast.error("Reservation not found.");
-      return;
-    }
-
     if (outstandingBalance <= 0) {
       toast.error("This reservation is already fully paid.");
       return;

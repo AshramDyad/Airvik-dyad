@@ -9,6 +9,8 @@ import {
   createImportJobRecord,
   fetchJobWithEntries,
   updateImportJob,
+  updateImportJobWithoutReturning,
+  mergeImportJobPatch,
   insertJobEntries,
   fetchJobById,
   extractStoredPayload,
@@ -249,7 +251,7 @@ export async function POST(request: Request) {
       );
     }
 
-    await updateImportJob(supabase, jobId, { status: "running" });
+    await updateImportJobWithoutReturning(supabase, jobId, { status: "running" });
 
     const roomAssignments = new Map(autoAssignments);
     needsManual.forEach(({ entry, payload }) => {
@@ -327,7 +329,7 @@ export async function POST(request: Request) {
         }
       }
 
-      await updateImportJob(supabase, jobId, {
+      await updateImportJobWithoutReturning(supabase, jobId, {
         summary: summaryState,
         processedRows: processedRowTally,
       });
@@ -411,13 +413,14 @@ export async function POST(request: Request) {
     }
 
     if (rowsToImport.length === 0) {
-      const completedJob = await updateImportJob(supabase, jobId, {
+      const completionPatch = {
         status: "completed",
         summary: summaryState,
         processedRows: processedRowTally,
         completedAt: new Date().toISOString(),
-      });
-      return noStoreJson({ job: completedJob });
+      } as const;
+      await updateImportJobWithoutReturning(supabase, jobId, completionPatch);
+      return noStoreJson({ job: mergeImportJobPatch(job, completionPatch) });
     }
 
     const entriesForImport = rowsToImport.map(({ entry }) => entry);
@@ -445,7 +448,7 @@ export async function POST(request: Request) {
         }
       }
     } catch (error) {
-      await updateImportJob(supabase, jobId, {
+      await updateImportJobWithoutReturning(supabase, jobId, {
         status: "failed",
         lastError: error instanceof Error ? error.message : "Import RPC failed",
       });

@@ -6,7 +6,7 @@ import type { Feedback } from "@/data/types";
 import { getServerSupabaseClient } from "@/lib/server/supabase";
 import { HttpError, requireFeature } from "@/lib/server/auth";
 import { logAdminActivityFromProfile } from "@/lib/activity/server";
-import { ADMIN_FEEDBACK_SELECT_COLUMNS } from "../columns";
+import { ADMIN_FEEDBACK_PATCH_RETURN_COLUMNS } from "../columns";
 
 const feedbackStatusValues = ["new", "in_review", "resolved"] as const;
 
@@ -41,6 +41,11 @@ type FeedbackTableInsert = {
 };
 
 type FeedbackTableUpdate = Partial<FeedbackTableRow>;
+
+type FeedbackPatchReturnRow = Pick<
+  FeedbackTableRow,
+  "id" | "name" | "email" | "status" | "internal_note" | "updated_at"
+>;
 
 type FeedbackSchema = {
   public: {
@@ -106,7 +111,7 @@ export async function PATCH(
       .from("feedback")
       .update(updates)
       .eq("id", id)
-      .select(ADMIN_FEEDBACK_SELECT_COLUMNS)
+      .select(ADMIN_FEEDBACK_PATCH_RETURN_COLUMNS)
       .maybeSingle();
 
     if (error) {
@@ -121,21 +126,21 @@ export async function PATCH(
       return NextResponse.json({ message: "Feedback not found" }, { status: 404 });
     }
 
-    const mapped = mapFeedbackRow(data as FeedbackTableRow);
+    const compact = mapFeedbackPatchReturn(data as FeedbackPatchReturnRow);
 
     await logAdminActivityFromProfile({
       profile,
       entry: {
         section: "feedback",
         entityType: "feedback",
-        entityId: mapped.id,
-        entityLabel: mapped.name ?? mapped.email ?? mapped.id,
+        entityId: compact.id,
+        entityLabel: compact.name ?? compact.email ?? compact.id,
         action: "feedback_updated",
         details: payload.status
           ? `Updated feedback status to ${payload.status}`
           : "Updated feedback metadata",
         metadata: {
-          status: mapped.status,
+          status: compact.status,
           hasInternalNote: Boolean(
             typeof payload.internalNote === "string" && payload.internalNote.length > 0
           ),
@@ -143,7 +148,14 @@ export async function PATCH(
       },
     });
 
-    return NextResponse.json({ data: mapped });
+    return NextResponse.json({
+      data: {
+        id: compact.id,
+        status: compact.status,
+        internalNote: compact.internalNote,
+        updatedAt: compact.updatedAt,
+      },
+    });
   } catch (error) {
     if (error instanceof HttpError) {
       return NextResponse.json({ message: error.message }, { status: error.status });
@@ -162,19 +174,13 @@ export async function PATCH(
   }
 }
 
-function mapFeedbackRow(row: FeedbackTableRow): Feedback {
+function mapFeedbackPatchReturn(row: FeedbackPatchReturnRow) {
   return {
     id: row.id,
-    feedbackType: row.feedback_type,
-    message: row.message,
     name: row.name ?? undefined,
-    isAnonymous: row.is_anonymous,
     email: row.email ?? undefined,
-    roomOrFacility: row.room_or_facility ?? undefined,
-    rating: row.rating ?? undefined,
     status: row.status,
     internalNote: row.internal_note ?? undefined,
-    createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
 }

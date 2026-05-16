@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { areIntervalsOverlapping, differenceInDays, format, formatISO, parseISO } from "date-fns";
+import { differenceInDays, format, formatISO, parseISO } from "date-fns";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -45,6 +45,7 @@ import { isActiveReservationStatus } from "@/lib/reservations/status";
 import { markReservationAsRemoved } from "@/lib/reservations/filters";
 import { useCurrencyFormatter } from "@/hooks/use-currency";
 import { useAdminReservationFormData } from "@/hooks/use-admin-reservation-form-data";
+import { useAdminRoomConflicts } from "@/hooks/use-admin-room-conflicts";
 import type { Reservation, RoomType } from "@/data/types";
 import type { ReservationWithDetails } from "@/app/admin/reservations/components/columns";
 import { useDataContext } from "@/context/data-context";
@@ -138,7 +139,6 @@ export function ReservationEditForm({
   const {
     updateReservation,
     addRoomsToBooking,
-    reservations,
     guests,
     property,
     validateBookingRequest,
@@ -164,9 +164,8 @@ export function ReservationEditForm({
   };
 
   const groupReservations = React.useMemo(
-    () => (activeBookingReservations.length > 0 ? activeBookingReservations : reservations)
-      .filter((entry) => entry.bookingId === reservation.bookingId),
-    [reservations, activeBookingReservations, reservation.bookingId]
+    () => activeBookingReservations.filter((entry) => entry.bookingId === reservation.bookingId),
+    [activeBookingReservations, reservation.bookingId]
   );
 
   const activeGroupReservations = React.useMemo(
@@ -320,12 +319,29 @@ export function ReservationEditForm({
     [activeGroupReservations]
   );
 
+  const adminCheckInDate = watchedDateRange?.from
+    ? formatISO(watchedDateRange.from, { representation: "date" })
+    : undefined;
+  const adminCheckOutDate = watchedDateRange?.to
+    ? formatISO(watchedDateRange.to, { representation: "date" })
+    : undefined;
+  const {
+    conflictingRoomIds,
+    isLoading: isLoadingRoomConflicts,
+  } = useAdminRoomConflicts({
+    checkIn: adminCheckInDate,
+    checkOut: adminCheckOutDate,
+    excludeBookingId: reservation.bookingId,
+  });
+
   const allAvailableRooms = React.useMemo(() => {
     if (!watchedDateRange?.from || !watchedDateRange?.to) {
       return [];
     }
-    const windowStart = watchedDateRange.from;
-    const windowEnd = watchedDateRange.to;
+
+    if (isLoadingRoomConflicts) {
+      return [];
+    }
 
     return rooms.filter((room) => {
       const belongsToBooking = bookingRoomIds.has(room.id);
@@ -333,24 +349,19 @@ export function ReservationEditForm({
         return false;
       }
 
-      const overlaps = reservations.some((resEntry) => {
-        if (resEntry.bookingId === reservation.bookingId) return false;
-        if (resEntry.roomId !== room.id) return false;
-        if (resEntry.status === "Cancelled") return false;
-        return areIntervalsOverlapping(
-          { start: windowStart, end: windowEnd },
-          { start: parseISO(resEntry.checkInDate), end: parseISO(resEntry.checkOutDate) },
-          { inclusive: false }
-        );
-      });
-
-      if (overlaps && !belongsToBooking) {
+      if (conflictingRoomIds.has(room.id) && !belongsToBooking) {
         return false;
       }
 
       return true;
     });
-  }, [watchedDateRange, rooms, reservations, reservation.bookingId, bookingRoomIds]);
+  }, [
+    watchedDateRange,
+    isLoadingRoomConflicts,
+    rooms,
+    bookingRoomIds,
+    conflictingRoomIds,
+  ]);
 
   const filteredAvailableRooms = React.useMemo(() => {
     if (!selectedRoomTypeId || selectedRoomTypeId === "__all") {
@@ -440,6 +451,7 @@ export function ReservationEditForm({
     selectedRoomIds.length > 0 &&
     !ratePlanUnavailable &&
     !isLoadingFormData &&
+    !isLoadingRoomConflicts &&
     !formDataError;
 
   React.useEffect(() => {
@@ -1119,7 +1131,11 @@ export function ReservationEditForm({
                           Loading room and rate data...
                         </p>
                       ) : watchedDateRange?.from && watchedDateRange?.to ? (
-                        filteredAvailableRooms.length ? (
+                        isLoadingRoomConflicts ? (
+                          <p className="rounded-xl border border-dashed border-border/60 p-4 text-center text-sm text-muted-foreground">
+                            Checking room availability...
+                          </p>
+                        ) : filteredAvailableRooms.length ? (
                           filteredAvailableRooms.map((room) => {
                             const roomType = roomTypeMap.get(room.roomTypeId);
                             const statusLabel = ROOM_STATUS_LABELS[room.status] ?? room.status;

@@ -27,6 +27,8 @@ type DbImportJob = {
   last_error: string | null;
 };
 
+type DbImportJobCreateReturn = Pick<DbImportJob, "id" | "created_at">;
+
 type DbImportJobEntry = {
   id: string;
   job_id: string;
@@ -40,6 +42,8 @@ type DbImportJobEntry = {
 
 export const IMPORT_JOB_SELECT_COLUMNS =
   "id, source, status, file_name, file_hash, total_rows, processed_rows, error_rows, summary, metadata, created_by, created_at, completed_at, last_error" as const;
+
+export const IMPORT_JOB_CREATE_RETURN_COLUMNS = "id, created_at" as const;
 
 export const IMPORT_JOB_ENTRY_SELECT_COLUMNS =
   "id, job_id, row_number, status, message, payload, created_at, updated_at" as const;
@@ -55,30 +59,88 @@ export interface CreateJobArgs {
   metadata?: Record<string, unknown>;
 }
 
+export type ImportJobPatch = Partial<{
+  status: ImportJobStatus;
+  summary: Record<string, unknown>;
+  metadata: Record<string, unknown>;
+  processedRows: number;
+  errorRows: number;
+  completedAt: string | null;
+  lastError: string | null;
+}>;
+
+export function mergeImportJobPatch(job: ImportJob, patch: ImportJobPatch): ImportJob {
+  return {
+    ...job,
+    status: patch.status ?? job.status,
+    summary: typeof patch.summary !== "undefined" ? patch.summary : job.summary,
+    metadata: typeof patch.metadata !== "undefined" ? patch.metadata : job.metadata,
+    processedRows: typeof patch.processedRows === "number" ? patch.processedRows : job.processedRows,
+    errorRows: typeof patch.errorRows === "number" ? patch.errorRows : job.errorRows,
+    completedAt: typeof patch.completedAt !== "undefined" ? patch.completedAt : job.completedAt,
+    lastError: typeof patch.lastError !== "undefined" ? patch.lastError : job.lastError,
+  };
+}
+
+const toImportJobUpdatePayload = (patch: ImportJobPatch): Record<string, unknown> => {
+  const payload: Record<string, unknown> = {};
+  if (patch.status) payload.status = patch.status;
+  if (typeof patch.summary !== "undefined") payload.summary = patch.summary;
+  if (typeof patch.metadata !== "undefined") payload.metadata = patch.metadata;
+  if (typeof patch.processedRows === "number") payload.processed_rows = patch.processedRows;
+  if (typeof patch.errorRows === "number") payload.error_rows = patch.errorRows;
+  if (typeof patch.completedAt !== "undefined") payload.completed_at = patch.completedAt;
+  if (typeof patch.lastError !== "undefined") payload.last_error = patch.lastError;
+  return payload;
+};
+
 export async function createImportJobRecord(
   client: SupabaseClient,
   args: CreateJobArgs
 ): Promise<ImportJob> {
+  const insertPayload: Omit<
+    DbImportJob,
+    | "id"
+    | "processed_rows"
+    | "error_rows"
+    | "created_at"
+    | "completed_at"
+    | "last_error"
+  > = {
+    source: args.source,
+    status: args.status ?? "pending",
+    file_name: args.fileName,
+    file_hash: args.fileHash,
+    total_rows: args.totalRows,
+    summary: args.summary ?? {},
+    metadata: args.metadata ?? {},
+    created_by: args.profileId,
+  };
+
   const { data, error } = await client
     .from("import_jobs")
-    .insert({
-      source: args.source,
-      status: args.status ?? "pending",
-      file_name: args.fileName,
-      file_hash: args.fileHash,
-      total_rows: args.totalRows,
-      summary: args.summary ?? {},
-      metadata: args.metadata ?? {},
-      created_by: args.profileId,
-    })
-    .select(IMPORT_JOB_SELECT_COLUMNS)
+    .insert(insertPayload)
+    .select(IMPORT_JOB_CREATE_RETURN_COLUMNS)
     .single();
 
   if (error) {
     throw error;
   }
 
-  return mapImportJob(data as DbImportJob);
+  const generated = data as DbImportJobCreateReturn | null;
+  if (!generated) {
+    throw new Error("Failed to create import job: no row returned");
+  }
+
+  return mapImportJob({
+    id: generated.id,
+    ...insertPayload,
+    processed_rows: 0,
+    error_rows: 0,
+    created_at: generated.created_at,
+    completed_at: null,
+    last_error: null,
+  });
 }
 
 export async function insertJobEntries(
@@ -146,24 +208,9 @@ export async function fetchJobWithEntries(
 export async function updateImportJob(
   client: SupabaseClient,
   jobId: string,
-  patch: Partial<{
-    status: ImportJobStatus;
-    summary: Record<string, unknown>;
-    metadata: Record<string, unknown>;
-    processedRows: number;
-    errorRows: number;
-    completedAt: string | null;
-    lastError: string | null;
-  }>
+  patch: ImportJobPatch
 ): Promise<ImportJob> {
-  const payload: Record<string, unknown> = {};
-  if (patch.status) payload.status = patch.status;
-  if (typeof patch.summary !== "undefined") payload.summary = patch.summary;
-  if (typeof patch.metadata !== "undefined") payload.metadata = patch.metadata;
-  if (typeof patch.processedRows === "number") payload.processed_rows = patch.processedRows;
-  if (typeof patch.errorRows === "number") payload.error_rows = patch.errorRows;
-  if (typeof patch.completedAt !== "undefined") payload.completed_at = patch.completedAt;
-  if (typeof patch.lastError !== "undefined") payload.last_error = patch.lastError;
+  const payload = toImportJobUpdatePayload(patch);
 
   const { data, error } = await client
     .from("import_jobs")
@@ -177,6 +224,23 @@ export async function updateImportJob(
   }
 
   return mapImportJob(data as DbImportJob);
+}
+
+export async function updateImportJobWithoutReturning(
+  client: SupabaseClient,
+  jobId: string,
+  patch: ImportJobPatch
+): Promise<void> {
+  const payload = toImportJobUpdatePayload(patch);
+
+  const { error } = await client
+    .from("import_jobs")
+    .update(payload)
+    .eq("id", jobId);
+
+  if (error) {
+    throw error;
+  }
 }
 
 export function mapImportJob(row: DbImportJob): ImportJob {

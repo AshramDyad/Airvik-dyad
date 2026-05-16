@@ -1,5 +1,5 @@
 import { createSessionClient } from "@/integrations/supabase/server";
-import { EVENT_SELECT_COLUMNS } from "@/lib/server/cache-config";
+import { EVENT_CREATE_RETURN_COLUMNS } from "@/lib/server/cache-config";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -52,15 +52,19 @@ export async function POST(request: Request) {
     const { data, error } = await supabase
       .from("event_banners")
       .insert(dbPayload)
-      .select(EVENT_SELECT_COLUMNS)
+      .select(EVENT_CREATE_RETURN_COLUMNS)
       .single();
 
     if (error) {
       return noStoreJson({ error: error.message }, { status: 500 });
     }
 
+    if (!data) {
+      return noStoreJson({ error: "Unable to create event" }, { status: 500 });
+    }
+
     // 6. Handle active status toggle if requested (using RPC)
-    if (formData.isActive && data) {
+    if (formData.isActive) {
       const { error: rpcError } = await supabase.rpc("toggle_event_banner", {
         target_event_id: data.id,
         new_status: true,
@@ -72,7 +76,17 @@ export async function POST(request: Request) {
       }
     }
 
-    return noStoreJson({ data }, { status: 201 });
+    return noStoreJson(
+      {
+        data: {
+          ...dbPayload,
+          id: data.id,
+          created_at: data.created_at,
+          updated_at: data.updated_at,
+        },
+      },
+      { status: 201 },
+    );
   } catch (error) {
     if (error instanceof z.ZodError) {
       return noStoreJson({ error: error.errors }, { status: 400 });

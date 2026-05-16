@@ -28,6 +28,8 @@ export const PUBLIC_BOOKING_ROOM_SELECT =
   "id, room_type_id, status" as const;
 export const PUBLIC_BOOKING_CONFLICT_SELECT =
   "id, booking_id, room_id, check_in_date, check_out_date, status" as const;
+export const PUBLIC_BOOKING_RESERVATION_CREATE_SELECT =
+  "id, booking_id, room_id, total_amount, booking_date" as const;
 
 export type PublicBookingInput = {
   roomTypeIds: string[];
@@ -126,28 +128,12 @@ type DbBookingConflict = {
   status: ReservationStatus;
 };
 
-type DbReservation = {
+type DbReservationCreateReturn = {
   id: string;
   booking_id: string;
-  guest_id: string;
   room_id: string;
-  rate_plan_id: string | null;
-  check_in_date: string;
-  check_out_date: string;
-  number_of_guests: number;
-  status: ReservationStatus;
-  notes: string | null;
   total_amount: number;
   booking_date: string;
-  source: Reservation["source"];
-  payment_method: Reservation["paymentMethod"] | null;
-  adult_count: number | null;
-  child_count: number | null;
-  tax_enabled_snapshot: boolean | null;
-  tax_rate_snapshot: number | null;
-  external_source: string | null;
-  external_id: string | null;
-  external_metadata: Record<string, unknown> | null;
 };
 
 type QueryResponse<T> = {
@@ -208,31 +194,6 @@ const fromDbRoom = (row: DbBookingRoom): Pick<Room, "id" | "roomTypeId" | "statu
   id: row.id,
   roomTypeId: row.room_type_id,
   status: row.status,
-});
-
-const fromDbReservation = (row: DbReservation): Reservation => ({
-  id: row.id,
-  bookingId: row.booking_id,
-  guestId: row.guest_id,
-  roomId: row.room_id,
-  ratePlanId: row.rate_plan_id,
-  checkInDate: row.check_in_date,
-  checkOutDate: row.check_out_date,
-  numberOfGuests: row.number_of_guests,
-  status: row.status,
-  notes: row.notes ?? undefined,
-  folio: [],
-  totalAmount: row.total_amount,
-  bookingDate: row.booking_date,
-  source: row.source,
-  paymentMethod: row.payment_method ?? "Not specified",
-  adultCount: row.adult_count ?? row.number_of_guests,
-  childCount: row.child_count ?? 0,
-  taxEnabledSnapshot: Boolean(row.tax_enabled_snapshot),
-  taxRateSnapshot: row.tax_rate_snapshot ?? 0,
-  externalSource: row.external_source ?? undefined,
-  externalId: row.external_id,
-  externalMetadata: row.external_metadata ?? undefined,
 });
 
 const throwIfError = (error: unknown, message: string) => {
@@ -471,9 +432,8 @@ export async function createPublicBooking(
     }).totalCost,
   );
 
-  const reservationsResponse = (await supabase.rpc(
-    "create_reservations_with_total",
-    {
+  const reservationsResponse = (await supabase
+    .rpc("create_reservations_with_total", {
       p_booking_id: "",
       p_guest_id: guestResponse.data.id,
       p_room_ids: assignedRoomIds,
@@ -491,12 +451,43 @@ export async function createPublicBooking(
       p_tax_enabled_snapshot: Boolean(propertyTax.tax_enabled),
       p_tax_rate_snapshot: propertyTax.tax_percentage ?? 0,
       p_custom_totals: customRoomTotals,
-    },
-  )) as RpcResponse<DbReservation[]>;
+    })
+    .select(
+      PUBLIC_BOOKING_RESERVATION_CREATE_SELECT,
+    )) as RpcResponse<DbReservationCreateReturn[]>;
 
   throwIfError(reservationsResponse.error, "Could not create reservation.");
 
-  const reservations = (reservationsResponse.data ?? []).map(fromDbReservation);
+  const notes = input.specialRequests?.trim() || undefined;
+  const reservationFields = {
+    guestId: guestResponse.data.id,
+    ratePlanId: ratePlan.id,
+    checkInDate: input.checkIn,
+    checkOutDate: input.checkOut,
+    numberOfGuests: input.adults + input.children,
+    status: "Confirmed" as ReservationStatus,
+    notes,
+    source: "website" as const,
+    paymentMethod: "UPI" as const,
+    adultCount: input.adults,
+    childCount: input.children,
+    taxEnabledSnapshot: Boolean(propertyTax.tax_enabled),
+    taxRateSnapshot: propertyTax.tax_percentage ?? 0,
+    externalSource: undefined,
+    externalId: null,
+    externalMetadata: undefined,
+  };
+  const reservations = (reservationsResponse.data ?? []).map(
+    (row): Reservation => ({
+      id: row.id,
+      bookingId: row.booking_id,
+      roomId: row.room_id,
+      folio: [],
+      totalAmount: row.total_amount,
+      bookingDate: row.booking_date,
+      ...reservationFields,
+    }),
+  );
   const confirmationReservationId = reservations[0]?.id;
 
   if (!confirmationReservationId) {

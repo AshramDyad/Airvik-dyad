@@ -47,4 +47,14 @@ describe("admin dashboard code splitting", () => {
     expect(panelSource).not.toContain("buildDashboardSummary");
     expect(panelSource).not.toContain("getTodayRange");
   });
+
+  it("loads sticky notes from the widget instead of dashboard startup data", () => {
+    const notesSource = readFileSync(
+      join(dashboardDir, "components/DashboardStickyNotes.tsx"),
+      "utf8",
+    );
+
+    expect(notesSource).toContain("refetchStickyNotes");
+    expect(notesSource).toContain("void refetchStickyNotes()");
+  });
 });

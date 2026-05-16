@@ -38,6 +38,8 @@ const INTERNAL_FOLIO_SOURCE = "internal" as const;
 // Column selection constants to reduce egress
 export const PROPERTY_SELECT_COLUMNS =
   "id, name, address, phone, email, logo_url, photos, google_maps_url, timezone, currency, allowSameDayTurnover:allow_same_day_turnover, showPartialDays:show_partial_days, defaultUnitsView:default_units_view, tax_enabled, tax_percentage, trust_registration_no, trust_date, pan_no, certificate_no" as const;
+export const PROPERTY_CREATE_RETURN_COLUMNS =
+  "id, allowSameDayTurnover:allow_same_day_turnover, showPartialDays:show_partial_days, defaultUnitsView:default_units_view" as const;
 const GUEST_SELECT_COLUMNS = 'id, first_name, last_name, email, phone, address, pincode, city, state, country, created_at' as const;
 const ROOM_SELECT_COLUMNS = 'id, room_number, room_type_id, status, photos' as const;
 export const ROOM_TYPE_SELECT_COLUMNS =
@@ -72,6 +74,8 @@ export const FOLIO_ITEM_SELECT_COLUMNS =
   "id, reservation_id, description, amount, timestamp, payment_method, transaction_id, external_source, external_reference, external_metadata" as const;
 export const RESERVATION_SELECT_COLUMNS =
   `id, booking_id, guest_id, room_id, rate_plan_id, check_in_date, check_out_date, number_of_guests, status, notes, total_amount, booking_date, source, payment_method, adult_count, child_count, tax_enabled_snapshot, tax_rate_snapshot, external_source, external_id, external_metadata, guest:guests(first_name,last_name,email,phone), folio:folio_items(${FOLIO_ITEM_SELECT_COLUMNS})` as const;
+export const RESERVATION_CREATE_RETURN_COLUMNS =
+  "id, booking_id, room_id, total_amount, booking_date" as const;
 
 type DbGuest = {
   id: string;
@@ -193,6 +197,11 @@ type DbReservation = {
   external_metadata: Record<string, unknown> | null;
   guest?: DbReservationGuest | null;
 };
+
+type DbReservationCreateReturnRow = Pick<
+  DbReservation,
+  "id" | "booking_id" | "room_id" | "total_amount" | "booking_date"
+>;
 
 type DbReservationGuest = {
   first_name: string | null;
@@ -799,6 +808,35 @@ export const updateProperty = (id: string, updatedData: Partial<Property>) => su
 export const updatePropertyWithoutReturning = (id: string, updatedData: Partial<Property>) =>
   supabase.from('properties').update(updatedData).eq('id', id);
 export const createProperty = (propertyData: Partial<Property>) => supabase.from('properties').insert([propertyData]).select(PROPERTY_SELECT_COLUMNS).single();
+export const createPropertyIdAndDefaults = async (propertyData: Partial<Property>) => {
+  const { data, error, ...rest } = await supabase
+    .from('properties')
+    .insert([propertyData])
+    .select(PROPERTY_CREATE_RETURN_COLUMNS)
+    .single();
+  const created = data as
+    | {
+        id?: string;
+        allowSameDayTurnover?: boolean | null;
+        showPartialDays?: boolean | null;
+        defaultUnitsView?: Property["defaultUnitsView"] | null;
+      }
+    | null;
+
+  return {
+    data:
+      typeof created?.id === "string"
+        ? {
+            id: created.id,
+            allowSameDayTurnover: created.allowSameDayTurnover ?? true,
+            showPartialDays: created.showPartialDays ?? true,
+            defaultUnitsView: created.defaultUnitsView ?? "remaining",
+          }
+        : null,
+    error,
+    ...rest,
+  };
+};
 
 // Guests
 const GUEST_PAGE_SIZE = 1000;
@@ -899,6 +937,18 @@ export const addGuest = async (guestData: Omit<Guest, "id">) => {
   const { data, error, ...rest } = await supabase.from('guests').insert([toDbGuest(guestData)]).select(GUEST_SELECT_COLUMNS).single();
   if (error || !data) return { data, error, ...rest };
   return { data: fromDbGuest(data), error, ...rest };
+};
+export const addGuestIdOnly = async (guestData: Omit<Guest, "id">) => {
+  const { data, error, ...rest } = await supabase
+    .from('guests')
+    .insert([toDbGuest(guestData)])
+    .select('id')
+    .single();
+  return {
+    data: (data as { id?: string } | null)?.id ?? null,
+    error,
+    ...rest,
+  };
 };
 export const updateGuest = async (id: string, updatedData: Partial<Guest>) => {
   const { data, error, ...rest } = await supabase.from('guests').update(toDbGuest(updatedData)).eq('id', id).select(GUEST_SELECT_COLUMNS).single();
@@ -1082,10 +1132,7 @@ export const addReservation = async (reservationsData: DbReservationInsert[]) =>
   return { data: typedData.map(fromDbReservation), error, ...rest };
 };
 
-export const createReservationsWithTotal = async (
-  args: CreateReservationsArgs
-): Promise<{ data: Reservation[]; error: PostgrestError | null }> => {
-  // Validate UUIDs
+const toCreateReservationsRpcArgs = (args: CreateReservationsArgs) => {
   validateUUID(args.p_guest_id, 'p_guest_id');
   validateUUID(args.p_rate_plan_id, 'p_rate_plan_id');
   args.p_room_ids.forEach((id, idx) => validateUUID(id, `p_room_ids[${idx}]`));
@@ -1105,9 +1152,8 @@ export const createReservationsWithTotal = async (
     });
   }
 
-  // Format dates and timestamps
   const resolvedBookingId = normalizeBookingCodeInput(args.p_booking_id);
-  const validatedArgs = {
+  return {
     ...args,
     p_booking_id: resolvedBookingId,
     p_check_in_date: formatDateForPostgres(args.p_check_in_date),
@@ -1123,7 +1169,22 @@ export const createReservationsWithTotal = async (
     p_tax_rate_snapshot: args.p_tax_rate_snapshot ?? 0,
     p_custom_totals: args.p_custom_totals ?? null,
   };
+};
 
+const fromDbReservationCreateReturn = (
+  row: DbReservationCreateReturnRow
+) => ({
+  id: row.id,
+  bookingId: row.booking_id,
+  roomId: row.room_id,
+  totalAmount: Number(row.total_amount ?? 0),
+  bookingDate: row.booking_date,
+});
+
+export const createReservationsWithTotal = async (
+  args: CreateReservationsArgs
+): Promise<{ data: Reservation[]; error: PostgrestError | null }> => {
+  const validatedArgs = toCreateReservationsRpcArgs(args);
   const { data, error } = await supabase.rpc('create_reservations_with_total', validatedArgs);
 
   if (error || !data) {
@@ -1132,6 +1193,27 @@ export const createReservationsWithTotal = async (
 
   const typedData = data as DbReservation[];
   return { data: typedData.map(fromDbReservation), error: null };
+};
+
+export const createReservationsWithTotalMinimal = async (
+  args: CreateReservationsArgs
+) => {
+  const validatedArgs = toCreateReservationsRpcArgs(args);
+  const { data, error, ...rest } = await supabase
+    .rpc('create_reservations_with_total', validatedArgs)
+    .select(RESERVATION_CREATE_RETURN_COLUMNS);
+
+  if (error || !data) {
+    return { data: [], error: error ?? null, ...rest };
+  }
+
+  return {
+    data: (data as unknown as DbReservationCreateReturnRow[]).map(
+      fromDbReservationCreateReturn
+    ),
+    error: null,
+    ...rest,
+  };
 };
 export const updateReservation = async (id: string, updatedData: Partial<Reservation>) => {
   const { data, error, ...rest } = await supabase.from('reservations').update(toDbReservation(updatedData)).eq('id', id).select(RESERVATION_SELECT_COLUMNS).single();
@@ -1168,29 +1250,47 @@ export const updateBookingReservationsStatusWithoutReturning = (
 ) =>
   supabase
     .from("reservations")
-    .update({ status })
+    .update({ status }, { count: "exact" })
     .eq("booking_id", bookingId);
 
 // Folio Items
 export const getFolioItems = () => supabase.from('folio_items').select(FOLIO_ITEM_SELECT_COLUMNS);
+const toDbFolioItemInsert = (itemData: FolioItemInsertPayload) => ({
+  reservation_id: itemData.reservation_id,
+  description: itemData.description,
+  amount: itemData.amount,
+  payment_method: itemData.payment_method ?? null,
+  transaction_id: itemData.transaction_id ?? null,
+  external_source: itemData.external_source ?? INTERNAL_FOLIO_SOURCE,
+  external_reference: itemData.external_reference ?? null,
+  external_metadata: itemData.external_metadata ?? {},
+  ...(itemData.timestamp ? { timestamp: itemData.timestamp } : {}),
+});
+
 export const addFolioItem = (itemData: FolioItemInsertPayload) =>
   supabase
     .from('folio_items')
-    .insert([
-      {
-        reservation_id: itemData.reservation_id,
-        description: itemData.description,
-        amount: itemData.amount,
-        payment_method: itemData.payment_method ?? null,
-        transaction_id: itemData.transaction_id ?? null,
-        external_source: itemData.external_source ?? INTERNAL_FOLIO_SOURCE,
-        external_reference: itemData.external_reference ?? null,
-        external_metadata: itemData.external_metadata ?? {},
-        ...(itemData.timestamp ? { timestamp: itemData.timestamp } : {}),
-      },
-    ])
+    .insert([toDbFolioItemInsert(itemData)])
     .select(FOLIO_ITEM_SELECT_COLUMNS)
     .single();
+
+export const addFolioItemIdAndTimestamp = async (itemData: FolioItemInsertPayload) => {
+  const { data, error, ...rest } = await supabase
+    .from('folio_items')
+    .insert([toDbFolioItemInsert(itemData)])
+    .select('id, timestamp')
+    .single();
+  const inserted = data as { id?: string; timestamp?: string | null } | null;
+
+  return {
+    data:
+      typeof inserted?.id === "string"
+        ? { id: inserted.id, timestamp: inserted.timestamp ?? null }
+        : null,
+    error,
+    ...rest,
+  };
+};
 
 // Reservation Activity Logs (compat helpers)
 export const getReservationActivityLogs = async (reservationId: string) =>
@@ -1268,20 +1368,51 @@ export const deleteRoom = (id: string) => supabase.from('rooms').delete().eq('id
 // Room Types
 export const getRoomTypes = () => supabase.from('room_types').select(ROOM_TYPE_SELECT_COLUMNS);
 export const getRoomTypeAmenities = () => supabase.from('room_type_amenities').select(ROOM_TYPE_AMENITY_SELECT_COLUMNS);
-export const upsertRoomType = (roomTypeData: RoomTypeUpsertInput) => {
-  const params = {
-    p_id: roomTypeData.id ?? null,
-    p_name: roomTypeData.name,
-    p_description: roomTypeData.description,
-    p_max_occupancy: roomTypeData.maxOccupancy,
-    p_bed_types: roomTypeData.bedTypes,
-    p_price: roomTypeData.price,
-    p_photos: roomTypeData.photos,
-    p_main_photo_url: roomTypeData.mainPhotoUrl,
-    p_amenity_ids: roomTypeData.amenities,
-    p_is_visible: roomTypeData.isVisible,
+const toRoomTypeUpsertParams = (roomTypeData: RoomTypeUpsertInput) => ({
+  p_id: roomTypeData.id ?? null,
+  p_name: roomTypeData.name,
+  p_description: roomTypeData.description,
+  p_max_occupancy: roomTypeData.maxOccupancy,
+  p_bed_types: roomTypeData.bedTypes,
+  p_price: roomTypeData.price,
+  p_photos: roomTypeData.photos,
+  p_main_photo_url: roomTypeData.mainPhotoUrl,
+  p_amenity_ids: roomTypeData.amenities,
+  p_is_visible: roomTypeData.isVisible,
+});
+
+export const upsertRoomType = (roomTypeData: RoomTypeUpsertInput) =>
+  supabase.rpc('upsert_room_type_with_amenities', toRoomTypeUpsertParams(roomTypeData)).single();
+
+export const upsertRoomTypeMinimal = async (roomTypeData: RoomTypeUpsertInput) => {
+  const { data, error, ...rest } = await supabase
+    .rpc(
+      'upsert_room_type_with_amenities_minimal',
+      toRoomTypeUpsertParams(roomTypeData)
+    )
+    .single();
+  const row = data as
+    | {
+        id?: string;
+        min_occupancy?: number | null;
+        max_children?: number | null;
+        category_id?: string | null;
+      }
+    | null;
+
+  return {
+    data:
+      typeof row?.id === "string"
+        ? {
+            id: row.id,
+            minOccupancy: row.min_occupancy ?? null,
+            maxChildren: row.max_children ?? null,
+            categoryId: row.category_id ?? null,
+          }
+        : null,
+    error,
+    ...rest,
   };
-  return supabase.rpc('upsert_room_type_with_amenities', params).single();
 };
 export const deleteRoomType = (id: string) => supabase.from('room_types').delete().eq('id', id);
 

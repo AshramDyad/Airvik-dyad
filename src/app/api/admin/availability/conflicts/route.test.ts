@@ -33,7 +33,7 @@ describe("admin reservation conflict API", () => {
 
     const response = await GET(
       new Request(
-        "http://localhost/api/admin/availability/conflicts?checkIn=2026-06-10&checkOut=2026-06-12",
+        "http://localhost/api/admin/availability/conflicts?checkIn=2026-06-10&checkOut=2026-06-12&excludeBookingId=booking-1",
       ) as never,
     );
 
@@ -45,6 +45,7 @@ describe("admin reservation conflict API", () => {
     expect(getAdminReservationConflictingRoomIdsMock).toHaveBeenCalledWith({
       checkIn: "2026-06-10",
       checkOut: "2026-06-12",
+      excludeBookingId: "booking-1",
     });
     expect(response.headers.get("Cache-Control")).toBe("private, no-store");
     await expect(response.json()).resolves.toEqual({

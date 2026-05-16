@@ -17,6 +17,7 @@ import type { PublicHomepageBanner } from "@/lib/event-banners";
 import { z } from "zod";
 import {
   EVENT_BANNERS_CACHE_TAG,
+  EVENT_CREATE_RETURN_COLUMNS,
   EVENTS_REVALIDATE_SECONDS,
   EVENT_SELECT_COLUMNS,
   PUBLIC_HOMEPAGE_BANNER_SELECT_COLUMNS,
@@ -218,6 +219,7 @@ const eventSchema = z.object({
 export async function createEvent(rawFormData: z.infer<typeof eventSchema>) {
   const supabase = await createSessionClient();
   const formData = eventSchema.parse(rawFormData);
+  const updatedBy = (await supabase.auth.getUser()).data.user?.id ?? null;
 
   // Prepare DB payload
   const dbPayload = {
@@ -227,24 +229,32 @@ export async function createEvent(rawFormData: z.infer<typeof eventSchema>) {
     is_active: false, // Default to false, user must toggle it explicitly via the specialized RPC or UI
     starts_at: formData.startsAt || null,
     ends_at: formData.endsAt || null,
-    updated_by: (await supabase.auth.getUser()).data.user?.id,
+    updated_by: updatedBy,
   };
 
   const { data, error } = await supabase
     .from("event_banners")
     .insert(dbPayload)
-    .select(EVENT_SELECT_COLUMNS)
+    .select(EVENT_CREATE_RETURN_COLUMNS)
     .single();
 
   if (error) throw error;
+  if (!data) throw new Error("Failed to create event");
 
   // If user wanted it active immediately, we need to call the toggle logic
-  if (formData.isActive && data) {
+  if (formData.isActive) {
     await toggleEventBanner(data.id, true);
   }
 
   revalidateEventPaths();
-  return mapEventBannerRow(eventBannerRowSchema.parse(data));
+  return mapEventBannerRow(
+    eventBannerRowSchema.parse({
+      ...dbPayload,
+      id: data.id,
+      created_at: data.created_at,
+      updated_at: data.updated_at,
+    }),
+  );
 }
 
 export async function updateEvent(id: string, rawFormData: z.infer<typeof eventSchema>) {

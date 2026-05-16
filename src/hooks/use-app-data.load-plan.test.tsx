@@ -1,6 +1,6 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Amenity, Guest, PropertyClosure, RatePlan, Reservation, Role, Room, RoomCategory, SeasonalPrice, StickyNote, User } from "@/data/types";
+import type { Amenity, FolioItem, Guest, Property, PropertyClosure, RatePlan, Reservation, Role, Room, RoomCategory, RoomType, SeasonalPrice, StickyNote, User } from "@/data/types";
 
 const sessionState = vi.hoisted(() => ({
   value: {
@@ -30,7 +30,7 @@ const apiMock = vi.hoisted(() => ({
       id: "property-1",
       name: "Airvik",
       currency: "INR",
-    },
+    } as Property | null,
     error: null,
   })),
   getGuests: vi.fn(async () => ({ data: [], error: null })),
@@ -53,7 +53,7 @@ const apiMock = vi.hoisted(() => ({
     data: [] as Array<{ id: string; name: string; icon: string }>,
     error: null,
   })),
-  getStickyNotes: vi.fn(() => ({ data: [], error: null })),
+  getStickyNotes: vi.fn(() => ({ data: [] as StickyNote[], error: null })),
   getUsers: vi.fn(async () => ({
     data: [] as Array<{
       id: string;
@@ -70,11 +70,30 @@ const apiMock = vi.hoisted(() => ({
   getGuestById: vi.fn(async () => ({ data: null, error: null })),
   getReservationsByBookingId: vi.fn(async () => ({ data: [], error: null })),
   createReservationsWithTotal: vi.fn(async () => ({ data: [] as Reservation[], error: null })),
+  createReservationsWithTotalMinimal: vi.fn(async () => ({
+    data: [] as Array<{
+      id: string;
+      bookingId: string;
+      roomId: string;
+      totalAmount: number;
+      bookingDate: string;
+    }>,
+    error: null,
+  })),
   createProperty: vi.fn(async () => ({
     data: {
       id: "property-1",
       name: "Created Property",
       currency: "INR",
+    },
+    error: null,
+  })),
+  createPropertyIdAndDefaults: vi.fn(async () => ({
+    data: {
+      id: "property-2",
+      allowSameDayTurnover: false,
+      showPartialDays: false,
+      defaultUnitsView: "booked",
     },
     error: null,
   })),
@@ -88,6 +107,20 @@ const apiMock = vi.hoisted(() => ({
   })),
   updatePropertyWithoutReturning: vi.fn(async () => ({
     data: null,
+    error: null,
+  })),
+  addGuest: vi.fn(async () => ({
+    data: {
+      id: "legacy-guest-1",
+      firstName: "Legacy",
+      lastName: "Guest",
+      email: "legacy@example.com",
+      phone: "111",
+    },
+    error: null,
+  })),
+  addGuestIdOnly: vi.fn(async () => ({
+    data: "guest-2",
     error: null,
   })),
   updateGuest: vi.fn(async () => ({
@@ -142,6 +175,57 @@ const apiMock = vi.hoisted(() => ({
   })),
   updateBookingReservationsStatusWithoutReturning: vi.fn(async () => ({
     data: null,
+    error: null,
+    count: null as number | null,
+  })),
+  upsertRoomType: vi.fn(async () => ({
+    data: {
+      id: "legacy-room-type-1",
+      name: "Legacy Returned Room Type",
+      description: "Legacy",
+      max_occupancy: 9,
+      min_occupancy: 1,
+      max_children: 0,
+      category_id: null,
+      bed_types: ["Legacy"],
+      price: 999,
+      amenities: [],
+      photos: [],
+      main_photo_url: null,
+      is_visible: true,
+    },
+    error: null,
+  })),
+  upsertRoomTypeMinimal: vi.fn(async () => ({
+    data: {
+      id: "room-type-2",
+      minOccupancy: 1,
+      maxChildren: 0,
+      categoryId: null,
+    } as {
+      id: string;
+      minOccupancy: number | null;
+      maxChildren: number | null;
+      categoryId: string | null;
+    } | null,
+    error: null,
+  })),
+  addFolioItem: vi.fn(async () => ({
+    data: {
+      id: "legacy-folio-1",
+      description: "Legacy charge",
+      amount: 999,
+      timestamp: "2026-05-14T15:00:00.000Z",
+      payment_method: null,
+      transaction_id: null,
+      external_source: "internal",
+      external_reference: null,
+      external_metadata: {},
+    },
+    error: null,
+  })),
+  addFolioItemIdAndTimestamp: vi.fn(async () => ({
+    data: { id: "folio-2", timestamp: "2026-05-14T16:30:00.000Z" },
     error: null,
   })),
   addRoom: vi.fn(async () => ({
@@ -568,6 +652,34 @@ describe("useAppData route-aware loading", () => {
     expect(apiMock.getReservations).not.toHaveBeenCalled();
   });
 
+  it("lazy-loads dashboard sticky notes on demand", async () => {
+    pathnameState.value = "/admin/dashboard";
+    const notes: StickyNote[] = [
+      {
+        id: "note-1",
+        title: "Follow up",
+        description: "Call the guest",
+        color: "yellow",
+        createdAt: "2026-05-16T00:00:00.000Z",
+      },
+    ];
+    apiMock.getStickyNotes.mockReturnValueOnce({ data: notes, error: null });
+
+    const { result } = renderHook(() => useAppData());
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    expect(apiMock.getStickyNotes).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await result.current.refetchStickyNotes();
+    });
+
+    expect(apiMock.getStickyNotes).toHaveBeenCalledTimes(1);
+    expect(apiMock.getStickyNotes).toHaveBeenCalledWith("user-1");
+    expect(result.current.stickyNotes).toEqual(notes);
+  });
+
   it("lets the admin rooms page use its route-backed room API", async () => {
     pathnameState.value = "/admin/rooms";
 
@@ -641,7 +753,7 @@ describe("useAppData route-aware loading", () => {
     expect(apiMock.getGuests).not.toHaveBeenCalled();
     expect(apiMock.getRooms).not.toHaveBeenCalled();
     expect(apiMock.getRoomTypes).not.toHaveBeenCalled();
-    expect(apiMock.getStickyNotes).toHaveBeenCalledTimes(1);
+    expect(apiMock.getStickyNotes).not.toHaveBeenCalled();
     expect(authorizedFetchMock).not.toHaveBeenCalled();
 
     expect(apiMock.getRoomCategories).not.toHaveBeenCalled();
@@ -821,6 +933,75 @@ describe("useAppData route-aware loading", () => {
     );
   });
 
+  it("creates property settings by returning only the inserted id and database defaults", async () => {
+    pathnameState.value = "/admin/settings";
+    apiMock.getProperty.mockResolvedValueOnce({ data: null, error: null });
+    const createdProperty = {
+      name: "Airvik Retreat",
+      address: "Rishikesh",
+      phone: "555-999-0000",
+      email: "hello@airvik.example",
+      logo_url: "",
+      photos: ["/property.jpg"],
+      google_maps_url: undefined,
+      currency: "INR",
+      tax_enabled: true,
+      tax_percentage: 0.12,
+      trust_registration_no: undefined,
+      trust_date: undefined,
+      pan_no: undefined,
+      certificate_no: undefined,
+    } satisfies Partial<Omit<Property, "id">>;
+
+    const { result } = renderHook(() => useAppData());
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    await act(async () => {
+      await result.current.updateProperty(createdProperty);
+    });
+
+    expect(apiMock.createPropertyIdAndDefaults).toHaveBeenCalledWith(createdProperty);
+    expect(apiMock.createProperty).not.toHaveBeenCalled();
+    expect(result.current.property).toMatchObject({
+      id: "property-2",
+      name: "Airvik Retreat",
+      address: "Rishikesh",
+      phone: "555-999-0000",
+      email: "hello@airvik.example",
+      photos: ["/property.jpg"],
+      currency: "INR",
+      tax_enabled: true,
+      tax_percentage: 0.12,
+      allowSameDayTurnover: false,
+      showPartialDays: false,
+      defaultUnitsView: "booked",
+    });
+    expect(logActivityMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        section: "property",
+        entityType: "property",
+        entityId: "property-2",
+        entityLabel: "Airvik Retreat",
+        action: "property_created",
+        details: "Created property configuration",
+        metadata: {
+          changedFields: [
+            "name",
+            "address",
+            "phone",
+            "email",
+            "logo_url",
+            "photos",
+            "google_maps_url",
+            "tax_enabled",
+            "tax_percentage",
+          ],
+        },
+      }),
+    );
+  });
+
   it("updates guests without returning rows when an existing guest is available", async () => {
     pathnameState.value = "/admin/guests";
     const existingGuest: Guest = {
@@ -864,6 +1045,206 @@ describe("useAppData route-aware loading", () => {
     );
   });
 
+  it("updates guests without returning rows when no local guest is available", async () => {
+    pathnameState.value = "/admin/guests";
+    const updatedGuest = {
+      firstName: "Ravi",
+      phone: "999",
+    };
+
+    const { result } = renderHook(() => useAppData());
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    await act(async () => {
+      await result.current.updateGuest("guest-1", updatedGuest);
+    });
+
+    expect(apiMock.updateGuestWithoutReturning).toHaveBeenCalledWith(
+      "guest-1",
+      updatedGuest,
+    );
+    expect(apiMock.updateGuest).not.toHaveBeenCalled();
+    expect(logActivityMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        section: "guests",
+        entityType: "guest",
+        entityId: "guest-1",
+        entityLabel: "Ravi",
+        action: "guest_updated",
+        details: "Updated guest Ravi",
+        metadata: { changedFields: ["firstName", "phone"] },
+      }),
+    );
+  });
+
+  it("adds guests by returning only the inserted id while preserving normalized local state", async () => {
+    pathnameState.value = "/admin/guests";
+    const newGuest = {
+      firstName: " Ravi ",
+      lastName: " Kumar ",
+      email: "",
+      phone: " 999 ",
+      address: " ",
+      pincode: "249201",
+      city: " Rishikesh ",
+      state: " Uttarakhand ",
+      country: " India ",
+    } satisfies Omit<Guest, "id">;
+
+    const { result } = renderHook(() => useAppData());
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    let created: Guest | undefined;
+    await act(async () => {
+      created = await result.current.addGuest(newGuest);
+    });
+
+    expect(apiMock.addGuestIdOnly).toHaveBeenCalledWith(newGuest);
+    expect(apiMock.addGuest).not.toHaveBeenCalled();
+    expect(created).toEqual({
+      id: "guest-2",
+      firstName: "Ravi",
+      lastName: "Kumar",
+      email: "",
+      phone: "999",
+      address: "",
+      pincode: "249201",
+      city: "Rishikesh",
+      state: "Uttarakhand",
+      country: "India",
+    });
+    expect(logActivityMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        section: "guests",
+        entityType: "guest",
+        entityId: "guest-2",
+        entityLabel: "Ravi Kumar",
+        action: "guest_created",
+        details: "Added guest Ravi Kumar",
+        metadata: { email: "", phone: "999" },
+      }),
+    );
+  });
+
+  it("adds room types by returning only the id and defaulted local fields", async () => {
+    pathnameState.value = "/admin/room-types";
+    const newRoomType = {
+      name: "Suite",
+      description: "River view suite",
+      maxOccupancy: 3,
+      bedTypes: ["Queen"],
+      price: 2500,
+      amenities: ["amenity-1"],
+      photos: ["/suite.jpg"],
+      mainPhotoUrl: "/suite.jpg",
+      isVisible: true,
+    } satisfies Omit<RoomType, "id">;
+
+    const { result } = renderHook(() => useAppData());
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    await act(async () => {
+      await result.current.addRoomType(newRoomType);
+    });
+
+    expect(apiMock.upsertRoomTypeMinimal).toHaveBeenCalledWith(newRoomType);
+    expect(apiMock.upsertRoomType).not.toHaveBeenCalled();
+    expect(result.current.roomTypes).toEqual([
+      {
+        id: "room-type-2",
+        ...newRoomType,
+        minOccupancy: 1,
+        maxChildren: 0,
+        categoryId: undefined,
+      },
+    ]);
+    expect(logActivityMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        section: "room_types",
+        entityType: "room_type",
+        entityId: "room-type-2",
+        entityLabel: "Suite",
+        action: "room_type_created",
+        details: "Created room type Suite",
+      }),
+    );
+  });
+
+  it("updates room types by returning only the id and preserving merged local state", async () => {
+    pathnameState.value = "/admin/room-types";
+    const existingRoomType: RoomType = {
+      id: "room-type-1",
+      name: "Suite",
+      description: "River view suite",
+      maxOccupancy: 3,
+      minOccupancy: 2,
+      maxChildren: 1,
+      categoryId: "category-1",
+      bedTypes: ["Queen"],
+      price: 2500,
+      amenities: ["amenity-1"],
+      photos: ["/suite.jpg"],
+      mainPhotoUrl: "/suite.jpg",
+      isVisible: true,
+    };
+    apiMock.upsertRoomTypeMinimal.mockResolvedValueOnce({
+      data: {
+        id: "room-type-1",
+        minOccupancy: 2,
+        maxChildren: 1,
+        categoryId: "category-1",
+      },
+      error: null,
+    });
+
+    const { result } = renderHook(() => useAppData());
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    await act(async () => {
+      await result.current.updateRoomType(
+        "room-type-1",
+        {
+          name: "Deluxe Suite",
+          price: 3000,
+          amenities: ["amenity-2"],
+        },
+        existingRoomType,
+      );
+    });
+
+    expect(apiMock.upsertRoomTypeMinimal).toHaveBeenCalledWith({
+      id: "room-type-1",
+      name: "Deluxe Suite",
+      description: "River view suite",
+      maxOccupancy: 3,
+      minOccupancy: 2,
+      maxChildren: 1,
+      categoryId: "category-1",
+      bedTypes: ["Queen"],
+      price: 3000,
+      photos: ["/suite.jpg"],
+      mainPhotoUrl: "/suite.jpg",
+      amenities: ["amenity-2"],
+      isVisible: true,
+    });
+    expect(apiMock.upsertRoomType).not.toHaveBeenCalled();
+    expect(logActivityMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        section: "room_types",
+        entityType: "room_type",
+        entityId: "room-type-1",
+        entityLabel: "Deluxe Suite",
+        action: "room_type_updated",
+        details: "Updated room type Deluxe Suite",
+        metadata: { changedFields: ["name", "price", "amenities"] },
+      }),
+    );
+  });
+
   it("updates rooms without returning rows when an existing room is available", async () => {
     pathnameState.value = "/admin/housekeeping";
     const existingRoom = {
@@ -890,6 +1271,39 @@ describe("useAppData route-aware loading", () => {
       roomNumber: "102",
       status: "Dirty",
     });
+    expect(apiMock.updateRoom).not.toHaveBeenCalled();
+    expect(logActivityMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        section: "rooms",
+        entityType: "room",
+        entityId: "room-1",
+        entityLabel: "102",
+        action: "room_updated",
+        details: "Updated room 102",
+        metadata: { changedFields: ["roomNumber", "status"] },
+      }),
+    );
+  });
+
+  it("updates rooms without returning rows when no local room is available", async () => {
+    pathnameState.value = "/admin/rooms";
+    const updatedRoom = {
+      roomNumber: "102",
+      status: "Dirty" as const,
+    };
+
+    const { result } = renderHook(() => useAppData());
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    await act(async () => {
+      await result.current.updateRoom("room-1", updatedRoom);
+    });
+
+    expect(apiMock.updateRoomWithoutReturning).toHaveBeenCalledWith(
+      "room-1",
+      updatedRoom,
+    );
     expect(apiMock.updateRoom).not.toHaveBeenCalled();
     expect(logActivityMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -958,6 +1372,39 @@ describe("useAppData route-aware loading", () => {
         updatedCategory,
         existingCategory,
       );
+    });
+
+    expect(apiMock.updateRoomCategoryWithoutReturning).toHaveBeenCalledWith(
+      "category-1",
+      updatedCategory,
+    );
+    expect(apiMock.updateRoomCategory).not.toHaveBeenCalled();
+    expect(logActivityMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        section: "room_categories",
+        entityType: "room_category",
+        entityId: "category-1",
+        entityLabel: "Suites",
+        action: "room_category_updated",
+        details: "Updated room category Suites",
+        metadata: { changedFields: ["name", "description"] },
+      }),
+    );
+  });
+
+  it("updates room categories without returning rows when no local category is available", async () => {
+    pathnameState.value = "/admin/room-categories";
+    const updatedCategory = {
+      name: "Suites",
+      description: "Suite rooms",
+    };
+
+    const { result } = renderHook(() => useAppData());
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    await act(async () => {
+      await result.current.updateRoomCategory("category-1", updatedCategory);
     });
 
     expect(apiMock.updateRoomCategoryWithoutReturning).toHaveBeenCalledWith(
@@ -1053,6 +1500,39 @@ describe("useAppData route-aware loading", () => {
     );
   });
 
+  it("updates rate plans without returning rows when no local rate plan is available", async () => {
+    pathnameState.value = "/admin/rates";
+    const updatedRatePlan = {
+      name: "Flexible",
+      price: 1200,
+    };
+
+    const { result } = renderHook(() => useAppData());
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    await act(async () => {
+      await result.current.updateRatePlan("rate-1", updatedRatePlan);
+    });
+
+    expect(apiMock.updateRatePlanWithoutReturning).toHaveBeenCalledWith(
+      "rate-1",
+      updatedRatePlan,
+    );
+    expect(apiMock.updateRatePlan).not.toHaveBeenCalled();
+    expect(logActivityMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        section: "rate_plans",
+        entityType: "rate_plan",
+        entityId: "rate-1",
+        entityLabel: "Flexible",
+        action: "rate_plan_updated",
+        details: "Updated rate plan Flexible",
+        metadata: { changedFields: ["name", "price"] },
+      }),
+    );
+  });
+
   it("adds rate plans by returning only the inserted id", async () => {
     pathnameState.value = "/admin/rates";
     const newRatePlan = {
@@ -1114,6 +1594,41 @@ describe("useAppData route-aware loading", () => {
         updatedSeasonalPrice,
         existingSeasonalPrice,
       );
+    });
+
+    expect(apiMock.updateSeasonalPriceWithoutReturning).toHaveBeenCalledWith(
+      "seasonal-1",
+      updatedSeasonalPrice,
+    );
+    expect(apiMock.updateSeasonalPrice).not.toHaveBeenCalled();
+    expect(logActivityMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        section: "seasonal_prices",
+        entityType: "seasonal_price",
+        entityId: "seasonal-1",
+        entityLabel: "Summer",
+        action: "seasonal_price_updated",
+        details: "Updated seasonal price Summer",
+      }),
+    );
+  });
+
+  it("updates seasonal prices without returning rows when no local seasonal price is available", async () => {
+    pathnameState.value = "/admin/rates";
+    const updatedSeasonalPrice = {
+      roomTypeId: "room-type-1",
+      name: "Summer",
+      price: 1500,
+      startDate: "2026-06-01",
+      endDate: "2026-06-30",
+    };
+
+    const { result } = renderHook(() => useAppData());
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    await act(async () => {
+      await result.current.updateSeasonalPrice("seasonal-1", updatedSeasonalPrice);
     });
 
     expect(apiMock.updateSeasonalPriceWithoutReturning).toHaveBeenCalledWith(
@@ -1213,6 +1728,41 @@ describe("useAppData route-aware loading", () => {
     );
   });
 
+  it("updates property closures without returning rows when no local closure is available", async () => {
+    pathnameState.value = "/admin/settings";
+    const updatedClosure: Partial<Omit<PropertyClosure, "id">> = {
+      propertyId: "property-1",
+      roomTypeId: undefined,
+      startDate: "2026-06-01",
+      endDate: "2026-06-03",
+      reason: undefined,
+    };
+
+    const { result } = renderHook(() => useAppData());
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    await act(async () => {
+      await result.current.updatePropertyClosure("closure-1", updatedClosure);
+    });
+
+    expect(apiMock.updatePropertyClosureWithoutReturning).toHaveBeenCalledWith(
+      "closure-1",
+      updatedClosure,
+    );
+    expect(apiMock.updatePropertyClosure).not.toHaveBeenCalled();
+    expect(logActivityMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        section: "settings",
+        entityType: "property",
+        entityId: "closure-1",
+        entityLabel: "Closure 2026-06-01 – 2026-06-03",
+        action: "property_closure_updated",
+        details: "Updated blocked dates 2026-06-01 to 2026-06-03",
+      }),
+    );
+  });
+
   it("adds property closures by returning only the inserted id", async () => {
     pathnameState.value = "/admin/settings";
     const newClosure = {
@@ -1267,6 +1817,40 @@ describe("useAppData route-aware loading", () => {
 
     await act(async () => {
       await result.current.updateRole("role-1", updatedRole, existingRole);
+    });
+
+    expect(apiMock.updateRoleWithoutReturning).toHaveBeenCalledWith(
+      "role-1",
+      updatedRole,
+    );
+    expect(apiMock.updateRole).not.toHaveBeenCalled();
+    expect(logActivityMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        section: "roles",
+        entityType: "role",
+        entityId: "role-1",
+        entityLabel: "Supervisor",
+        action: "role_updated",
+        details: "Updated role Supervisor",
+        metadata: { changedFields: ["name", "permissions", "hierarchyLevel"] },
+      }),
+    );
+  });
+
+  it("updates roles without returning rows when no local role is available", async () => {
+    pathnameState.value = "/admin/settings";
+    const updatedRole: Partial<Omit<Role, "id">> = {
+      name: "Supervisor",
+      permissions: ["read:room", "update:room"],
+      hierarchyLevel: 2,
+    };
+
+    const { result } = renderHook(() => useAppData());
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    await act(async () => {
+      await result.current.updateRole("role-1", updatedRole);
     });
 
     expect(apiMock.updateRoleWithoutReturning).toHaveBeenCalledWith(
@@ -1360,6 +1944,39 @@ describe("useAppData route-aware loading", () => {
     );
   });
 
+  it("updates users without returning profile rows when no local user is available", async () => {
+    pathnameState.value = "/admin/settings";
+    const updatedUser = {
+      name: "New User",
+      roleId: "role-2",
+    };
+
+    const { result } = renderHook(() => useAppData());
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    await act(async () => {
+      await result.current.updateUser("user-2", updatedUser);
+    });
+
+    expect(apiMock.updateUserProfileWithoutReturning).toHaveBeenCalledWith(
+      "user-2",
+      updatedUser,
+    );
+    expect(apiMock.updateUserProfile).not.toHaveBeenCalled();
+    expect(logActivityMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        section: "users",
+        entityType: "user",
+        entityId: "user-2",
+        entityLabel: "New User",
+        action: "user_updated",
+        details: "Updated user New User",
+        metadata: { changedFields: ["name", "roleId"] },
+      }),
+    );
+  });
+
   it("updates amenities without returning rows when an existing amenity is available", async () => {
     pathnameState.value = "/admin/settings";
     const existingAmenity = {
@@ -1382,6 +1999,39 @@ describe("useAppData route-aware loading", () => {
         updatedAmenity,
         existingAmenity,
       );
+    });
+
+    expect(apiMock.updateAmenityWithoutReturning).toHaveBeenCalledWith(
+      "amenity-1",
+      updatedAmenity,
+    );
+    expect(apiMock.updateAmenity).not.toHaveBeenCalled();
+    expect(logActivityMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        section: "amenities",
+        entityType: "amenity",
+        entityId: "amenity-1",
+        entityLabel: "High Speed Wi-Fi",
+        action: "amenity_updated",
+        details: "Updated amenity High Speed Wi-Fi",
+        metadata: { changedFields: ["name", "icon"] },
+      }),
+    );
+  });
+
+  it("updates amenities without returning rows when no local amenity is available", async () => {
+    pathnameState.value = "/admin/settings";
+    const updatedAmenity = {
+      name: "High Speed Wi-Fi",
+      icon: "Router",
+    };
+
+    const { result } = renderHook(() => useAppData());
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    await act(async () => {
+      await result.current.updateAmenity("amenity-1", updatedAmenity);
     });
 
     expect(apiMock.updateAmenityWithoutReturning).toHaveBeenCalledWith(
@@ -1485,6 +2135,40 @@ describe("useAppData route-aware loading", () => {
 
     await act(async () => {
       await result.current.updateStickyNote("note-1", updatedNote, existingNote);
+    });
+
+    expect(apiMock.updateStickyNoteWithoutReturning).toHaveBeenCalledWith(
+      "note-1",
+      updatedNote,
+    );
+    expect(apiMock.updateStickyNote).not.toHaveBeenCalled();
+    expect(logActivityMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        section: "sticky_notes",
+        entityType: "sticky_note",
+        entityId: "note-1",
+        entityLabel: "Front desk follow-up",
+        action: "sticky_note_updated",
+        details: "Updated note Front desk follow-up",
+        metadata: { changedFields: ["title", "description", "color"] },
+      }),
+    );
+  });
+
+  it("updates sticky notes without returning rows when no local note is available", async () => {
+    pathnameState.value = "/admin/dashboard";
+    const updatedNote = {
+      title: "Front desk follow-up",
+      description: "Call guest at 9",
+      color: "blue" as const,
+    };
+
+    const { result } = renderHook(() => useAppData());
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    await act(async () => {
+      await result.current.updateStickyNote("note-1", updatedNote);
     });
 
     expect(apiMock.updateStickyNoteWithoutReturning).toHaveBeenCalledWith(
@@ -1745,6 +2429,38 @@ describe("useAppData route-aware loading", () => {
     );
   });
 
+  it("updates reservations without returning rows when no local reservation is available", async () => {
+    const updatedReservation: Partial<Omit<Reservation, "id">> = {
+      bookingId: "BK-404",
+      status: "Checked-in",
+    };
+
+    const { result } = renderHook(() => useAppData());
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    await act(async () => {
+      await result.current.updateReservation("reservation-404", updatedReservation);
+    });
+
+    expect(apiMock.updateReservationWithoutReturning).toHaveBeenCalledWith(
+      "reservation-404",
+      updatedReservation,
+    );
+    expect(apiMock.updateReservation).not.toHaveBeenCalled();
+    expect(logActivityMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        section: "reservations",
+        entityType: "reservation",
+        entityId: "reservation-404",
+        entityLabel: "BK-404",
+        action: "reservation_updated",
+        details: "Updated reservation BK-404",
+        metadata: { changedFields: ["bookingId", "status"] },
+      }),
+    );
+  });
+
   it("updates known booking reservation statuses without returning rows", async () => {
     pathnameState.value = "/admin/reservations/reservation-1";
     authorizedFetchMock.mockResolvedValueOnce(
@@ -1814,25 +2530,138 @@ describe("useAppData route-aware loading", () => {
     );
   });
 
+  it("updates booking reservation statuses without returning rows when no local reservations are available", async () => {
+    apiMock.updateBookingReservationsStatusWithoutReturning.mockResolvedValueOnce({
+      data: null,
+      error: null,
+      count: 2,
+    });
+
+    const { result } = renderHook(() => useAppData());
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    await act(async () => {
+      await result.current.updateBookingReservationStatus("BK-404", "Cancelled");
+    });
+
+    expect(apiMock.updateBookingReservationsStatusWithoutReturning).toHaveBeenCalledWith(
+      "BK-404",
+      "Cancelled",
+    );
+    expect(apiMock.updateBookingReservationsStatus).not.toHaveBeenCalled();
+    expect(logActivityMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        section: "reservations",
+        entityType: "reservation",
+        entityId: "BK-404",
+        entityLabel: "BK-404",
+        action: "reservation_status_updated",
+        details: "Changed booking BK-404 status to Cancelled for 2 rooms",
+        metadata: { status: "Cancelled", bookingId: "BK-404", affectedReservations: 2 },
+      }),
+    );
+  });
+
+  it("adds folio items by returning only the inserted id and server timestamp", async () => {
+    pathnameState.value = "/admin/reservations/reservation-1";
+    authorizedFetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          data: {
+            reservations: [makeReservation()],
+            guest: {
+              id: "guest-1",
+              firstName: "Nirav",
+              lastName: "Patel",
+              email: "nirav@example.com",
+              phone: "+91 9999999999",
+            },
+            rooms: [],
+            roomTypes: [],
+            ratePlans: [],
+          },
+        }),
+        { status: 200 },
+      ),
+    );
+    const newItem = {
+      description: "Spa charge",
+      amount: 500,
+      paymentMethod: "Cash",
+      transactionId: "txn-1",
+    } satisfies Omit<FolioItem, "id" | "timestamp">;
+
+    const { result } = renderHook(() => useAppData());
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    await act(async () => {
+      await result.current.loadBookingDetails("reservation-1");
+    });
+
+    await waitFor(() => expect(result.current.activeBookingReservations).toHaveLength(1));
+
+    await act(async () => {
+      await result.current.addFolioItem("reservation-1", newItem);
+    });
+
+    expect(apiMock.addFolioItemIdAndTimestamp).toHaveBeenCalledWith({
+      reservation_id: "reservation-1",
+      description: "Spa charge",
+      amount: 500,
+      payment_method: "Cash",
+      transaction_id: "txn-1",
+      external_source: undefined,
+      external_reference: null,
+      external_metadata: undefined,
+    });
+    expect(apiMock.addFolioItem).not.toHaveBeenCalled();
+    expect(result.current.activeBookingReservations[0].folio).toEqual([
+      {
+        id: "folio-2",
+        description: "Spa charge",
+        amount: 500,
+        timestamp: "2026-05-14T16:30:00.000Z",
+        paymentMethod: "Cash",
+        transactionId: "txn-1",
+        externalSource: "internal",
+        externalMetadata: {},
+      },
+    ]);
+    expect(logActivityMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        section: "reservations",
+        entityType: "reservation",
+        entityId: "reservation-1",
+        entityLabel: "reservation-1",
+        action: "reservation_charge_added",
+        details: "Added charge Spa charge",
+        amountMinor: 50000,
+        metadata: { description: "Spa charge", paymentMethod: "Cash" },
+      }),
+    );
+  });
+
   it("normalizes created room occupancies without returning reservation rows", async () => {
     pathnameState.value = "/admin/reservations/new";
     const createdReservations = [
-      makeReservation({
+      {
         id: "reservation-1",
+        bookingId: "A1001",
         roomId: "room-1",
-        adultCount: 3,
-        childCount: 1,
-        numberOfGuests: 4,
-      }),
-      makeReservation({
+        totalAmount: 2000,
+        bookingDate: "2026-05-13T00:00:00.000Z",
+      },
+      {
         id: "reservation-2",
+        bookingId: "A1001",
         roomId: "room-2",
-        adultCount: 3,
-        childCount: 1,
-        numberOfGuests: 4,
-      }),
+        totalAmount: 2000,
+        bookingDate: "2026-05-13T00:00:00.000Z",
+      },
     ];
-    apiMock.createReservationsWithTotal.mockResolvedValueOnce({
+    apiMock.createReservationsWithTotalMinimal.mockResolvedValueOnce({
       data: createdReservations,
       error: null,
     });
@@ -1863,6 +2692,24 @@ describe("useAppData route-aware loading", () => {
       });
     });
 
+    expect(apiMock.createReservationsWithTotalMinimal).toHaveBeenCalledWith(
+      expect.objectContaining({
+        p_booking_id: null,
+        p_guest_id: "guest-1",
+        p_room_ids: ["room-1", "room-2"],
+        p_rate_plan_id: "rate-plan-1",
+        p_check_in_date: "2026-06-10",
+        p_check_out_date: "2026-06-12",
+        p_number_of_guests: 3,
+        p_status: "Confirmed",
+        p_booking_date: "2026-05-13T00:00:00.000Z",
+        p_source: "reception",
+        p_payment_method: "UPI",
+        p_adult_count: 3,
+        p_child_count: 1,
+      }),
+    );
+    expect(apiMock.createReservationsWithTotal).not.toHaveBeenCalled();
     expect(apiMock.updateReservationWithoutReturning).toHaveBeenNthCalledWith(
       1,
       "reservation-1",

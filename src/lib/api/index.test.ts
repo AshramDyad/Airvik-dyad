@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const supabaseMock = vi.hoisted(() => ({
   from: vi.fn(),
+  rpc: vi.fn(),
 }));
 
 vi.mock("@/integrations/supabase/client", () => ({
@@ -13,6 +14,7 @@ import {
   ADMIN_ACTIVITY_LOG_SELECT_COLUMNS,
   BOOKING_RESTRICTION_SELECT_COLUMNS,
   CATEGORY_SELECT_COLUMNS,
+  FOLIO_ITEM_SELECT_COLUMNS,
   getAdminActivityLogs,
   getBookingRestrictions,
   getCategories,
@@ -32,8 +34,12 @@ import {
   getStickyNotes,
   getUserProfile,
   HOUSEKEEPING_ASSIGNMENT_SELECT_COLUMNS,
+  upsertRoomTypeMinimal,
   createCategoryIdOnly,
+  createReservationsWithTotalMinimal,
   createPostWithoutReturning,
+  addFolioItemIdAndTimestamp,
+  addGuestIdOnly,
   addRoomCategoryIdOnly,
   addRoomIdOnly,
   addRatePlanIdOnly,
@@ -59,8 +65,11 @@ import {
   updateSeasonalPriceWithoutReturning,
   updateStickyNoteWithoutReturning,
   uploadFile,
+  createPropertyIdAndDefaults,
+  PROPERTY_CREATE_RETURN_COLUMNS,
   PROPERTY_SELECT_COLUMNS,
   RATE_PLAN_SELECT_COLUMNS,
+  RESERVATION_CREATE_RETURN_COLUMNS,
   RESERVATION_SELECT_COLUMNS,
   ROLE_SELECT_COLUMNS,
   ROOM_CATEGORY_SELECT_COLUMNS,
@@ -184,6 +193,44 @@ describe("client API query shape", () => {
     expect(query.eq).toHaveBeenCalledWith("id", "property-1");
     expect(query.select).not.toHaveBeenCalled();
     expect(query.single).not.toHaveBeenCalled();
+  });
+
+  it("property create commands return only the inserted id and database defaults", async () => {
+    if (typeof createPropertyIdAndDefaults !== "function") {
+      expect(createPropertyIdAndDefaults).toBeTypeOf("function");
+      return;
+    }
+
+    const query = createQuery({
+      data: {
+        id: "property-2",
+        allowSameDayTurnover: true,
+        showPartialDays: true,
+        defaultUnitsView: "remaining",
+      },
+      error: null,
+    });
+    supabaseMock.from.mockReturnValue(query);
+    const propertyData = {
+      name: "Airvik Retreat",
+      currency: "INR",
+      tax_enabled: true,
+      tax_percentage: 0.12,
+    };
+
+    const result = await createPropertyIdAndDefaults(propertyData);
+
+    expect(result.data).toEqual({
+      id: "property-2",
+      allowSameDayTurnover: true,
+      showPartialDays: true,
+      defaultUnitsView: "remaining",
+    });
+    expect(supabaseMock.from).toHaveBeenCalledWith("properties");
+    expect(query.insert).toHaveBeenCalledWith([propertyData]);
+    expect(query.select).toHaveBeenCalledWith(PROPERTY_CREATE_RETURN_COLUMNS);
+    expect(query.select).not.toHaveBeenCalledWith(PROPERTY_SELECT_COLUMNS);
+    expect(query.single).toHaveBeenCalledTimes(1);
   });
 
   it("shared lookup readers avoid wildcard selects", () => {
@@ -481,6 +528,60 @@ describe("client API query shape", () => {
     expect(query.single).toHaveBeenCalledTimes(1);
   });
 
+  it("room type upsert commands return only the id and defaulted local fields", async () => {
+    if (typeof upsertRoomTypeMinimal !== "function") {
+      expect(upsertRoomTypeMinimal).toBeTypeOf("function");
+      return;
+    }
+
+    const query = createQuery({
+      data: {
+        id: "room-type-1",
+        min_occupancy: 1,
+        max_children: 0,
+        category_id: null,
+      },
+      error: null,
+    });
+    supabaseMock.rpc.mockReturnValue(query);
+
+    const result = await upsertRoomTypeMinimal({
+      name: "Suite",
+      description: "River view suite",
+      maxOccupancy: 3,
+      bedTypes: ["Queen"],
+      price: 2500,
+      amenities: ["amenity-1"],
+      photos: ["/suite.jpg"],
+      mainPhotoUrl: "/suite.jpg",
+      isVisible: true,
+    });
+
+    expect(result.data).toEqual({
+      id: "room-type-1",
+      minOccupancy: 1,
+      maxChildren: 0,
+      categoryId: null,
+    });
+    expect(supabaseMock.rpc).toHaveBeenCalledWith(
+      "upsert_room_type_with_amenities_minimal",
+      {
+        p_id: null,
+        p_name: "Suite",
+        p_description: "River view suite",
+        p_max_occupancy: 3,
+        p_bed_types: ["Queen"],
+        p_price: 2500,
+        p_photos: ["/suite.jpg"],
+        p_main_photo_url: "/suite.jpg",
+        p_amenity_ids: ["amenity-1"],
+        p_is_visible: true,
+      },
+    );
+    expect(query.single).toHaveBeenCalledTimes(1);
+    expect(query.select).not.toHaveBeenCalled();
+  });
+
   it("user profile reads use exact profile and role columns", () => {
     const query = createQuery();
     supabaseMock.from.mockReturnValue(query);
@@ -542,6 +643,76 @@ describe("client API query shape", () => {
     expect(query.range).toHaveBeenCalledWith(50, 74);
   });
 
+  it("reservation create RPCs can return only generated ids, booking ids, rooms, totals, and booking dates", async () => {
+    if (typeof createReservationsWithTotalMinimal !== "function") {
+      expect(createReservationsWithTotalMinimal).toBeTypeOf("function");
+      return;
+    }
+
+    const guestId = "00000000-0000-4000-8000-000000000001";
+    const roomId = "00000000-0000-4000-8000-000000000002";
+    const ratePlanId = "00000000-0000-4000-8000-000000000003";
+    const reservationId = "00000000-0000-4000-8000-000000000004";
+    const query = createQuery({
+      data: [
+        {
+          id: reservationId,
+          booking_id: "A1001",
+          room_id: roomId,
+          total_amount: 2500,
+          booking_date: "2026-05-13T00:00:00.000Z",
+        },
+      ],
+      error: null,
+    });
+    supabaseMock.rpc.mockReturnValue(query);
+
+    const result = await createReservationsWithTotalMinimal({
+      p_booking_id: null,
+      p_guest_id: guestId,
+      p_room_ids: [roomId],
+      p_rate_plan_id: ratePlanId,
+      p_check_in_date: "2026-06-10",
+      p_check_out_date: "2026-06-12",
+      p_number_of_guests: 2,
+      p_status: "Confirmed",
+      p_notes: null,
+      p_booking_date: "2026-05-13T00:00:00.000Z",
+      p_source: "reception",
+      p_payment_method: "UPI",
+      p_adult_count: 2,
+      p_child_count: 0,
+      p_tax_enabled_snapshot: true,
+      p_tax_rate_snapshot: 0.12,
+      p_custom_totals: null,
+    });
+
+    expect(result.data).toEqual([
+      {
+        id: reservationId,
+        bookingId: "A1001",
+        roomId,
+        totalAmount: 2500,
+        bookingDate: "2026-05-13T00:00:00.000Z",
+      },
+    ]);
+    expect(supabaseMock.rpc).toHaveBeenCalledWith(
+      "create_reservations_with_total",
+      expect.objectContaining({
+        p_booking_id: null,
+        p_guest_id: guestId,
+        p_room_ids: [roomId],
+        p_rate_plan_id: ratePlanId,
+        p_check_in_date: "2026-06-10",
+        p_check_out_date: "2026-06-12",
+        p_source: "reception",
+        p_payment_method: "UPI",
+        p_custom_totals: null,
+      }),
+    );
+    expect(query.select).toHaveBeenCalledWith(RESERVATION_CREATE_RETURN_COLUMNS);
+  });
+
   it("reservation mutations return only the mapped reservation shape", async () => {
     const query = createQuery({ data: reservationRow, error: null });
     supabaseMock.from.mockReturnValue(query);
@@ -589,10 +760,58 @@ describe("client API query shape", () => {
     await updateBookingReservationsStatusWithoutReturning("A1001", "Cancelled");
 
     expect(supabaseMock.from).toHaveBeenCalledWith("reservations");
-    expect(query.update).toHaveBeenCalledWith({ status: "Cancelled" });
+    expect(query.update).toHaveBeenCalledWith(
+      { status: "Cancelled" },
+      { count: "exact" }
+    );
     expect(query.eq).toHaveBeenCalledWith("booking_id", "A1001");
     expect(query.select).not.toHaveBeenCalled();
     expect(query.single).not.toHaveBeenCalled();
+  });
+
+  it("folio item create commands return only the inserted id and server timestamp", async () => {
+    if (typeof addFolioItemIdAndTimestamp !== "function") {
+      expect(addFolioItemIdAndTimestamp).toBeTypeOf("function");
+      return;
+    }
+
+    const query = createQuery({
+      data: { id: "folio-1", timestamp: "2026-05-14T16:30:00.000Z" },
+      error: null,
+    });
+    supabaseMock.from.mockReturnValue(query);
+
+    const result = await addFolioItemIdAndTimestamp({
+      reservation_id: "reservation-1",
+      description: "Spa charge",
+      amount: 500,
+      payment_method: null,
+      transaction_id: null,
+      external_source: undefined,
+      external_reference: null,
+      external_metadata: undefined,
+    });
+
+    expect(result.data).toEqual({
+      id: "folio-1",
+      timestamp: "2026-05-14T16:30:00.000Z",
+    });
+    expect(supabaseMock.from).toHaveBeenCalledWith("folio_items");
+    expect(query.insert).toHaveBeenCalledWith([
+      {
+        reservation_id: "reservation-1",
+        description: "Spa charge",
+        amount: 500,
+        payment_method: null,
+        transaction_id: null,
+        external_source: "internal",
+        external_reference: null,
+        external_metadata: {},
+      },
+    ]);
+    expect(query.select).toHaveBeenCalledWith("id, timestamp");
+    expect(query.select).not.toHaveBeenCalledWith(FOLIO_ITEM_SELECT_COLUMNS);
+    expect(query.single).toHaveBeenCalledTimes(1);
   });
 
   it("guest update commands can avoid returned rows while preserving guest column mapping", async () => {
@@ -618,6 +837,47 @@ describe("client API query shape", () => {
     expect(query.eq).toHaveBeenCalledWith("id", "guest-1");
     expect(query.select).not.toHaveBeenCalled();
     expect(query.single).not.toHaveBeenCalled();
+  });
+
+  it("guest create commands return only the inserted id while preserving insert normalization", async () => {
+    if (typeof addGuestIdOnly !== "function") {
+      expect(addGuestIdOnly).toBeTypeOf("function");
+      return;
+    }
+
+    const query = createQuery({ data: { id: "guest-1" }, error: null });
+    supabaseMock.from.mockReturnValue(query);
+
+    const result = await addGuestIdOnly({
+      firstName: " Ravi ",
+      lastName: " Kumar ",
+      email: "",
+      phone: " 999 ",
+      address: " ",
+      pincode: "249201",
+      city: " Rishikesh ",
+      state: " Uttarakhand ",
+      country: " India ",
+    });
+
+    expect(result.data).toBe("guest-1");
+    expect(supabaseMock.from).toHaveBeenCalledWith("guests");
+    expect(query.insert).toHaveBeenCalledWith([
+      {
+        first_name: "Ravi",
+        last_name: "Kumar",
+        email: null,
+        phone: "999",
+        address: null,
+        pincode: "249201",
+        city: "Rishikesh",
+        state: "Uttarakhand",
+        country: "India",
+      },
+    ]);
+    expect(query.select).toHaveBeenCalledWith("id");
+    expect(query.select).toHaveBeenCalledTimes(1);
+    expect(query.single).toHaveBeenCalledTimes(1);
   });
 
   it("room update commands can avoid returned rows when the caller can merge locally", async () => {

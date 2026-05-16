@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import { Plus } from "lucide-react";
 import { useDataContext } from "@/context/data-context";
 import { Button } from "@/components/ui/button";
@@ -7,7 +8,11 @@ import { StickyNoteCard } from "./StickyNoteCard";
 import { StickyNoteFormDialog } from "./StickyNoteFormDialog";
 
 export function DashboardStickyNotes() {
-  const { stickyNotes } = useDataContext();
+  const { stickyNotes, refetchStickyNotes } = useDataContext();
+
+  React.useEffect(() => {
+    void refetchStickyNotes();
+  }, [refetchStickyNotes]);
 
   return (
     <div className="rounded-2xl border border-border/60 bg-card/80 shadow-sm">

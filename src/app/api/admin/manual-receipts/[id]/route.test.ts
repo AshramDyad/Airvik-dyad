@@ -17,8 +17,8 @@ vi.mock("@/integrations/supabase/server", () => ({
   createServerSupabaseClient: createServerSupabaseClientMock,
 }));
 
-import { MANUAL_RECEIPT_SELECT_COLUMNS } from "../columns";
 import { PATCH } from "./route";
+import { MANUAL_RECEIPT_PATCH_RETURN_COLUMNS } from "../columns";
 
 const receiptRow = {
   id: "receipt-1",
@@ -63,7 +63,7 @@ describe("manual receipt detail API", () => {
     vi.clearAllMocks();
   });
 
-  it("PATCH returns exact manual receipt columns", async () => {
+  it("PATCH confirms the updated id without returning receipt rows", async () => {
     const query = createQuery({ data: receiptRow, error: null });
     const supabase = { from: vi.fn(() => query) };
     createServerSupabaseClientMock.mockReturnValue(supabase);
@@ -78,7 +78,10 @@ describe("manual receipt detail API", () => {
 
     expect(response.status).toBe(200);
     expect(query.eq).toHaveBeenCalledWith("id", "receipt-1");
-    expect(query.select).toHaveBeenCalledWith(MANUAL_RECEIPT_SELECT_COLUMNS);
+    expect(query.select).toHaveBeenCalledWith(MANUAL_RECEIPT_PATCH_RETURN_COLUMNS);
     expect(query.maybeSingle).toHaveBeenCalledTimes(1);
+    await expect(response.json()).resolves.toEqual({
+      data: { id: "receipt-1" },
+    });
   });
 });

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDonationById, updateDonationRecord } from "@/lib/api/donations";
+import { getDonationById, updateDonationRecordTimestampOnly } from "@/lib/api/donations";
 import { verifyCheckoutSignature } from "@/lib/razorpay";
 
 const cacheHeaders = {
@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
       return noStoreJson({ message: "Signature verification failed" }, { status: 400 });
     }
 
-    const updated = await updateDonationRecord(donation.id, {
+    const { updatedAt } = await updateDonationRecordTimestampOnly(donation.id, {
       paymentStatus: "paid",
       razorpayOrderId: razorpay_order_id,
       razorpayPaymentId: razorpay_payment_id,
@@ -40,14 +40,14 @@ export async function POST(request: NextRequest) {
 
     return noStoreJson({
       receipt: {
-        donationId: updated.id,
-        amountInMinor: updated.amountInMinor,
-        currency: updated.currency,
-        frequency: updated.frequency,
-        email: updated.email,
-        message: updated.message,
-        paymentId: updated.razorpayPaymentId,
-        timestamp: updated.updatedAt,
+        donationId: donation.id,
+        amountInMinor: donation.amountInMinor,
+        currency: donation.currency,
+        frequency: donation.frequency,
+        email: donation.email,
+        message: donation.message,
+        paymentId: razorpay_payment_id,
+        timestamp: updatedAt,
       },
     });
   } catch (error) {

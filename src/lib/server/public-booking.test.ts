@@ -11,6 +11,7 @@ vi.mock("@/integrations/supabase/server", () => ({
 import {
   createPublicBooking,
   PUBLIC_BOOKING_CONFLICT_SELECT,
+  PUBLIC_BOOKING_RESERVATION_CREATE_SELECT,
   PUBLIC_BOOKING_ROOM_SELECT,
 } from "./public-booking";
 
@@ -111,42 +112,25 @@ describe("createPublicBooking", () => {
     ]);
     const conflictsQuery = createQuery([]);
 
-    const rpc = vi.fn(async (fn: string) => {
+    const reservationCreateQuery = createQuery([
+      {
+        id: "reservation-1",
+        booking_id: "A1001",
+        room_id: roomOneId,
+        total_amount: 2000,
+        booking_date: "2026-05-13T00:00:00.000Z",
+      },
+    ]);
+
+    const rpc = vi.fn((fn: string) => {
       if (fn === "validate_booking_request") {
-        return { data: { isValid: true }, error: null };
+        return Promise.resolve({ data: { isValid: true }, error: null });
       }
       if (fn === "get_or_create_booking_guest") {
-        return { data: { id: "guest-1" }, error: null };
+        return Promise.resolve({ data: { id: "guest-1" }, error: null });
       }
       if (fn === "create_reservations_with_total") {
-        return {
-          data: [
-            {
-              id: "reservation-1",
-              booking_id: "A1001",
-              guest_id: "guest-1",
-              room_id: roomOneId,
-              rate_plan_id: "rate-plan-1",
-              check_in_date: "2026-06-10",
-              check_out_date: "2026-06-12",
-              number_of_guests: 3,
-              status: "Confirmed",
-              notes: "Near the lift",
-              total_amount: 2000,
-              booking_date: "2026-05-13T00:00:00.000Z",
-              source: "website",
-              payment_method: "UPI",
-              adult_count: 2,
-              child_count: 1,
-              tax_enabled_snapshot: true,
-              tax_rate_snapshot: 0.12,
-              external_source: null,
-              external_id: null,
-              external_metadata: null,
-            },
-          ],
-          error: null,
-        };
+        return reservationCreateQuery;
       }
       throw new Error(`Unexpected RPC ${fn}`);
     });
@@ -187,6 +171,32 @@ describe("createPublicBooking", () => {
     });
 
     expect(result.confirmationReservationId).toBe("reservation-1");
+    expect(result.reservations).toEqual([
+      {
+        id: "reservation-1",
+        bookingId: "A1001",
+        guestId: "guest-1",
+        roomId: roomOneId,
+        ratePlanId: "rate-plan-1",
+        checkInDate: "2026-06-10",
+        checkOutDate: "2026-06-12",
+        numberOfGuests: 3,
+        status: "Confirmed",
+        notes: "Near the lift",
+        folio: [],
+        totalAmount: 2000,
+        bookingDate: "2026-05-13T00:00:00.000Z",
+        source: "website",
+        paymentMethod: "UPI",
+        adultCount: 2,
+        childCount: 1,
+        taxEnabledSnapshot: true,
+        taxRateSnapshot: 0.12,
+        externalSource: undefined,
+        externalId: null,
+        externalMetadata: undefined,
+      },
+    ]);
 
     expect(roomsQuery.select).toHaveBeenCalledWith(PUBLIC_BOOKING_ROOM_SELECT);
     expect(roomsQuery.in).toHaveBeenCalledWith("room_type_id", [
@@ -246,6 +256,9 @@ describe("createPublicBooking", () => {
         p_tax_rate_snapshot: 0.12,
         p_custom_totals: [2000, 4000],
       }),
+    );
+    expect(reservationCreateQuery.select).toHaveBeenCalledWith(
+      PUBLIC_BOOKING_RESERVATION_CREATE_SELECT,
     );
   });
 });

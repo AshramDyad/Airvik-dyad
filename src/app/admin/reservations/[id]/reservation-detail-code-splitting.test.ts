@@ -66,6 +66,11 @@ describe("admin reservation detail code splitting", () => {
     expect(clientSource).toContain("activeBookingRooms");
     expect(clientSource).toContain("activeBookingRoomTypes");
     expect(clientSource).toContain("activeBookingRatePlans");
+    expect(clientSource).not.toContain("reservations.find");
+    expect(clientSource).not.toContain("bookings.flatMap");
+    expect(clientSource).not.toContain(
+      "isolatedBookingReservations.length > 0 ? isolatedBookingReservations : reservations",
+    );
     expect(clientSource).not.toContain("rooms,\n    property");
     expect(stayDetailsSource).not.toContain("ratePlans } = useDataContext");
     expect(linkedReservationsSource).not.toContain("rooms, roomTypes");

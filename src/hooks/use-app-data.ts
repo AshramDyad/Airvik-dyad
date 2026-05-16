@@ -351,6 +351,79 @@ const getLocalDateKey = (date = new Date()) =>
     date.getDate()
   ).padStart(2, "0")}`;
 
+const normalizeGuestText = (value?: string | null) => value?.trim() ?? "";
+
+const createLocalGuest = (id: string, guestData: Omit<Guest, "id">): Guest => ({
+  id,
+  firstName: normalizeGuestText(guestData.firstName),
+  lastName: normalizeGuestText(guestData.lastName),
+  email: normalizeGuestText(guestData.email),
+  phone: normalizeGuestText(guestData.phone),
+  address: normalizeGuestText(guestData.address),
+  pincode: normalizeGuestText(guestData.pincode),
+  city: normalizeGuestText(guestData.city),
+  state: normalizeGuestText(guestData.state),
+  country: normalizeGuestText(guestData.country),
+});
+
+type RoomTypeMinimalResult = {
+  id: string;
+  minOccupancy?: number | null;
+  maxChildren?: number | null;
+  categoryId?: string | null;
+};
+
+const createLocalRoomType = (
+  id: string,
+  roomTypeData: Omit<RoomType, "id">,
+  defaults?: RoomTypeMinimalResult | null
+): RoomType => ({
+  id,
+  name: roomTypeData.name,
+  description: roomTypeData.description,
+  maxOccupancy: roomTypeData.maxOccupancy,
+  minOccupancy: defaults?.minOccupancy ?? roomTypeData.minOccupancy,
+  maxChildren: defaults?.maxChildren ?? roomTypeData.maxChildren,
+  categoryId: defaults?.categoryId ?? roomTypeData.categoryId,
+  bedTypes: roomTypeData.bedTypes,
+  price: roomTypeData.price,
+  amenities: roomTypeData.amenities ?? [],
+  photos: roomTypeData.photos ?? [],
+  mainPhotoUrl: roomTypeData.mainPhotoUrl,
+  isVisible: roomTypeData.isVisible ?? true,
+});
+
+type ReservationCreateMinimalResult = {
+  id: string;
+  bookingId: string;
+  roomId: string;
+  totalAmount: number;
+  bookingDate: string;
+};
+
+type ReservationCreateLocalFields = Omit<
+  Reservation,
+  | "id"
+  | "bookingId"
+  | "roomId"
+  | "folio"
+  | "totalAmount"
+  | "bookingDate"
+>;
+
+const createLocalReservation = (
+  created: ReservationCreateMinimalResult,
+  fields: ReservationCreateLocalFields
+): Reservation => ({
+  id: created.id,
+  bookingId: created.bookingId,
+  roomId: created.roomId,
+  folio: [],
+  totalAmount: created.totalAmount,
+  bookingDate: created.bookingDate,
+  ...fields,
+});
+
 export function useAppData() {
   const { session, isLoading: isSessionLoading } = useSessionContext();
   const pathname = usePathname();
@@ -541,7 +614,7 @@ export function useAppData() {
       const [
         propertyRes, guestsRes, roomsRes, roomTypesRes, roomCategoriesRes, ratePlansRes,
         seasonalPricesRes, propertyClosuresRes,
-        rolesRes, amenitiesRes, stickyNotesRes, usersFuncRes, housekeepingAssignmentsRes,
+        rolesRes, amenitiesRes, usersFuncRes, housekeepingAssignmentsRes,
         roomTypeAmenitiesRes,
         dashboardReservationsRes
       ] = await Promise.all([
@@ -568,9 +641,6 @@ export function useAppData() {
           : Promise.resolve({ data: [] as PropertyClosure[] }),
         canLoad("roles") ? api.getRoles() : Promise.resolve({ data: [] }),
         canLoad("amenities") ? api.getAmenities() : Promise.resolve({ data: [] }),
-        canLoad("stickyNotes") && userId
-          ? api.getStickyNotes(userId)
-          : Promise.resolve({ data: [] }),
         canLoad("users")
           ? api.getUsers()
           : canLoad("housekeepers")
@@ -633,7 +703,6 @@ export function useAppData() {
       setPropertyClosures(propertyClosuresRes.data || []);
       setRoles((rolesRes.data || []).map(mapDbRole));
       setAmenities(amenitiesRes.data || []);
-      setStickyNotes(stickyNotesRes.data || []);
       setUsers(usersFuncRes.data || []);
       setHousekeepingAssignments(housekeepingAssignmentsRes.data || []);
 
@@ -702,14 +771,21 @@ export function useAppData() {
       return;
     }
 
-    const { data, error } = await api.createProperty(updatedData);
-    if (error) throw error;
-    setProperty({ ...defaultProperty, ...data });
+    const { data, error } = await api.createPropertyIdAndDefaults(updatedData);
+    if (error || !data) {
+      throw error ?? new Error("Failed to create property.");
+    }
+    const createdProperty: Property = {
+      ...defaultProperty,
+      ...updatedData,
+      ...data,
+    };
+    setProperty(createdProperty);
     recordActivity({
       section: "property",
       entityType: "property",
-      entityId: data.id,
-      entityLabel: data.name,
+      entityId: createdProperty.id,
+      entityLabel: createdProperty.name,
       action: property.id === "default-property-id" ? "property_created" : "property_updated",
       details: property.id === "default-property-id"
         ? "Created property configuration"
@@ -719,20 +795,23 @@ export function useAppData() {
   };
 
   const addGuest = async (guestData: Omit<Guest, "id">) => {
-    const { data, error } = await api.addGuest(guestData);
-    if (error) throw error;
-    setGuests(prev => [...prev, data]);
-    const label = formatName(data.firstName, data.lastName) || data.email;
+    const { data: guestId, error } = await api.addGuestIdOnly(guestData);
+    if (error || !guestId) {
+      throw error ?? new Error("Failed to create guest");
+    }
+    const createdGuest = createLocalGuest(guestId, guestData);
+    setGuests(prev => [...prev, createdGuest]);
+    const label = formatName(createdGuest.firstName, createdGuest.lastName) || createdGuest.email;
     recordActivity({
       section: "guests",
       entityType: "guest",
-      entityId: data.id,
+      entityId: createdGuest.id,
       entityLabel: label,
       action: "guest_created",
       details: `Added guest ${label}`,
-      metadata: { email: data.email, phone: data.phone },
+      metadata: { email: createdGuest.email, phone: createdGuest.phone },
     });
-    return data;
+    return createdGuest;
   };
 
   const updateGuest = async (
@@ -763,15 +842,17 @@ export function useAppData() {
       return;
     }
 
-    const { data, error } = await api.updateGuest(guestId, updatedData);
+    const { error } = await api.updateGuestWithoutReturning(guestId, updatedData);
     if (error) throw error;
-    setGuests(prev => prev.map(g => g.id === guestId ? data : g));
-    const label = formatName(data.firstName, data.lastName) || data.email;
+    const label =
+      formatName(updatedData.firstName, updatedData.lastName) ||
+      updatedData.email ||
+      guestId;
     const changedFields = extractChangedFields(undefined, updatedData);
     recordActivity({
       section: "guests",
       entityType: "guest",
-      entityId: data.id,
+      entityId: guestId,
       entityLabel: label,
       action: "guest_updated",
       details: `Updated guest ${label}`,
@@ -813,7 +894,7 @@ export function useAppData() {
     const taxEnabled = Boolean(property?.tax_enabled);
     const taxRate = property?.tax_percentage ?? 0;
 
-    const { data, error } = await api.createReservationsWithTotal({
+    const { data, error } = await api.createReservationsWithTotalMinimal({
       p_booking_id: null,
       p_guest_id: reservationDetails.guestId,
       p_room_ids: roomIds,
@@ -835,6 +916,24 @@ export function useAppData() {
 
     if (error) throw error;
 
+    const createdReservations = data.map((createdReservation) =>
+      createLocalReservation(createdReservation, {
+        guestId: reservationDetails.guestId,
+        ratePlanId: reservationDetails.ratePlanId || "default-rate-plan",
+        checkInDate: reservationDetails.checkInDate,
+        checkOutDate: reservationDetails.checkOutDate,
+        numberOfGuests: reservationDetails.numberOfGuests,
+        status: reservationDetails.status,
+        notes: reservationDetails.notes,
+        source: reservationDetails.source,
+        paymentMethod: reservationDetails.paymentMethod,
+        adultCount: reservationDetails.adultCount,
+        childCount: reservationDetails.childCount,
+        taxEnabledSnapshot: taxEnabled,
+        taxRateSnapshot: taxEnabled ? taxRate : 0,
+      })
+    );
+
     const normalizedOccupancies = normalizeRoomOccupancies(
       roomIds,
       reservationDetails.adultCount,
@@ -842,10 +941,7 @@ export function useAppData() {
       roomOccupancies
     );
 
-    let reservationsWithEmptyFolio: Reservation[] = data.map((r) => ({
-      ...r,
-      folio: [],
-    }));
+    let reservationsWithEmptyFolio: Reservation[] = createdReservations;
     reservationsWithEmptyFolio = await applyRoomOccupancyAssignments(
       reservationsWithEmptyFolio,
       normalizedOccupancies
@@ -884,7 +980,7 @@ export function useAppData() {
 
     const { roomOccupancies } = payload;
 
-    const { data, error } = await api.createReservationsWithTotal({
+    const { data, error } = await api.createReservationsWithTotalMinimal({
       p_booking_id: payload.bookingId,
       p_guest_id: payload.guestId,
       p_room_ids: payload.roomIds,
@@ -906,6 +1002,24 @@ export function useAppData() {
 
     if (error) throw error;
 
+    const createdFromMinimal = data.map((createdReservation) =>
+      createLocalReservation(createdReservation, {
+        guestId: payload.guestId,
+        ratePlanId: payload.ratePlanId || "default-rate-plan",
+        checkInDate: payload.checkInDate,
+        checkOutDate: payload.checkOutDate,
+        numberOfGuests: payload.numberOfGuests,
+        status: payload.status,
+        notes: payload.notes,
+        source: payload.source,
+        paymentMethod: payload.paymentMethod,
+        adultCount: payload.adultCount,
+        childCount: payload.childCount,
+        taxEnabledSnapshot: payload.taxEnabledSnapshot,
+        taxRateSnapshot: payload.taxRateSnapshot,
+      })
+    );
+
     const normalizedOccupancies = normalizeRoomOccupancies(
       payload.roomIds,
       payload.adultCount,
@@ -913,10 +1027,7 @@ export function useAppData() {
       roomOccupancies
     );
 
-    let createdReservations: Reservation[] = data.map((reservation) => ({
-      ...reservation,
-      folio: reservation.folio ?? [],
-    }));
+    let createdReservations: Reservation[] = createdFromMinimal;
 
     createdReservations = await applyRoomOccupancyAssignments(
       createdReservations,
@@ -967,20 +1078,21 @@ export function useAppData() {
       return;
     }
 
-    const { data, error } = await api.updateReservation(reservationId, updatedData);
+    const { error } = await api.updateReservationWithoutReturning(
+      reservationId,
+      updatedData
+    );
     if (error) throw error;
-    if (!data) throw new Error("Failed to update reservation");
-    setReservations(prev => prev.map(r => r.id === reservationId ? { ...r, ...data } : r));
-    setActiveBookingReservations(prev => prev.map(r => r.id === reservationId ? { ...r, ...data } : r));
     triggerReservationsCacheRevalidation();
+    const reservationLabel = updatedData.bookingId || reservationId;
     const changedFields = extractChangedFields(undefined, updateForState);
     recordActivity({
       section: "reservations",
       entityType: "reservation",
       entityId: reservationId,
-      entityLabel: data.bookingId,
+      entityLabel: reservationLabel,
       action: "reservation_updated",
-      details: `Updated reservation ${data.bookingId}`,
+      details: `Updated reservation ${reservationLabel}`,
       metadata: changedFields.length ? { changedFields } : undefined,
     });
   };
@@ -1082,46 +1194,16 @@ export function useAppData() {
       return;
     }
 
-    const { data, error } = await api.updateBookingReservationsStatus(
+    const { count, error } = await api.updateBookingReservationsStatusWithoutReturning(
       bookingId,
       status
     );
     if (error) throw error;
-    if (!data?.length) {
+    const affectedReservations = count ?? 0;
+    if (!affectedReservations) {
       return;
     }
-
-    const updatesById = new Map(data.map((entry) => [entry.id, entry]));
-    setReservations((prev) =>
-      prev.map((reservation) => {
-        const updated = updatesById.get(reservation.id);
-        if (!updated) {
-          return reservation;
-        }
-        return {
-          ...reservation,
-          ...updated,
-          folio: reservation.folio,
-        };
-      })
-    );
     triggerReservationsCacheRevalidation();
-
-    data.forEach((updatedReservation) => {
-      recordActivity({
-        section: "reservations",
-        entityType: "reservation",
-        entityId: updatedReservation.id,
-        entityLabel: updatedReservation.bookingId,
-        action: "reservation_status_updated",
-        details: `Changed reservation status to ${status}`,
-        metadata: {
-          status,
-          bookingId,
-          roomId: updatedReservation.roomId,
-        },
-      });
-    });
 
     recordActivity({
       section: "reservations",
@@ -1129,8 +1211,8 @@ export function useAppData() {
       entityId: bookingId,
       entityLabel: bookingId,
       action: "reservation_status_updated",
-      details: `Changed booking ${bookingId} status to ${status} for ${data.length} rooms`,
-      metadata: { status, bookingId, affectedReservations: data.length },
+      details: `Changed booking ${bookingId} status to ${status} for ${affectedReservations} rooms`,
+      metadata: { status, bookingId, affectedReservations },
     });
   };
 
@@ -1138,7 +1220,7 @@ export function useAppData() {
     reservationId: string,
     item: Omit<FolioItem, "id" | "timestamp">
   ) => {
-    const { data, error } = await api.addFolioItem({
+    const { data: inserted, error } = await api.addFolioItemIdAndTimestamp({
       reservation_id: reservationId,
       description: item.description,
       amount: item.amount,
@@ -1148,33 +1230,22 @@ export function useAppData() {
       external_reference: item.externalReference ?? null,
       external_metadata: item.externalMetadata ?? undefined,
     });
-    if (error || !data) {
+    if (error || !inserted?.id) {
       if (error && typeof error === "object" && "message" in error) {
         throw new Error(String((error as { message?: string }).message || "Failed to add folio item"));
       }
       throw new Error("Failed to add folio item");
     }
-    const inserted = data as {
-      id: string;
-      description: string;
-      amount: number;
-      timestamp: string | null;
-      payment_method: string | null;
-      transaction_id: string | null;
-      external_source: string | null;
-      external_reference: string | null;
-      external_metadata: Record<string, unknown> | null;
-    };
     const folioItem: FolioItem = {
       id: inserted.id,
-      description: inserted.description,
-      amount: inserted.amount,
+      description: item.description,
+      amount: item.amount,
       timestamp: inserted.timestamp ?? new Date().toISOString(),
-      paymentMethod: inserted.payment_method ?? undefined,
-      transactionId: inserted.transaction_id ?? undefined,
-      externalSource: inserted.external_source ?? undefined,
-      externalReference: inserted.external_reference ?? undefined,
-      externalMetadata: inserted.external_metadata ?? undefined,
+      paymentMethod: item.paymentMethod ?? undefined,
+      transactionId: item.transactionId ?? undefined,
+      externalSource: item.externalSource ?? "internal",
+      externalReference: item.externalReference ?? undefined,
+      externalMetadata: item.externalMetadata ?? {},
     };
     setReservations(prev =>
       prev.map(r =>
@@ -1224,14 +1295,15 @@ export function useAppData() {
   };
 
   const addRoomType = async (roomTypeData: Omit<RoomType, "id">) => {
-    const { data, error } = await api.upsertRoomType({
+    const payload = {
       ...roomTypeData,
       isVisible: roomTypeData.isVisible ?? true,
-    });
-    if (error || !data) throw error ?? new Error("Failed to create room type.");
-    const newRoomType = api.fromDbRoomType(
-      data as Parameters<typeof api.fromDbRoomType>[0]
-    );
+    };
+    const { data, error } = await api.upsertRoomTypeMinimal(payload);
+    if (error || !data?.id) {
+      throw error ?? new Error("Failed to create room type.");
+    }
+    const newRoomType = createLocalRoomType(data.id, payload, data);
     setRoomTypes(prev => [...prev, newRoomType]);
     recordActivity({
       section: "room_types",
@@ -1259,6 +1331,9 @@ export function useAppData() {
       name: updatedData.name ?? existingRoomType.name,
       description: updatedData.description ?? existingRoomType.description,
       maxOccupancy: updatedData.maxOccupancy ?? existingRoomType.maxOccupancy,
+      minOccupancy: updatedData.minOccupancy ?? existingRoomType.minOccupancy,
+      maxChildren: updatedData.maxChildren ?? existingRoomType.maxChildren,
+      categoryId: updatedData.categoryId ?? existingRoomType.categoryId,
       bedTypes: updatedData.bedTypes ?? existingRoomType.bedTypes,
       price: updatedData.price ?? existingRoomType.price,
       photos: updatedData.photos ?? existingRoomType.photos,
@@ -1270,11 +1345,11 @@ export function useAppData() {
           : existingRoomType.isVisible,
     };
 
-    const { data, error } = await api.upsertRoomType(payload);
-    if (error || !data) throw error ?? new Error("Failed to update room type.");
-    const updatedRoomType = api.fromDbRoomType(
-      data as Parameters<typeof api.fromDbRoomType>[0]
-    );
+    const { data, error } = await api.upsertRoomTypeMinimal(payload);
+    if (error || !data?.id) {
+      throw error ?? new Error("Failed to update room type.");
+    }
+    const updatedRoomType = createLocalRoomType(data.id, payload, data);
     setRoomTypes(prev => prev.map(rt => rt.id === roomTypeId ? updatedRoomType : rt));
     const changedFields = extractChangedFields(existingRoomType, updatedData);
     recordActivity({
@@ -1333,17 +1408,17 @@ export function useAppData() {
       return;
     }
 
-    const { data: updatedRoom, error } = await api.updateRoom(roomId, updatedData);
+    const { error } = await api.updateRoomWithoutReturning(roomId, updatedData);
     if (error) throw error;
-    setRooms(prev => prev.map(r => r.id === roomId ? updatedRoom : r));
+    const label = updatedData.roomNumber ?? roomId;
     const changedFields = extractChangedFields(undefined, updatedData);
     recordActivity({
       section: "rooms",
       entityType: "room",
       entityId: roomId,
-      entityLabel: updatedRoom.roomNumber,
+      entityLabel: label,
       action: "room_updated",
-      details: `Updated room ${updatedRoom.roomNumber}`,
+      details: `Updated room ${label}`,
       metadata: changedFields.length ? { changedFields } : undefined,
     });
   };
@@ -1440,17 +1515,20 @@ export function useAppData() {
       return;
     }
 
-    const { data, error } = await api.updateRoomCategory(roomCategoryId, updatedData);
+    const { error } = await api.updateRoomCategoryWithoutReturning(
+      roomCategoryId,
+      updatedData,
+    );
     if (error) throw error;
-    setRoomCategories(prev => prev.map(rc => rc.id === roomCategoryId ? data : rc));
+    const label = updatedData.name ?? roomCategoryId;
     const changedFields = extractChangedFields(undefined, updatedData);
     recordActivity({
       section: "room_categories",
       entityType: "room_category",
       entityId: roomCategoryId,
-      entityLabel: data.name,
+      entityLabel: label,
       action: "room_category_updated",
-      details: `Updated room category ${data.name}`,
+      details: `Updated room category ${label}`,
       metadata: changedFields.length ? { changedFields } : undefined,
     });
   };
@@ -1522,17 +1600,17 @@ export function useAppData() {
       return;
     }
 
-    const { data, error } = await api.updateRatePlan(ratePlanId, updatedData);
+    const { error } = await api.updateRatePlanWithoutReturning(ratePlanId, updatedData);
     if (error) throw error;
-    setRatePlans(prev => prev.map(rp => rp.id === ratePlanId ? data : rp));
+    const label = updatedData.name ?? ratePlanId;
     const changedFields = extractChangedFields(undefined, updatedData);
     recordActivity({
       section: "rate_plans",
       entityType: "rate_plan",
       entityId: ratePlanId,
-      entityLabel: data.name,
+      entityLabel: label,
       action: "rate_plan_updated",
-      details: `Updated rate plan ${data.name}`,
+      details: `Updated rate plan ${label}`,
       metadata: changedFields.length ? { changedFields } : undefined,
     });
   };
@@ -1607,16 +1685,16 @@ export function useAppData() {
       return;
     }
 
-    const { data: updated, error } = await api.updateSeasonalPrice(id, updatedData);
-    if (error || !updated) throw error ?? new Error("Failed to update seasonal price");
-    setSeasonalPrices(prev => prev.map(sp => sp.id === id ? updated : sp));
+    const { error } = await api.updateSeasonalPriceWithoutReturning(id, updatedData);
+    if (error) throw error;
+    const label = updatedData.name || id;
     recordActivity({
       section: "seasonal_prices",
       entityType: "seasonal_price",
       entityId: id,
-      entityLabel: updated.name || id,
+      entityLabel: label,
       action: "seasonal_price_updated",
-      details: `Updated seasonal price ${updated.name || ""}`,
+      details: `Updated seasonal price ${label === id ? "" : label}`,
     });
   };
 
@@ -1689,16 +1767,27 @@ export function useAppData() {
       return;
     }
 
-    const { data: updated, error } = await api.updatePropertyClosure(id, updatedData);
-    if (error || !updated) throw error ?? new Error("Failed to update property closure");
-    setPropertyClosures(prev => prev.map(c => c.id === id ? updated : c));
+    const { error } = await api.updatePropertyClosureWithoutReturning(
+      id,
+      updatedData,
+    );
+    if (error) throw error;
+    const fallbackLabel =
+      updatedData.reason ||
+      (updatedData.startDate && updatedData.endDate
+        ? `Closure ${updatedData.startDate} – ${updatedData.endDate}`
+        : id);
+    const fallbackDetails =
+      updatedData.startDate && updatedData.endDate
+        ? `Updated blocked dates ${updatedData.startDate} to ${updatedData.endDate}`
+        : `Updated blocked dates ${id}`;
     recordActivity({
       section: "settings",
       entityType: "property",
       entityId: id,
-      entityLabel: updated.reason || `Closure ${updated.startDate} – ${updated.endDate}`,
+      entityLabel: fallbackLabel,
       action: "property_closure_updated",
-      details: `Updated blocked dates ${updated.startDate} to ${updated.endDate}`,
+      details: fallbackDetails,
     });
   };
 
@@ -1768,18 +1857,17 @@ export function useAppData() {
       return;
     }
 
-    const { data, error } = await api.updateRole(roleId, updatedData);
+    const { error } = await api.updateRoleWithoutReturning(roleId, updatedData);
     if (error) throw error;
-    const mappedRole = mapDbRole(data as Role & { hierarchy_level?: number });
-    setRoles(prev => prev.map(r => r.id === roleId ? mappedRole : r));
+    const roleLabel = updatedData.name || roleId;
     const changedFields = extractChangedFields(undefined, updatedData);
     recordActivity({
       section: "roles",
       entityType: "role",
       entityId: roleId,
-      entityLabel: mappedRole.name,
+      entityLabel: roleLabel,
       action: "role_updated",
-      details: `Updated role ${mappedRole.name}`,
+      details: `Updated role ${roleLabel}`,
       metadata: changedFields.length ? { changedFields } : undefined,
     });
   };
@@ -1841,17 +1929,20 @@ export function useAppData() {
       return;
     }
 
-    const { data, error } = await api.updateUserProfile(userId, payload);
-    if (error || !data) throw error ?? new Error("Failed to update user profile");
-    setUsers(prev => prev.map(u => u.id === userId ? { ...u, name: data.name, roleId: data.role_id } : u));
+    const { error } = await api.updateUserProfileWithoutReturning(
+      userId,
+      payload,
+    );
+    if (error) throw error;
+    const userLabel = payload.name ?? userId;
     const changedFields = extractChangedFields(undefined, payload);
     recordActivity({
       section: "users",
       entityType: "user",
       entityId: userId,
-      entityLabel: data.name ?? userId,
+      entityLabel: userLabel,
       action: "user_updated",
-      details: `Updated user ${data.name ?? userId}`,
+      details: `Updated user ${userLabel}`,
       metadata: changedFields.length ? { changedFields } : undefined,
     });
   };
@@ -1892,6 +1983,17 @@ export function useAppData() {
     if (error) console.error("Error refetching amenities:", error);
     else setAmenities(data || []);
   }, []);
+
+  const refetchStickyNotes = React.useCallback(async () => {
+    if (!userId) {
+      setStickyNotes([]);
+      return;
+    }
+
+    const { data, error } = await api.getStickyNotes(userId);
+    if (error) console.error("Error refetching sticky notes:", error);
+    else setStickyNotes(data || []);
+  }, [userId]);
 
   const addAmenity = async (amenityData: Omit<Amenity, "id">) => {
     const { data: amenityId, error } = await api.addAmenityIdOnly(amenityData);
@@ -1941,17 +2043,20 @@ export function useAppData() {
       return;
     }
 
-    const { data, error } = await api.updateAmenity(amenityId, updatedData);
+    const { error } = await api.updateAmenityWithoutReturning(
+      amenityId,
+      updatedData,
+    );
     if (error) throw error;
-    setAmenities(prev => prev.map(a => a.id === amenityId ? data : a));
+    const amenityLabel = updatedData.name || amenityId;
     const changedFields = extractChangedFields(undefined, updatedData);
     recordActivity({
       section: "amenities",
       entityType: "amenity",
       entityId: amenityId,
-      entityLabel: data.name,
+      entityLabel: amenityLabel,
       action: "amenity_updated",
-      details: `Updated amenity ${data.name}`,
+      details: `Updated amenity ${amenityLabel}`,
       metadata: changedFields.length ? { changedFields } : undefined,
     });
   };
@@ -2024,17 +2129,20 @@ export function useAppData() {
       return;
     }
 
-    const { data, error } = await api.updateStickyNote(noteId, updatedData);
+    const { error } = await api.updateStickyNoteWithoutReturning(
+      noteId,
+      updatedData,
+    );
     if (error) throw error;
-    setStickyNotes(prev => prev.map(n => n.id === noteId ? data : n));
+    const noteLabel = updatedData.title || noteId;
     const changedFields = extractChangedFields(undefined, updatedData);
     recordActivity({
       section: "sticky_notes",
       entityType: "sticky_note",
       entityId: noteId,
-      entityLabel: data.title,
+      entityLabel: noteLabel,
       action: "sticky_note_updated",
-      details: `Updated note ${data.title}`,
+      details: `Updated note ${noteLabel}`,
       metadata: changedFields.length ? { changedFields } : undefined,
     });
   };
@@ -2145,6 +2253,7 @@ export function useAppData() {
     refetchUsers,
     refetchRoles,
     refetchAmenities,
+    refetchStickyNotes,
     updateGuest,
     updateReservation,
     updateReservationStatus,

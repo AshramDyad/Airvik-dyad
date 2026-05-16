@@ -20,10 +20,12 @@ vi.mock("@/lib/server/page-auth", () => ({
 }));
 
 import {
+  createReview,
   getPublishedReviews,
 } from "./reviews";
 import {
   PUBLIC_REVIEW_SELECT_COLUMNS,
+  REVIEW_CREATE_RETURN_COLUMNS,
   REVIEWS_CACHE_TAG,
   REVIEWS_REVALIDATE_SECONDS,
 } from "./cache-config";
@@ -42,6 +44,15 @@ const createReviewsQuery = (response: unknown) => {
     eq: vi.fn(() => query),
     order: vi.fn(() => query),
     limit: vi.fn(async () => response),
+  };
+  return query;
+};
+
+const createInsertQuery = (response: unknown) => {
+  const query = {
+    insert: vi.fn(() => query),
+    select: vi.fn(() => query),
+    single: vi.fn(async () => response),
   };
   return query;
 };
@@ -81,5 +92,60 @@ describe("review server data access", () => {
       ascending: false,
     });
     expect(query.limit).toHaveBeenCalledWith(20);
+  });
+
+  it("creates reviews by returning only generated fields", async () => {
+    const reviewId = "22222222-2222-4222-8222-222222222222";
+    const userId = "11111111-1111-4111-8111-111111111111";
+    const query = createInsertQuery({
+      data: {
+        id: reviewId,
+        created_at: "2026-05-14T00:00:00.000Z",
+        updated_at: "2026-05-14T00:01:00.000Z",
+      },
+      error: null,
+    });
+    const getUser = vi.fn(async () => ({
+      data: {
+        user: { id: userId },
+      },
+    }));
+    const supabase = {
+      auth: { getUser },
+      from: vi.fn(() => query),
+    };
+    supabaseMocks.createSessionClient.mockResolvedValue(supabase);
+
+    await expect(
+      createReview({
+        reviewerName: "Asha",
+        content: "Peaceful stay.",
+        imageUrl: "https://example.com/review.jpg",
+        isPublished: true,
+      }),
+    ).resolves.toEqual({
+      id: reviewId,
+      reviewerName: "Asha",
+      reviewerTitle: undefined,
+      content: "Peaceful stay.",
+      imageUrl: "https://example.com/review.jpg",
+      isPublished: true,
+      createdAt: "2026-05-14T00:00:00.000Z",
+      updatedAt: "2026-05-14T00:01:00.000Z",
+      updatedBy: userId,
+    });
+
+    expect(requirePagePermissionsMock).toHaveBeenCalledWith("create:review");
+    expect(supabase.from).toHaveBeenCalledWith("testimonials");
+    expect(query.insert).toHaveBeenCalledWith({
+      reviewer_name: "Asha",
+      reviewer_title: null,
+      content: "Peaceful stay.",
+      image_url: "https://example.com/review.jpg",
+      is_published: true,
+      updated_by: userId,
+      updated_at: expect.any(String),
+    });
+    expect(query.select).toHaveBeenCalledWith(REVIEW_CREATE_RETURN_COLUMNS);
   });
 });

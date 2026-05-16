@@ -8,12 +8,15 @@ vi.mock("@/integrations/supabase/server", () => ({
 
 import {
   createDonationRecord,
+  DONATION_CREATE_RETURN_COLUMNS,
   DONATION_SELECT_COLUMNS,
   DONATION_ID_SELECT_COLUMNS,
   DONATION_STATS_SELECT_COLUMNS,
+  DONATION_UPDATE_TIMESTAMP_COLUMNS,
   getDonationIdByOrderId,
   getDonationStats,
   updateDonationRecord,
+  updateDonationRecordTimestampOnly,
   updateDonationRecordWithoutReturning,
 } from "./donations";
 
@@ -38,6 +41,12 @@ const donationRow = {
   updated_at: "2026-05-01T00:00:00.000Z",
 };
 
+const donationGeneratedRow = {
+  id: "donation-1",
+  created_at: "2026-05-01T00:00:00.000Z",
+  updated_at: "2026-05-01T00:00:00.000Z",
+};
+
 const createQuery = (response: unknown) => {
   const query = {
     insert: vi.fn(() => query),
@@ -55,23 +64,45 @@ describe("donation API data access", () => {
     vi.clearAllMocks();
   });
 
-  it("createDonationRecord returns only the mapped donation columns", async () => {
-    const query = createQuery({ data: donationRow, error: null });
+  it("createDonationRecord returns a mapped donation while selecting only generated fields", async () => {
+    const query = createQuery({ data: donationGeneratedRow, error: null });
     createServerSupabaseClientMock.mockReturnValue({ from: vi.fn(() => query) });
 
-    await createDonationRecord({
+    await expect(createDonationRecord({
       donorName: "Asha",
       email: "asha@example.com",
       phone: "555",
       amountInMinor: 10000,
       currency: "INR",
       frequency: "one_time",
+      message: "Seva",
       consent: true,
       paymentProvider: "razorpay",
       paymentStatus: "paid",
+      razorpayOrderId: "order_1",
+      metadata: { source: "web" },
+    })).resolves.toEqual({
+      id: "donation-1",
+      donorName: "Asha",
+      email: "asha@example.com",
+      phone: "555",
+      amountInMinor: 10000,
+      currency: "INR",
+      frequency: "one_time",
+      message: "Seva",
+      consent: true,
+      paymentProvider: "razorpay",
+      paymentStatus: "paid",
+      razorpayOrderId: "order_1",
+      razorpayPaymentId: undefined,
+      razorpaySignature: undefined,
+      upiReference: undefined,
+      metadata: { source: "web" },
+      createdAt: "2026-05-01T00:00:00.000Z",
+      updatedAt: "2026-05-01T00:00:00.000Z",
     });
 
-    expect(query.select).toHaveBeenCalledWith(DONATION_SELECT_COLUMNS);
+    expect(query.select).toHaveBeenCalledWith(DONATION_CREATE_RETURN_COLUMNS);
     expect(query.single).toHaveBeenCalledTimes(1);
   });
 
@@ -83,6 +114,27 @@ describe("donation API data access", () => {
 
     expect(query.eq).toHaveBeenCalledWith("id", "donation-1");
     expect(query.select).toHaveBeenCalledWith(DONATION_SELECT_COLUMNS);
+    expect(query.single).toHaveBeenCalledTimes(1);
+  });
+
+  it("updateDonationRecordTimestampOnly returns only the database update timestamp", async () => {
+    const query = createQuery({
+      data: { updated_at: "2026-05-01T01:00:00.000Z" },
+      error: null,
+    });
+    createServerSupabaseClientMock.mockReturnValue({ from: vi.fn(() => query) });
+
+    await expect(updateDonationRecordTimestampOnly("donation-1", {
+      paymentStatus: "paid",
+      razorpayPaymentId: "pay_1",
+    })).resolves.toEqual({ updatedAt: "2026-05-01T01:00:00.000Z" });
+
+    expect(query.update).toHaveBeenCalledWith({
+      payment_status: "paid",
+      razorpay_payment_id: "pay_1",
+    });
+    expect(query.eq).toHaveBeenCalledWith("id", "donation-1");
+    expect(query.select).toHaveBeenCalledWith(DONATION_UPDATE_TIMESTAMP_COLUMNS);
     expect(query.single).toHaveBeenCalledTimes(1);
   });
 

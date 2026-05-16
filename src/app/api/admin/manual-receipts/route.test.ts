@@ -17,12 +17,20 @@ vi.mock("@/integrations/supabase/server", () => ({
   createServerSupabaseClient: createServerSupabaseClientMock,
 }));
 
-import { MANUAL_RECEIPT_SELECT_COLUMNS } from "./columns";
+import {
+  MANUAL_RECEIPT_CREATE_RETURN_COLUMNS,
+  MANUAL_RECEIPT_SELECT_COLUMNS,
+} from "./columns";
 import { GET, POST } from "./route";
 
-const receiptRow = {
+const receiptGeneratedRow = {
   id: "receipt-1",
   slip_no: 1,
+  created_at: "2026-05-01T00:00:00.000Z",
+};
+
+const receiptRow = {
+  ...receiptGeneratedRow,
   first_name: "Asha",
   last_name: "Guest",
   full_name: "Asha Guest",
@@ -45,7 +53,6 @@ const receiptRow = {
   donation_type: null,
   donation_in: null,
   payment_mode: null,
-  created_at: "2026-05-01T00:00:00.000Z",
 };
 
 const createQuery = (response: unknown) => {
@@ -77,8 +84,8 @@ describe("manual receipts API", () => {
     expect(query.order).toHaveBeenCalledWith("created_at", { ascending: false });
   });
 
-  it("POST returns exact manual receipt columns", async () => {
-    const query = createQuery({ data: receiptRow, error: null });
+  it("POST returns a full receipt while selecting only generated fields", async () => {
+    const query = createQuery({ data: receiptGeneratedRow, error: null });
     const supabase = { from: vi.fn(() => query) };
     createServerSupabaseClientMock.mockReturnValue(supabase);
 
@@ -96,7 +103,36 @@ describe("manual receipts API", () => {
 
     expect(response.status).toBe(201);
     expect(response.headers.get("Cache-Control")).toBe("private, no-store");
-    expect(query.select).toHaveBeenCalledWith(MANUAL_RECEIPT_SELECT_COLUMNS);
+    expect(query.select).toHaveBeenCalledWith(MANUAL_RECEIPT_CREATE_RETURN_COLUMNS);
     expect(query.single).toHaveBeenCalledTimes(1);
+    await expect(response.json()).resolves.toEqual({
+      data: {
+        id: "receipt-1",
+        slipNo: 1,
+        firstName: "Asha",
+        lastName: "Guest",
+        fullName: "Asha Guest",
+        phone: "9999999999",
+        email: null,
+        address: null,
+        city: null,
+        pancard: null,
+        aadharCard: null,
+        dob: null,
+        amount: 1000,
+        paymentMethod: "Cash",
+        transactionId: null,
+        note: null,
+        status: "Accepted",
+        byHand: null,
+        creator: null,
+        imgLink: null,
+        trust: null,
+        donationType: null,
+        donationIn: null,
+        paymentMode: null,
+        createdAt: "2026-05-01T00:00:00.000Z",
+      },
+    });
   });
 });

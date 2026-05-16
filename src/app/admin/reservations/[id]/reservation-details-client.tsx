@@ -76,7 +76,6 @@ const ReservationActivityTimeline = dynamic(
 export function ReservationDetailsClient() {
   const params = useParams<{ id: string }>();
   const {
-    reservations,
     guests,
     property,
     isLoading,
@@ -89,7 +88,6 @@ export function ReservationDetailsClient() {
     activeBookingRooms,
     activeBookingRoomTypes,
     activeBookingRatePlans,
-    bookings,
   } = useDataContext();
 
   const reservationIdFromParams = React.useMemo(() => {
@@ -106,12 +104,12 @@ export function ReservationDetailsClient() {
   }, [reservationIdFromParams, loadBookingDetails]);
 
   const reservation = React.useMemo(() => {
-    const found = isolatedBookingReservations.find((r) => r.id === reservationIdFromParams) ||
-                  reservations.find((r) => r.id === reservationIdFromParams) ||
-                  bookings.flatMap((b) => b.subRows).find((r) => r.id === reservationIdFromParams);
+    const found = isolatedBookingReservations.find(
+      (r) => r.id === reservationIdFromParams
+    );
     console.log(`[Page] Finding reservation for ${reservationIdFromParams}: ${found ? 'Found' : 'Not Found'}`);
     return found;
-  }, [reservations, isolatedBookingReservations, bookings, reservationIdFromParams]);
+  }, [isolatedBookingReservations, reservationIdFromParams]);
 
   const isActuallyLoading = 
     isLoading || 
@@ -168,7 +166,7 @@ export function ReservationDetailsClient() {
   const bookingLookupRooms = activeBookingRooms;
   const bookingLookupRatePlans = activeBookingRatePlans;
 
-  const bookingReservationsWithDetails: ReservationWithDetails[] = (isolatedBookingReservations.length > 0 ? isolatedBookingReservations : reservations)
+  const bookingReservationsWithDetails: ReservationWithDetails[] = isolatedBookingReservations
     .filter((entry) => entry.bookingId === reservation.bookingId)
     .map((entry) => {
       const entryGuest = guests.find((g) => g.id === entry.guestId);

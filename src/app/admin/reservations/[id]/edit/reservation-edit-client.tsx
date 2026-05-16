@@ -25,7 +25,6 @@ export function ReservationEditClient() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const {
-    reservations,
     guests,
     isLoading,
     loadBookingDetails,
@@ -35,7 +34,6 @@ export function ReservationEditClient() {
     lookupStatus,
     activeBookingReservations,
     activeBookingRooms,
-    bookings,
   } = useDataContext();
 
   const raw = params?.id;
@@ -49,12 +47,10 @@ export function ReservationEditClient() {
   }, [reservationId, loadBookingDetails]);
 
   const reservation = React.useMemo(() => {
-    const found = activeBookingReservations.find((entry) => entry.id === reservationId) ||
-                  reservations.find((entry) => entry.id === reservationId) ||
-                  bookings.flatMap((b) => b.subRows).find((entry) => entry.id === reservationId);
+    const found = activeBookingReservations.find((entry) => entry.id === reservationId);
     console.log(`[EditPage] Finding reservation for ${reservationId}: ${found ? 'Found' : 'Not Found'}`);
     return found;
-  }, [reservations, activeBookingReservations, bookings, reservationId]);
+  }, [activeBookingReservations, reservationId]);
 
   const isActuallyLoading = 
     isLoading || 

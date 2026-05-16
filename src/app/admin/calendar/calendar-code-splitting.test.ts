@@ -48,6 +48,10 @@ describe("admin calendar code splitting", () => {
     );
 
     expect(availabilitySource).toContain("useCalendarReservationDetails");
+    expect(availabilitySource).not.toContain("LegacyAvailabilityCalendar");
+    expect(availabilitySource).not.toContain("useLegacyView");
+    expect(availabilitySource).not.toContain("reservations, guests, rooms");
+    expect(availabilitySource).not.toContain("Use legacy view");
     expect(roomTypeRowSource).toContain("reservationDetailsById");
     expect(roomTypeRowSource).not.toContain("@/context/data-context");
     expect(hoverCardSource).toContain("reservationDetailsById");

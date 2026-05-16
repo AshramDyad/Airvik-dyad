@@ -46,6 +46,7 @@ import { useDataContext } from "@/context/data-context";
 import { authorizedFetch } from "@/lib/auth/client-session";
 import { formatCurrency } from "@/lib/currency";
 import type { ManualReceipt } from "@/data/types";
+import { mergeManualReceiptUpdate } from "./manual-receipt-utils";
 
 const PAYMENT_METHODS = [
   "Cash",
@@ -181,9 +182,9 @@ export default function ManualReceiptHistory() {
     setDialogOpen(true);
   }
 
-  async function updateReceipt(id: string, values: EditFormValues): Promise<ManualReceipt | null> {
+  async function updateReceipt(receipt: ManualReceipt, values: EditFormValues): Promise<ManualReceipt | null> {
     try {
-      const res = await authorizedFetch(`/api/admin/manual-receipts/${id}`, {
+      const res = await authorizedFetch(`/api/admin/manual-receipts/${receipt.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(values),
@@ -194,8 +195,11 @@ export default function ManualReceiptHistory() {
           (body as { message?: string } | null)?.message || "Update failed",
         );
       }
-      const json = (await res.json()) as { data: ManualReceipt };
-      return json.data;
+      const json = (await res.json()) as { data?: { id?: string } };
+      if (json.data?.id !== receipt.id) {
+        throw new Error("Update failed");
+      }
+      return mergeManualReceiptUpdate(receipt, values);
     } catch (err) {
       console.error(err);
       toast.error(
@@ -236,7 +240,7 @@ export default function ManualReceiptHistory() {
     setSaving(true);
     try {
       const values = form.getValues();
-      const updated = await updateReceipt(editingReceipt.id, values);
+      const updated = await updateReceipt(editingReceipt, values);
       if (!updated) return;
 
       setReceipts((prev) =>

@@ -4,7 +4,10 @@ import { z } from "zod";
 import type { ManualReceipt } from "@/data/types";
 import { createServerSupabaseClient } from "@/integrations/supabase/server";
 import { requireFeature, HttpError } from "@/lib/server/auth";
-import { MANUAL_RECEIPT_SELECT_COLUMNS } from "./columns";
+import {
+  MANUAL_RECEIPT_CREATE_RETURN_COLUMNS,
+  MANUAL_RECEIPT_SELECT_COLUMNS,
+} from "./columns";
 
 const cacheHeaders = {
   "Cache-Control": "private, no-store",
@@ -166,34 +169,36 @@ export async function POST(request: Request) {
       parsed.paymentMethod ??
       ((parsed.paymentMode ?? "Cash") as (typeof PAYMENT_METHODS)[number]);
 
+    const insertPayload = {
+      first_name: firstName,
+      last_name: lastName,
+      full_name: fullName || null,
+      phone: parsed.phone,
+      email: parsed.email || null,
+      address: parsed.address || null,
+      city: parsed.city || null,
+      pancard: parsed.pancard || null,
+      aadhar_card: parsed.aadharCard || null,
+      dob: parsed.dob || null,
+      amount: parsed.amount,
+      payment_method: paymentMethod,
+      transaction_id: parsed.transactionId || null,
+      note: parsed.note || null,
+      status: parsed.status || "Accepted",
+      by_hand: parsed.byHand || null,
+      creator: parsed.creator || null,
+      img_link: parsed.imgLink || null,
+      trust: parsed.trust || null,
+      donation_type: parsed.donationType || null,
+      donation_in: parsed.donationIn || null,
+      payment_mode: parsed.paymentMode || null,
+    };
+
     const supabase = createServerSupabaseClient();
     const { data, error } = await supabase
       .from("manual_receipts")
-      .insert({
-        first_name: firstName,
-        last_name: lastName,
-        full_name: fullName || null,
-        phone: parsed.phone,
-        email: parsed.email || null,
-        address: parsed.address || null,
-        city: parsed.city || null,
-        pancard: parsed.pancard || null,
-        aadhar_card: parsed.aadharCard || null,
-        dob: parsed.dob || null,
-        amount: parsed.amount,
-        payment_method: paymentMethod,
-        transaction_id: parsed.transactionId || null,
-        note: parsed.note || null,
-        status: parsed.status || "Accepted",
-        by_hand: parsed.byHand || null,
-        creator: parsed.creator || null,
-        img_link: parsed.imgLink || null,
-        trust: parsed.trust || null,
-        donation_type: parsed.donationType || null,
-        donation_in: parsed.donationIn || null,
-        payment_mode: parsed.paymentMode || null,
-      })
-      .select(MANUAL_RECEIPT_SELECT_COLUMNS)
+      .insert(insertPayload)
+      .select(MANUAL_RECEIPT_CREATE_RETURN_COLUMNS)
       .single();
 
     if (error) {
@@ -203,9 +208,22 @@ export async function POST(request: Request) {
         { status: 500, headers: cacheHeaders },
       );
     }
+    if (!data) {
+      return NextResponse.json(
+        { message: "Unable to save receipt." },
+        { status: 500, headers: cacheHeaders },
+      );
+    }
 
     return NextResponse.json(
-      { data: mapRow(data as unknown as DbManualReceipt) },
+      {
+        data: mapRow({
+          ...insertPayload,
+          id: data.id,
+          slip_no: data.slip_no,
+          created_at: data.created_at,
+        } as DbManualReceipt),
+      },
       { status: 201, headers: cacheHeaders },
     );
   } catch (error) {

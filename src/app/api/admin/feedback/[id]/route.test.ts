@@ -25,8 +25,8 @@ vi.mock("@/lib/activity/server", () => ({
   logAdminActivityFromProfile: logAdminActivityFromProfileMock,
 }));
 
-import { ADMIN_FEEDBACK_SELECT_COLUMNS } from "../columns";
 import { PATCH } from "./route";
+import { ADMIN_FEEDBACK_PATCH_RETURN_COLUMNS } from "../columns";
 
 const feedbackRow = {
   id: "feedback-1",
@@ -58,7 +58,7 @@ describe("admin feedback detail API", () => {
     vi.clearAllMocks();
   });
 
-  it("uses exact feedback columns after updates", async () => {
+  it("returns only compact update fields after feedback updates", async () => {
     const query = createQuery({ data: feedbackRow, error: null });
     const supabase = { from: vi.fn(() => query) };
     getServerSupabaseClientMock.mockResolvedValue(supabase);
@@ -74,7 +74,15 @@ describe("admin feedback detail API", () => {
     expect(response.status).toBe(200);
     expect(supabase.from).toHaveBeenCalledWith("feedback");
     expect(query.eq).toHaveBeenCalledWith("id", "feedback-1");
-    expect(query.select).toHaveBeenCalledWith(ADMIN_FEEDBACK_SELECT_COLUMNS);
+    expect(query.select).toHaveBeenCalledWith(ADMIN_FEEDBACK_PATCH_RETURN_COLUMNS);
     expect(query.maybeSingle).toHaveBeenCalledTimes(1);
+    await expect(response.json()).resolves.toEqual({
+      data: {
+        id: "feedback-1",
+        status: "in_review",
+        internalNote: "Checking",
+        updatedAt: "2026-05-02T00:00:00.000Z",
+      },
+    });
   });
 });

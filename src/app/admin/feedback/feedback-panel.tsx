@@ -38,6 +38,7 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { PermissionGate } from "@/components/admin/permission-gate";
+import { mergeFeedbackUpdate, type FeedbackPatchResult } from "./feedback-panel-utils";
 
 const CLEAR_FILTER_VALUE = "__all";
 
@@ -210,10 +211,13 @@ export default function FeedbackPanel() {
         throw new Error(result?.message ?? "Unable to update feedback");
       }
 
+      const updated = result.data as FeedbackPatchResult;
       setFeedback((prev) =>
-        prev.map((item) => (item.id === id ? result.data : item))
+        prev.map((item) => mergeFeedbackUpdate(item, updated))
       );
-      setDetailFeedback(result.data);
+      setDetailFeedback((current) =>
+        current ? mergeFeedbackUpdate(current, updated) : current
+      );
       toast.success("Feedback updated");
     } catch (error) {
       console.error("Failed to update feedback", error);

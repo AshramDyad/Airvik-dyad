@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const donationMocks = vi.hoisted(() => ({
   getDonationById: vi.fn(),
   updateDonationRecord: vi.fn(),
+  updateDonationRecordTimestampOnly: vi.fn(),
 }));
 const razorpayMocks = vi.hoisted(() => ({
   verifyCheckoutSignature: vi.fn(),
@@ -42,6 +43,9 @@ describe("donation verify payment API", () => {
       razorpaySignature: "sig_1",
       updatedAt: "2026-05-14T01:00:00.000Z",
     });
+    donationMocks.updateDonationRecordTimestampOnly.mockResolvedValue({
+      updatedAt: "2026-05-14T01:00:00.000Z",
+    });
     razorpayMocks.verifyCheckoutSignature.mockReturnValue(true);
   });
 
@@ -65,6 +69,16 @@ describe("donation verify payment API", () => {
       paymentId: "pay_1",
       signature: "sig_1",
     });
+    expect(donationMocks.updateDonationRecordTimestampOnly).toHaveBeenCalledWith(
+      "donation-1",
+      {
+        paymentStatus: "paid",
+        razorpayOrderId: "order_1",
+        razorpayPaymentId: "pay_1",
+        razorpaySignature: "sig_1",
+      },
+    );
+    expect(donationMocks.updateDonationRecord).not.toHaveBeenCalled();
     await expect(response.json()).resolves.toEqual({
       receipt: {
         donationId: "donation-1",
