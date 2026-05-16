@@ -13,7 +13,11 @@ import { RolesDataTable } from "./roles-data-table";
 import { columns } from "./roles-columns";
 
 export function RolesPermissions() {
-  const { roles } = useDataContext();
+  const { roles, refetchRoles } = useDataContext();
+
+  React.useEffect(() => {
+    void refetchRoles();
+  }, [refetchRoles]);
 
   return (
     <Card>

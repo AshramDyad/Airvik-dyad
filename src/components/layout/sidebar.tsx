@@ -11,7 +11,6 @@ import {
   DollarSign,
   BarChart3,
   Settings,
-  Package2,
   ClipboardList,
   Layers,
   FolderOpen,
@@ -27,7 +26,6 @@ import * as React from "react";
 
 import { cn } from "@/lib/utils";
 import { useAuthContext } from "@/context/auth-context";
-import { useDataContext } from "@/context/data-context";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -169,7 +167,6 @@ interface SidebarProps {
 export function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
   const pathname = usePathname() ?? "";
   const { hasPermission, hasAnyPermission } = useAuthContext();
-  const { property } = useDataContext();
   const [openDropdowns, setOpenDropdowns] = React.useState<
     Record<string, boolean>
   >({});

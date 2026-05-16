@@ -1,5 +1,3 @@
-import Link from "next/link";
-
 export const metadata = {
   title: "Donation Cancelled | Sahajanand Wellness",
 };
@@ -14,18 +12,18 @@ export default function DonateCancelPage() {
           you need alternative giving options such as NEFT or material donations.
         </p>
         <div className="mt-8 flex flex-wrap justify-center gap-3">
-          <Link
+          <a
             href="/donate"
             className="inline-flex rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground"
           >
             Try again
-          </Link>
-          <Link
+          </a>
+          <a
             href="/"
             className="inline-flex rounded-full border border-border px-6 py-3 text-sm font-semibold text-foreground"
           >
             Back home
-          </Link>
+          </a>
         </div>
       </div>
     </div>

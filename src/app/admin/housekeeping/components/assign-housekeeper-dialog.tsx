@@ -22,28 +22,26 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { useDataContext } from "@/context/data-context";
+import type { User } from "@/data/types";
 
 interface AssignHousekeeperDialogProps {
   roomId: string;
   currentAssigneeId?: string;
+  housekeepers: User[];
   children: React.ReactNode;
 }
 
 export function AssignHousekeeperDialog({
   roomId,
   currentAssigneeId,
+  housekeepers,
   children,
 }: AssignHousekeeperDialogProps) {
   const [open, setOpen] = React.useState(false);
   const [selectedUserId, setSelectedUserId] = React.useState<string>(
     currentAssigneeId || ""
   );
-  const { assignHousekeeper, users, roles } = useDataContext();
-
-  const housekeeperRole = roles.find((r) => r.name === "Housekeeper");
-  const housekeepers = housekeeperRole
-    ? users.filter((u) => u.roleId === housekeeperRole.id)
-    : [];
+  const { assignHousekeeper } = useDataContext();
 
   const handleSave = () => {
     if (!selectedUserId || selectedUserId === "") {

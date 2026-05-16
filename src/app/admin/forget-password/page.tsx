@@ -1,5 +1,5 @@
-import { AdminForgotPassword } from "@/components/auth/admin/forgot-password";
+import { AdminForgotPasswordLoader } from "@/components/auth/admin/forgot-password-loader";
 
 export default function AdminForgotPasswordPage() {
-  return <AdminForgotPassword />;
+  return <AdminForgotPasswordLoader />;
 }

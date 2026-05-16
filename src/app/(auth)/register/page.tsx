@@ -1,5 +1,5 @@
-import { UserRegister } from "@/components/auth/user/register";
+import { UserRegisterLoader } from "@/components/auth/user/register-loader";
 
 export default function RegisterPage() {
-  return <UserRegister />;
+  return <UserRegisterLoader />;
 }

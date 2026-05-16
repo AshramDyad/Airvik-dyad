@@ -1,5 +1,5 @@
 import { requirePageFeature } from "@/lib/server/page-auth";
-import { ReviewForm } from "@/components/admin/reviews/review-form";
+import { ReviewFormLoader } from "@/components/admin/reviews/review-form-loader";
 
 export default async function CreateReviewPage() {
   await requirePageFeature("reviewsCreate");
@@ -10,7 +10,7 @@ export default async function CreateReviewPage() {
         <h1 className="text-2xl font-semibold tracking-tight">Add Review</h1>
         <p className="text-muted-foreground">Capture a new guest story for the home page carousel.</p>
       </div>
-      <ReviewForm />
+      <ReviewFormLoader />
     </div>
   );
 }

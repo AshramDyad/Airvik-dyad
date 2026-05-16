@@ -4,7 +4,12 @@ import { createSessionClient } from "@/integrations/supabase/server";
 import { getServerProfile } from "@/lib/server/page-auth";
 import { uploadToImagesBucket } from "@/lib/server/storage";
 
-const unauthorized = NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+const cacheHeaders = {
+  "Cache-Control": "private, no-store",
+};
+
+const noStoreJson = (body: unknown, init?: ResponseInit) =>
+  NextResponse.json(body, { ...init, headers: cacheHeaders });
 
 export async function POST(request: Request) {
   const supabase = await createSessionClient();
@@ -13,37 +18,37 @@ export async function POST(request: Request) {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return unauthorized;
+    return noStoreJson({ error: "Unauthorized" }, { status: 401 });
   }
 
   const profile = await getServerProfile();
 
   if (!profile) {
-    return unauthorized;
+    return noStoreJson({ error: "Unauthorized" }, { status: 401 });
   }
 
   const hasSettingPermission = profile.permissions.includes("update:setting");
 
   if (!hasSettingPermission) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    return noStoreJson({ error: "Forbidden" }, { status: 403 });
   }
 
   const formData = await request.formData();
   const rawFile = formData.get("file");
 
   if (!rawFile || !(rawFile instanceof File)) {
-    return NextResponse.json({ error: "Missing file" }, { status: 400 });
+    return noStoreJson({ error: "Missing file" }, { status: 400 });
   }
 
   if (!rawFile.type?.startsWith("image/")) {
-    return NextResponse.json({ error: "Only image uploads are allowed" }, { status: 400 });
+    return noStoreJson({ error: "Only image uploads are allowed" }, { status: 400 });
   }
 
   try {
     const url = await uploadToImagesBucket(rawFile, { prefix: "event-banners" });
-    return NextResponse.json({ url });
+    return noStoreJson({ url });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Upload failed";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return noStoreJson({ error: message }, { status: 500 });
   }
 }

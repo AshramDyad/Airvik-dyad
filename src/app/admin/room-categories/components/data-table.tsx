@@ -31,9 +31,11 @@ import type { RoomCategory } from "@/data/types"
 export function RoomCategoriesDataTable<TData extends RoomCategory, TValue>({
   columns,
   data,
+  onRefresh,
 }: {
   columns: ColumnDef<TData, TValue>[]
   data: TData[]
+  onRefresh: () => void | Promise<void>
 }) {
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [itemToDelete, setItemToDelete] = React.useState<TData | null>(null)
@@ -42,8 +44,9 @@ export function RoomCategoriesDataTable<TData extends RoomCategory, TValue>({
 
   const handleDeleteConfirm = async () => {
     if (itemToDelete) {
-      const success = await deleteRoomCategory(itemToDelete.id);
+      const success = await deleteRoomCategory(itemToDelete.id, itemToDelete);
       if (success) {
+        await onRefresh();
         toast.success(`Room category "${itemToDelete.name}" has been deleted.`);
       } else {
         toast.error("Failed to delete room category.", {
@@ -68,6 +71,7 @@ export function RoomCategoriesDataTable<TData extends RoomCategory, TValue>({
       openDeleteDialog: (item: TData) => {
         setItemToDelete(item)
       },
+      refreshData: onRefresh,
       hasPermission,
     },
   })
@@ -77,7 +81,7 @@ export function RoomCategoriesDataTable<TData extends RoomCategory, TValue>({
       <div className="space-y-6">
         <div className="flex items-center justify-end gap-3">
           {hasPermission("create:room_category") && (
-            <RoomCategoryFormDialog>
+            <RoomCategoryFormDialog onSaved={onRefresh}>
               <Button>Add Room Category</Button>
             </RoomCategoryFormDialog>
           )}

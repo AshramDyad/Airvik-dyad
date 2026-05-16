@@ -1,5 +1,5 @@
 import { getCategories } from "@/lib/api";
-import { PostForm } from "@/components/admin/posts/post-form";
+import { PostFormLoader } from "@/components/admin/posts/post-form-loader";
 import { requirePageFeature } from "@/lib/server/page-auth";
 
 export default async function CreatePostPage() {
@@ -9,7 +9,7 @@ export default async function CreatePostPage() {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold tracking-tight">Add New Post</h1>
-      <PostForm categories={categories} />
+      <PostFormLoader categories={categories} />
     </div>
   );
 }

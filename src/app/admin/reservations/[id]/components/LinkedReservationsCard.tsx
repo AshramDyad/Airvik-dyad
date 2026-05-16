@@ -9,18 +9,20 @@ import {
 } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { useDataContext } from "@/context/data-context";
 import type { ReservationWithDetails } from "@/app/admin/reservations/components/columns";
+import type { Room, RoomType } from "@/data/types";
 
 interface LinkedReservationsCardProps {
   reservations: ReservationWithDetails[];
+  rooms: Room[];
+  roomTypes: RoomType[];
 }
 
 export function LinkedReservationsCard({
   reservations,
+  rooms,
+  roomTypes,
 }: LinkedReservationsCardProps) {
-  const { rooms, roomTypes } = useDataContext();
-
   const sortedReservations = [...reservations].sort((a, b) => {
     const roomA = a.roomNumber || "";
     const roomB = b.roomNumber || "";

@@ -18,26 +18,77 @@ import {
 import { DeleteConfirmationDialog } from "@/components/shared/delete-confirmation-dialog";
 import { useDataContext } from "@/context/data-context";
 import { useAuthContext } from "@/context/auth-context";
+import type { PropertyClosure, RoomType } from "@/data/types";
+import { authorizedFetch } from "@/lib/auth/client-session";
 import { PropertyClosureFormDialog } from "./property-closure-form-dialog";
 
+type RoomTypeOption = Pick<RoomType, "id" | "name">;
+
+type PropertyClosuresApiResponse = {
+  data?: {
+    propertyClosures?: PropertyClosure[];
+    roomTypes?: RoomTypeOption[];
+  };
+  message?: string;
+};
+
 export function PropertyClosuresSection() {
-  const { propertyClosures, roomTypes, deletePropertyClosure } =
-    useDataContext();
+  const { property, deletePropertyClosure } = useDataContext();
   const { hasPermission } = useAuthContext();
+  const [closures, setClosures] = React.useState<PropertyClosure[]>([]);
+  const [roomTypeOptions, setRoomTypeOptions] = React.useState<
+    RoomTypeOption[]
+  >([]);
+  const [isLoading, setIsLoading] = React.useState(true);
   const [deleteTarget, setDeleteTarget] = React.useState<{
-    id: string;
+    closure: PropertyClosure;
     label: string;
   } | null>(null);
 
+  const loadClosureData = React.useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const response = await authorizedFetch(
+        "/api/admin/settings/property-closures",
+        { cache: "no-store" },
+      );
+      const payload = (await response.json().catch(() => null)) as
+        | PropertyClosuresApiResponse
+        | null;
+
+      if (!response.ok) {
+        throw new Error(
+          payload?.message ?? "Failed to load blocked date ranges",
+        );
+      }
+
+      setClosures(payload?.data?.propertyClosures ?? []);
+      setRoomTypeOptions(payload?.data?.roomTypes ?? []);
+    } catch (error) {
+      console.error(error);
+      toast.error((error as Error).message ?? "Failed to load blocked dates.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    void loadClosureData();
+  }, [loadClosureData]);
+
   const roomTypeNameMap = React.useMemo(() => {
     const map = new Map<string, string>();
-    roomTypes.forEach((rt) => map.set(rt.id, rt.name));
+    roomTypeOptions.forEach((rt) => map.set(rt.id, rt.name));
     return map;
-  }, [roomTypes]);
+  }, [roomTypeOptions]);
 
-  const handleDelete = async (id: string, label: string) => {
+  const handleDelete = async (closure: PropertyClosure, label: string) => {
     try {
-      await deletePropertyClosure(id);
+      const success = await deletePropertyClosure(closure.id, closure);
+      if (!success) {
+        throw new Error("Failed to delete blocked dates.");
+      }
+      setClosures((current) => current.filter((item) => item.id !== closure.id));
       toast.success(`Deleted blocked dates: ${label}`);
     } catch {
       toast.error("Failed to delete blocked dates.");
@@ -55,7 +106,11 @@ export function PropertyClosuresSection() {
           </p>
         </div>
         {hasPermission("update:setting") && (
-          <PropertyClosureFormDialog>
+          <PropertyClosureFormDialog
+            propertyId={property.id}
+            roomTypes={roomTypeOptions}
+            onSaved={loadClosureData}
+          >
             <Button size="sm">
               <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
               Add Blocked Dates
@@ -63,7 +118,11 @@ export function PropertyClosuresSection() {
           </PropertyClosureFormDialog>
         )}
       </div>
-      {propertyClosures.length === 0 ? (
+      {isLoading ? (
+        <p className="text-muted-foreground text-sm">
+          Loading blocked date ranges...
+        </p>
+      ) : closures.length === 0 ? (
         <p className="text-muted-foreground text-sm">
           No blocked date ranges configured. Add one to prevent user bookings
           during a specific period.
@@ -84,7 +143,7 @@ export function PropertyClosuresSection() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {propertyClosures.map((closure) => {
+              {closures.map((closure) => {
                 const label =
                   closure.reason ??
                   `${closure.startDate} – ${closure.endDate}`;
@@ -113,7 +172,12 @@ export function PropertyClosuresSection() {
                     <TableCell>
                       <div className="flex items-center gap-1">
                         {hasPermission("update:setting") && (
-                          <PropertyClosureFormDialog closure={closure}>
+                          <PropertyClosureFormDialog
+                            closure={closure}
+                            propertyId={property.id}
+                            roomTypes={roomTypeOptions}
+                            onSaved={loadClosureData}
+                          >
                             <Button
                               variant="ghost"
                               size="icon"
@@ -131,7 +195,7 @@ export function PropertyClosuresSection() {
                             className="h-8 w-8 text-destructive"
                             aria-label={`Delete blocked dates ${label}`}
                             onClick={() =>
-                              setDeleteTarget({ id: closure.id, label })
+                              setDeleteTarget({ closure, label })
                             }
                           >
                             <Trash2 className="h-4 w-4" aria-hidden="true" />
@@ -153,7 +217,7 @@ export function PropertyClosuresSection() {
         }}
         onConfirm={() => {
           if (deleteTarget) {
-            handleDelete(deleteTarget.id, deleteTarget.label);
+            handleDelete(deleteTarget.closure, deleteTarget.label);
             setDeleteTarget(null);
           }
         }}

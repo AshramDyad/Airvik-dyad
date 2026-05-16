@@ -8,6 +8,7 @@ import {
 import type { Feedback } from "@/data/types";
 import { getServerSupabaseClient } from "@/lib/server/supabase";
 import { requireFeature, HttpError } from "@/lib/server/auth";
+import { ADMIN_FEEDBACK_SELECT_COLUMNS } from "./columns";
 
 const feedbackTypeValues = ["suggestion", "praise", "complaint", "question"] as const;
 const feedbackStatusValues = ["new", "in_review", "resolved"] as const;
@@ -49,7 +50,7 @@ export async function GET(request: Request) {
 
     let query = supabase
       .from("feedback")
-      .select("*", { count: "exact" })
+      .select(ADMIN_FEEDBACK_SELECT_COLUMNS, { count: "exact" })
       .order("created_at", { ascending: false })
       .range(start, end);
 

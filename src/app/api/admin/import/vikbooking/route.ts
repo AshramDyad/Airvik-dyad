@@ -38,6 +38,12 @@ const ImportRunSchema = z.object({
 const DUPLICATE_LOOKUP_CHUNK = 200;
 const SKIP_REASON_ALREADY_IMPORTED = "already_imported";
 const SKIP_REASON_DUPLICATE_IN_FILE = "duplicate_in_file";
+const cacheHeaders = {
+  "Cache-Control": "private, no-store",
+};
+
+const noStoreJson = (body: unknown, init?: ResponseInit) =>
+  NextResponse.json(body, { ...init, headers: cacheHeaders });
 
 const buildAssignmentKey = (payload: StoredImportPayload, roomId: string): string => {
   if (payload.externalId) {
@@ -57,7 +63,7 @@ export async function POST(request: Request) {
       const formData = await request.formData();
       const file = formData.get("file");
       if (!(file instanceof File)) {
-        return NextResponse.json(
+        return noStoreJson(
           { message: "CSV file is required" },
           { status: 400 }
         );
@@ -65,7 +71,7 @@ export async function POST(request: Request) {
 
       const parseResult = await parseVikBookingCsv(file);
       if (parseResult.rows.length === 0) {
-        return NextResponse.json(
+        return noStoreJson(
           { message: "The CSV did not contain any rows" },
           { status: 400 }
         );
@@ -149,12 +155,12 @@ export async function POST(request: Request) {
         }))
       );
 
-      return NextResponse.json({
+      return noStoreJson({
         job,
         issues: parseResult.issues,
         missingRoomLabels,
         missingRoomNumbers,
-        preview: parseResult.rows,
+        preview: summaryPreview,
         totalRows: parseResult.rows.length,
         autoMatchedCount,
       });
@@ -165,25 +171,25 @@ export async function POST(request: Request) {
 
     const { job, entries } = await fetchJobWithEntries(supabase, jobId);
     if (job.source !== VIKBOOKING_SOURCE) {
-      return NextResponse.json({ message: "Job source mismatch" }, { status: 400 });
+      return noStoreJson({ message: "Job source mismatch" }, { status: 400 });
     }
 
     if (job.status === "completed") {
-      return NextResponse.json(
+      return noStoreJson(
         { message: "Import job is already completed" },
         { status: 400 }
       );
     }
 
     if (job.status === "running") {
-      return NextResponse.json(
+      return noStoreJson(
         { message: "Import job is currently running" },
         { status: 409 }
       );
     }
 
     if (!entries.length) {
-      return NextResponse.json(
+      return noStoreJson(
         { message: "No rows available for import" },
         { status: 400 }
       );
@@ -216,7 +222,7 @@ export async function POST(request: Request) {
             .filter(Boolean)
         )
       );
-      return NextResponse.json(
+      return noStoreJson(
         {
           message: "Room number mappings are incomplete",
           missingRoomNumbers,
@@ -234,7 +240,7 @@ export async function POST(request: Request) {
     const { mapped, missing } = resolveRoomMappings(uniqueLabels, links);
 
     if (missing.length > 0) {
-      return NextResponse.json(
+      return noStoreJson(
         {
           message: "Room mappings are incomplete",
           missingRoomLabels: missing,
@@ -411,7 +417,7 @@ export async function POST(request: Request) {
         processedRows: processedRowTally,
         completedAt: new Date().toISOString(),
       });
-      return NextResponse.json({ job: completedJob });
+      return noStoreJson({ job: completedJob });
     }
 
     const entriesForImport = rowsToImport.map(({ entry }) => entry);
@@ -447,17 +453,17 @@ export async function POST(request: Request) {
     }
 
     const latestJob = await fetchJobById(supabase, jobId);
-    return NextResponse.json({ job: latestJob });
+    return noStoreJson({ job: latestJob });
   } catch (error) {
     if (error instanceof HttpError) {
-      return NextResponse.json(
+      return noStoreJson(
         { message: error.message },
         { status: error.status }
       );
     }
 
     console.error("VikBooking import error", error);
-    return NextResponse.json(
+    return noStoreJson(
       { message: "Failed to process VikBooking import" },
       { status: 500 }
     );

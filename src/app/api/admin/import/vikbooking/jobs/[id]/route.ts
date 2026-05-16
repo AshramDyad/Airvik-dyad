@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import type { ImportJobEntryStatus } from "@/data/types";
 import { createServerSupabaseClient } from "@/integrations/supabase/server";
 import { fetchJobById } from "@/lib/importers/vikbooking/jobs";
 import type { SkipReportEntry, StoredImportPayload } from "@/lib/importers/vikbooking/types";
@@ -12,6 +13,19 @@ type RouteContext = {
 };
 
 const SKIPPED_FETCH_PAGE_SIZE = 500;
+const RECENT_ERROR_LIMIT = 10;
+const ENTRY_STATUSES: ImportJobEntryStatus[] = [
+  "pending",
+  "imported",
+  "skipped",
+  "error",
+];
+const cacheHeaders = {
+  "Cache-Control": "private, no-store",
+};
+
+const noStoreJson = (body: unknown, init?: ResponseInit) =>
+  NextResponse.json(body, { ...init, headers: cacheHeaders });
 
 export async function GET(request: Request, context: RouteContext) {
   try {
@@ -20,32 +34,11 @@ export async function GET(request: Request, context: RouteContext) {
     const { id } = await context.params;
     const job = await fetchJobById(supabase, id);
     if (!job) {
-      return NextResponse.json({ message: "Job not found" }, { status: 404 });
+      return noStoreJson({ message: "Job not found" }, { status: 404 });
     }
 
-    const { data, error } = await supabase
-      .from("import_job_entries")
-      .select("id,status,message,row_number")
-      .eq("job_id", id)
-      .order("row_number", { ascending: true });
-
-    if (error) {
-      throw error;
-    }
-
-    const statusCounts: Record<string, number> = {};
-    const errors: Array<{ id: string; rowNumber: number; message?: string | null }> = [];
-
-    (data ?? []).forEach((entry) => {
-      statusCounts[entry.status] = (statusCounts[entry.status] ?? 0) + 1;
-      if (entry.status === "error" && errors.length < 10) {
-        errors.push({
-          id: entry.id,
-          rowNumber: entry.row_number,
-          message: entry.message,
-        });
-      }
-    });
+    const statusCounts = await fetchEntryStatusCounts(supabase, id);
+    const errors = await fetchRecentErroredEntries(supabase, id);
 
     const skippedData = await fetchAllSkippedEntries(supabase, id);
 
@@ -68,21 +61,67 @@ export async function GET(request: Request, context: RouteContext) {
       };
     });
 
-    return NextResponse.json({ job, statusCounts, errors, skippedEntries });
+    return noStoreJson({ job, statusCounts, errors, skippedEntries });
   } catch (error) {
     if (error instanceof HttpError) {
-      return NextResponse.json(
+      return noStoreJson(
         { message: error.message },
         { status: error.status }
       );
     }
 
     console.error("Failed to fetch import job", error);
-    return NextResponse.json(
+    return noStoreJson(
       { message: "Failed to fetch job status" },
       { status: 500 }
     );
   }
+}
+
+async function fetchEntryStatusCounts(
+  client: SupabaseClient,
+  jobId: string
+): Promise<Record<string, number>> {
+  const pairs = await Promise.all(
+    ENTRY_STATUSES.map(async (status) => {
+      const { count, error } = await client
+        .from("import_job_entries")
+        .select("id", { count: "exact", head: true })
+        .eq("job_id", jobId)
+        .eq("status", status);
+
+      if (error) {
+        throw error;
+      }
+
+      return [status, count ?? 0] as const;
+    })
+  );
+
+  return Object.fromEntries(pairs);
+}
+
+async function fetchRecentErroredEntries(
+  client: SupabaseClient,
+  jobId: string
+): Promise<Array<{ id: string; rowNumber: number; message?: string | null }>> {
+  const { data, error } = await client
+    .from("import_job_entries")
+    .select("id,row_number,message")
+    .eq("job_id", jobId)
+    .eq("status", "error")
+    .order("row_number", { ascending: true })
+    .limit(RECENT_ERROR_LIMIT);
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []).map((entry) => ({
+    id: entry.id,
+    rowNumber: entry.row_number,
+    message: entry.message,
+  }));
 }
 
 type SkippedEntryRow = {

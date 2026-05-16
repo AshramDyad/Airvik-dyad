@@ -28,6 +28,7 @@ export async function sendWhatsAppMessage(phone: string, message: string): Promi
     const config = getWhatsAppConfig();
     const response = await fetch(`${config.apiUrl}/send/message`, {
       method: "POST",
+      cache: "no-store",
       headers: {
         ...getHeaders(config),
         "Content-Type": "application/json",
@@ -63,6 +64,7 @@ export async function sendWhatsAppImage(
 
     const response = await fetch(`${config.apiUrl}/send/image`, {
       method: "POST",
+      cache: "no-store",
       headers: getHeaders(config),
       body: formData,
     });
@@ -95,6 +97,7 @@ export async function sendWhatsAppFile(
 
     const response = await fetch(`${config.apiUrl}/send/file`, {
       method: "POST",
+      cache: "no-store",
       headers: getHeaders(config),
       body: formData,
     });

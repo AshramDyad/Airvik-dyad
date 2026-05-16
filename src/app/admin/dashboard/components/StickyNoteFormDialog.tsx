@@ -93,7 +93,7 @@ export function StickyNoteFormDialog({
   async function onSubmit(values: z.infer<typeof noteSchema>) {
     try {
       if (isEditing && note) {
-        await updateStickyNote(note.id, values);
+        await updateStickyNote(note.id, values, note);
       } else {
         await addStickyNote(values);
       }

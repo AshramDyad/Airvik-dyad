@@ -15,7 +15,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import type { RoomType } from "@/data/types"
 import { RoomTypeFormDialog } from "./room-type-form-dialog"
-import { useDataContext } from "@/context/data-context"
+import type { AdminRoomTypeAmenityOption } from "./types"
 
 function RoomTypeImageCell({ roomType }: { roomType: RoomType }) {
   const imageUrl =
@@ -35,9 +35,13 @@ function RoomTypeImageCell({ roomType }: { roomType: RoomType }) {
   )
 }
 
-function RoomTypeAmenitiesCell({ amenityIds }: { amenityIds: string[] }) {
-  const { amenities: allAmenities } = useDataContext()
-
+function RoomTypeAmenitiesCell({
+  amenityIds,
+  amenities,
+}: {
+  amenityIds: string[]
+  amenities: AdminRoomTypeAmenityOption[]
+}) {
   if (!amenityIds?.length) {
     return <span className="text-muted-foreground">N/A</span>
   }
@@ -45,7 +49,7 @@ function RoomTypeAmenitiesCell({ amenityIds }: { amenityIds: string[] }) {
   return (
     <div className="flex flex-wrap gap-1">
       {amenityIds.map((id) => {
-        const amenity = allAmenities.find((item) => item.id === id)
+        const amenity = amenities.find((item) => item.id === id)
         return (
           <Badge key={id} variant="secondary">
             {amenity?.name || id}
@@ -81,9 +85,14 @@ export const columns: ColumnDef<RoomType>[] = [
   {
     accessorKey: "amenities",
     header: "Amenities",
-    cell: ({ row }) => {
+    cell: ({ row, table }) => {
       const amenityIds = row.getValue("amenities") as string[]
-      return <RoomTypeAmenitiesCell amenityIds={amenityIds} />
+      return (
+        <RoomTypeAmenitiesCell
+          amenityIds={amenityIds}
+          amenities={table.options.meta?.amenities ?? []}
+        />
+      )
     },
   },
   {
@@ -103,7 +112,11 @@ export const columns: ColumnDef<RoomType>[] = [
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>Actions</DropdownMenuLabel>
             {hasPermission?.("update:room_type") && (
-                <RoomTypeFormDialog roomType={roomType}>
+                <RoomTypeFormDialog
+                  roomType={roomType}
+                  amenities={table.options.meta?.amenities ?? []}
+                  onSaved={() => table.options.meta?.refreshData?.()}
+                >
                     <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
                         Edit
                     </DropdownMenuItem>

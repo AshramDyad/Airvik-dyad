@@ -1,16 +1,54 @@
 "use server";
 
 import "server-only";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag, unstable_cache } from "next/cache";
 import { createServerSupabaseClient, createSessionClient } from "@/integrations/supabase/server";
-import { eventBannerRowSchema, mapEventBannerRow } from "@/lib/event-banners";
+import {
+  eventBannerRowSchema,
+  isEventBannerActive,
+  isPublicHomepageBannerActive,
+  mapEventBannerRow,
+  mapPublicHomepageBannerRow,
+  publicHomepageBannerRowSchema,
+  toPublicHomepageBanner,
+} from "@/lib/event-banners";
 import type { EventBanner } from "@/data/types";
+import type { PublicHomepageBanner } from "@/lib/event-banners";
 import { z } from "zod";
-
-// Column selection to reduce egress
-const EVENT_SELECT_COLUMNS = 'id, title, description, image_url, is_active, starts_at, ends_at, created_at, updated_at, updated_by' as const;
+import {
+  EVENT_BANNERS_CACHE_TAG,
+  EVENTS_REVALIDATE_SECONDS,
+  EVENT_SELECT_COLUMNS,
+  PUBLIC_HOMEPAGE_BANNER_SELECT_COLUMNS,
+} from "@/lib/server/cache-config";
 
 // --- Data Fetching ---
+
+const mapEventRows = (rows: unknown[] | null): EventBanner[] =>
+  (rows ?? [])
+    .map((row) => eventBannerRowSchema.safeParse(row))
+    .filter((result): result is { success: true; data: z.infer<typeof eventBannerRowSchema> } => result.success)
+    .map((result) => mapEventBannerRow(result.data));
+
+const mapPublicHomepageBannerRows = (rows: unknown[] | null) =>
+  (rows ?? [])
+    .map((row) => publicHomepageBannerRowSchema.safeParse(row))
+    .filter(
+      (
+        result,
+      ): result is {
+        success: true;
+        data: z.infer<typeof publicHomepageBannerRowSchema>;
+      } => result.success,
+    )
+    .map((result) => mapPublicHomepageBannerRow(result.data));
+
+const revalidateEventPaths = () => {
+  revalidateTag(EVENT_BANNERS_CACHE_TAG);
+  revalidatePath("/admin/events");
+  revalidatePath("/events");
+  revalidatePath("/");
+};
 
 export async function getAllEvents(): Promise<EventBanner[]> {
   const supabase = createServerSupabaseClient();
@@ -24,17 +62,14 @@ export async function getAllEvents(): Promise<EventBanner[]> {
     throw new Error("Failed to fetch events");
   }
 
-  return data
-    .map((row) => eventBannerRowSchema.safeParse(row))
-    .filter((result) => result.success)
-    .map((result) => mapEventBannerRow(result.data));
+  return mapEventRows(data);
 }
 
 export async function getEventById(id: string): Promise<EventBanner | null> {
   const supabase = createServerSupabaseClient();
   const { data, error } = await supabase
     .from("event_banners")
-    .select("*")
+    .select(EVENT_SELECT_COLUMNS)
     .eq("id", id)
     .single();
 
@@ -48,49 +83,101 @@ export async function getEventById(id: string): Promise<EventBanner | null> {
   return mapEventBannerRow(parsed);
 }
 
-export async function getHomepageBanner(): Promise<EventBanner | null> {
+const toMinuteBucket = (date: Date): string => {
+  const time = date.getTime();
+  if (!Number.isFinite(time)) {
+    return new Date().toISOString().slice(0, 16);
+  }
+  return new Date(Math.floor(time / 60_000) * 60_000).toISOString();
+};
+
+async function getHomepageBannerUncached(nowBucket: string): Promise<EventBanner | null> {
   try {
     const supabase = createServerSupabaseClient();
+    const now = new Date(nowBucket);
     const { data, error } = await supabase
       .from("event_banners")
-      .select("*")
+      .select(EVENT_SELECT_COLUMNS)
       .eq("is_active", true)
-      // Extra safety: active within dates (handled by RLS usually, but explicit check good)
-      .or(`starts_at.is.null,starts_at.lte.${new Date().toISOString()}`)
-      .or(`ends_at.is.null,ends_at.gte.${new Date().toISOString()}`)
-      .limit(1)
-      .maybeSingle();
+      .order("updated_at", { ascending: false })
+      .limit(5);
 
     if (error) {
       console.error("Error fetching homepage banner:", error);
       return null;
     }
 
-    if (!data) return null;
-
-    const parsed = eventBannerRowSchema.safeParse(data);
-    if (!parsed.success) return null;
-    return mapEventBannerRow(parsed.data);
+    return mapEventRows(data).find((banner) => isEventBannerActive(banner, now)) ?? null;
   } catch {
     return null;
   }
 }
 
-export async function getUpcomingEvents(): Promise<EventBanner[]> {
+const homepageBannerCache = unstable_cache(
+  async (nowBucket: string) => getHomepageBannerUncached(nowBucket),
+  ["homepage-banner"],
+  {
+    revalidate: EVENTS_REVALIDATE_SECONDS,
+    tags: [EVENT_BANNERS_CACHE_TAG],
+  }
+);
+
+export async function getHomepageBanner(now = new Date()): Promise<EventBanner | null> {
+  return homepageBannerCache(toMinuteBucket(now));
+}
+
+async function getHomepageModalBannerUncached(
+  nowBucket: string,
+): Promise<PublicHomepageBanner | null> {
   try {
     const supabase = createServerSupabaseClient();
-    const now = new Date().toISOString();
+    const now = new Date(nowBucket);
+    const { data, error } = await supabase
+      .from("event_banners")
+      .select(PUBLIC_HOMEPAGE_BANNER_SELECT_COLUMNS)
+      .eq("is_active", true)
+      .order("updated_at", { ascending: false })
+      .limit(5);
+
+    if (error) {
+      console.error("Error fetching homepage modal banner:", error);
+      return null;
+    }
+
+    const active = mapPublicHomepageBannerRows(data).find((banner) =>
+      isPublicHomepageBannerActive(banner, now),
+    );
+
+    return active ? toPublicHomepageBanner(active) : null;
+  } catch {
+    return null;
+  }
+}
+
+const homepageModalBannerCache = unstable_cache(
+  async (nowBucket: string) => getHomepageModalBannerUncached(nowBucket),
+  ["homepage-modal-banner"],
+  {
+    revalidate: EVENTS_REVALIDATE_SECONDS,
+    tags: [EVENT_BANNERS_CACHE_TAG],
+  },
+);
+
+export async function getHomepageModalBanner(
+  now = new Date(),
+): Promise<PublicHomepageBanner | null> {
+  return homepageModalBannerCache(toMinuteBucket(now));
+}
+
+async function getUpcomingEventsUncached(nowBucket: string): Promise<EventBanner[]> {
+  try {
+    const supabase = createServerSupabaseClient();
 
     const { data, error } = await supabase
       .from("event_banners")
-      .select("*")
-      .gt("starts_at", now)
-      .eq("is_active", false) // Assuming upcoming aren't the ACTIVE banner? Or maybe they can be?
-      // Requirement: "Upcoming events list... visible separately"
-      // Usually upcoming events are distinct from the currently running active banner.
-      // I will fetch ALL future events regardless of active flag,
-      // but maybe exclude the one that is currently the main banner if needed.
-      // For now, simple date filter.
+      .select(EVENT_SELECT_COLUMNS)
+      .gt("starts_at", nowBucket)
+      .eq("is_active", false)
       .order("starts_at", { ascending: true });
 
     if (error) {
@@ -98,13 +185,23 @@ export async function getUpcomingEvents(): Promise<EventBanner[]> {
       return [];
     }
 
-    return data
-      .map((row) => eventBannerRowSchema.safeParse(row))
-      .filter((result) => result.success)
-      .map((result) => mapEventBannerRow(result.data));
+    return mapEventRows(data);
   } catch {
     return [];
   }
+}
+
+const upcomingEventsCache = unstable_cache(
+  async (nowBucket: string) => getUpcomingEventsUncached(nowBucket),
+  ["upcoming-events"],
+  {
+    revalidate: EVENTS_REVALIDATE_SECONDS,
+    tags: [EVENT_BANNERS_CACHE_TAG],
+  }
+);
+
+export async function getUpcomingEvents(now = new Date()): Promise<EventBanner[]> {
+  return upcomingEventsCache(toMinuteBucket(now));
 }
 
 // --- Actions ---
@@ -136,7 +233,7 @@ export async function createEvent(rawFormData: z.infer<typeof eventSchema>) {
   const { data, error } = await supabase
     .from("event_banners")
     .insert(dbPayload)
-    .select()
+    .select(EVENT_SELECT_COLUMNS)
     .single();
 
   if (error) throw error;
@@ -146,9 +243,7 @@ export async function createEvent(rawFormData: z.infer<typeof eventSchema>) {
     await toggleEventBanner(data.id, true);
   }
 
-  revalidatePath("/admin/events");
-  revalidatePath("/events");
-  revalidatePath("/");
+  revalidateEventPaths();
   return mapEventBannerRow(eventBannerRowSchema.parse(data));
 }
 
@@ -185,9 +280,7 @@ export async function updateEvent(id: string, rawFormData: z.infer<typeof eventS
     await toggleEventBanner(id, formData.isActive);
   }
 
-  revalidatePath("/admin/events");
-  revalidatePath("/events");
-  revalidatePath("/");
+  revalidateEventPaths();
 }
 
 export async function deleteEvent(id: string) {
@@ -195,9 +288,7 @@ export async function deleteEvent(id: string) {
   const { error } = await supabase.from("event_banners").delete().eq("id", id);
   if (error) throw error;
 
-  revalidatePath("/admin/events");
-  revalidatePath("/events");
-  revalidatePath("/");
+  revalidateEventPaths();
 }
 
 export async function toggleEventBanner(id: string, isActive: boolean) {
@@ -210,7 +301,5 @@ export async function toggleEventBanner(id: string, isActive: boolean) {
 
   if (error) throw error;
 
-  revalidatePath("/admin/events");
-  revalidatePath("/events");
-  revalidatePath("/");
+  revalidateEventPaths();
 }

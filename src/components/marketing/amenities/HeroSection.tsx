@@ -1,5 +1,3 @@
-"use client";
-
 import Image from "next/image";
 
 /**
@@ -19,6 +17,7 @@ export function AmenitiesHeroSection() {
           fill
           priority
           quality={100}
+          sizes="100vw"
           className="object-cover"
         />
       </div>

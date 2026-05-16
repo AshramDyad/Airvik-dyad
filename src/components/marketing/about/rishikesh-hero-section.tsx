@@ -1,39 +1,12 @@
-"use client";
-
-import Link from "next/link";
 import Image from "next/image";
-import { motion, type Variants } from "framer-motion";
 import { Button } from "@/components/ui/button";
 
 export function RishikeshHeroSection() {
-  const contentVariants: Variants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: { duration: 0.6, ease: [0.16, 1, 0.3, 1] },
-    },
-  };
-
-  const imageVariants: Variants = {
-    hidden: { opacity: 0, x: 20 },
-    visible: {
-      opacity: 1,
-      x: 0,
-      transition: { duration: 0.6, ease: [0.16, 1, 0.3, 1], delay: 0.2 },
-    },
-  };
-
   return (
     <section className="bg-background py-10 sm:py-12 overflow-hidden">
       <div className="container mx-auto px-4">
-        <motion.div
-          className="grid lg:grid-cols-2 gap-12 items-center"
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, amount: 0.25 }}
-        >
-          <motion.div variants={contentVariants} className="space-y-4">
+        <div className="grid lg:grid-cols-2 gap-12 items-center">
+          <div className="space-y-4">
             <p className="text-sm font-semibold uppercase tracking-widest text-primary">
               About Rishikesh
             </p>
@@ -53,14 +26,14 @@ export function RishikeshHeroSection() {
             </p>
             <div>
               <Button asChild size="lg">
-                <Link href="#rishikesh-experience">
+                <a href="#rishikesh-experience">
                   Explore the Spirit of Rishikesh
-                </Link>
+                </a>
               </Button>
             </div>
-          </motion.div>
+          </div>
           
-          <motion.div variants={imageVariants} className="relative">
+          <div className="relative">
             <div className="relative rounded-xl overflow-hidden">
               <Image
                 src="/ram-lkshmanjula.webp"
@@ -71,8 +44,8 @@ export function RishikeshHeroSection() {
                 priority
               />
             </div>
-          </motion.div>
-        </motion.div>
+          </div>
+        </div>
       </div>
     </section>
   );

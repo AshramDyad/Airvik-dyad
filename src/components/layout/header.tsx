@@ -4,7 +4,6 @@ import Link from "next/link";
 import {
   CircleUser,
   Menu,
-  Package2,
 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 
@@ -46,8 +45,8 @@ const navItems: HeaderNavItem[] = [
 export function Header() {
   const pathname = usePathname();
   const router = useRouter();
-  const { property, roles } = useDataContext();
-  const { currentUser, hasAnyPermission } = useAuthContext();
+  const { property } = useDataContext();
+  const { currentUser, userRole, hasAnyPermission } = useAuthContext();
   const accessibleNavItems = navItems.filter(({ feature, permissions }) => {
     const featurePermissions = feature ? getPermissionsForFeature(feature) : [];
     const required = [...featurePermissions, ...(permissions ?? [])];
@@ -58,7 +57,6 @@ export function Header() {
   });
   const activeNavItem = accessibleNavItems.find((item) => item.href === pathname);
   const pageTitle = activeNavItem?.label || "Dashboard";
-  const userRole = roles.find(r => r.id === currentUser?.roleId);
 
   const handleLogout = async () => {
     await signOutUser();

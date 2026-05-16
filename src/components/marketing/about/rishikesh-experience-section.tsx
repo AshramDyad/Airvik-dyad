@@ -52,6 +52,7 @@ export function RishikeshExperienceSection() {
         src="/rih.png"
         alt="Ganga river in Rishikesh"
         fill
+        sizes="100vw"
         className="object-cover"
         quality={90}
       />

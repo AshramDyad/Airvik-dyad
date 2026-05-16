@@ -3,6 +3,7 @@
 import "server-only";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { randomUUID } from "crypto";
+import { IMAGE_ASSET_CACHE_CONTROL_SECONDS } from "@/lib/server/storage-config";
 
 const bucketName = "images";
 const maxFileSizeBytes = 5 * 1024 * 1024; // 5MB default limit
@@ -90,7 +91,7 @@ export async function uploadToImagesBucket(file: File, options: UploadOptions = 
   const { error: uploadError } = await supabase.storage
     .from(bucketName)
     .upload(objectPath, fileBuffer, {
-      cacheControl: "3600",
+      cacheControl: IMAGE_ASSET_CACHE_CONTROL_SECONDS,
       contentType: file.type || undefined,
       upsert: false,
     });

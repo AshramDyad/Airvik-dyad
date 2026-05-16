@@ -4,7 +4,7 @@ import * as React from "react";
 import { addMonths, startOfMonth } from "date-fns";
 
 import type { RoomTypeAvailability } from "@/data/types";
-import { getMonthlyAvailability } from "@/lib/api";
+import { authorizedFetch } from "@/lib/auth/client-session";
 
 export const formatMonthStart = (value: Date): string => {
   const normalized = new Date(value.getFullYear(), value.getMonth(), 1);
@@ -12,6 +12,56 @@ export const formatMonthStart = (value: Date): string => {
   const month = String(normalized.getMonth() + 1).padStart(2, '0');
   const day = '01';
   return `${year}-${month}-${day}`;
+};
+
+type MonthlyAvailabilityResponse = {
+  data: RoomTypeAvailability[];
+};
+
+const normalizeRoomTypeKey = (roomTypeIds?: string[]) => {
+  if (!roomTypeIds || roomTypeIds.length === 0) {
+    return "all";
+  }
+  const normalized = Array.from(
+    new Set(roomTypeIds.map((id) => id.trim()).filter(Boolean))
+  ).sort();
+  return normalized.length > 0 ? normalized.join(",") : "all";
+};
+
+const getRoomTypeIdsFromKey = (roomTypeKey: string) =>
+  roomTypeKey === "all" ? undefined : roomTypeKey.split(",");
+
+const isAbortError = (error: unknown) =>
+  error instanceof DOMException && error.name === "AbortError";
+
+const fetchMonthlyAvailability = async (
+  monthStart: string,
+  roomTypeKey: string,
+  signal?: AbortSignal
+): Promise<RoomTypeAvailability[]> => {
+  const params = new URLSearchParams({ monthStart });
+  const roomTypeIds = getRoomTypeIdsFromKey(roomTypeKey);
+  if (roomTypeIds?.length) {
+    params.set("roomTypeIds", roomTypeIds.join(","));
+  }
+
+  const response = await authorizedFetch(
+    `/api/admin/availability/monthly?${params.toString()}`,
+    {
+      cache: "no-store",
+      signal,
+    }
+  );
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => null)) as {
+      message?: string;
+    } | null;
+    throw new Error(payload?.message ?? "Failed to load monthly availability");
+  }
+
+  const payload = (await response.json()) as MonthlyAvailabilityResponse;
+  return payload.data ?? [];
 };
 
 export function useMonthlyAvailability(
@@ -23,25 +73,25 @@ export function useMonthlyAvailability(
   const [error, setError] = React.useState<Error | null>(null);
 
   const monthStart = React.useMemo(() => formatMonthStart(month), [month]);
-  const roomTypeKey = React.useMemo(() => {
-    if (!roomTypeIds || roomTypeIds.length === 0) {
-      return "all";
-    }
-    return [...roomTypeIds].sort().join(",");
-  }, [roomTypeIds]);
+  const roomTypeKey = React.useMemo(
+    () => normalizeRoomTypeKey(roomTypeIds),
+    [roomTypeIds]
+  );
 
   React.useEffect(() => {
+    const controller = new AbortController();
     let isSubscribed = true;
     setIsLoading(true);
     setError(null);
 
-    getMonthlyAvailability(monthStart, roomTypeIds)
+    fetchMonthlyAvailability(monthStart, roomTypeKey, controller.signal)
       .then((payload) => {
         if (!isSubscribed) return;
         setData(payload);
       })
       .catch((err) => {
         if (!isSubscribed) return;
+        if (isAbortError(err)) return;
         setError(err as Error);
         setData(null);
       })
@@ -53,8 +103,9 @@ export function useMonthlyAvailability(
 
     return () => {
       isSubscribed = false;
+      controller.abort();
     };
-  }, [monthStart, roomTypeKey, roomTypeIds]);
+  }, [monthStart, roomTypeKey]);
 
   return { data, isLoading, error };
 }
@@ -80,18 +131,18 @@ export function useMultiMonthAvailability(
     [monthSequence]
   );
 
-  const roomTypeKey = React.useMemo(() => {
-    if (!roomTypeIds || roomTypeIds.length === 0) {
-      return "all";
-    }
-    return [...roomTypeIds].sort().join(",");
-  }, [roomTypeIds]);
+  const roomTypeKey = React.useMemo(
+    () => normalizeRoomTypeKey(roomTypeIds),
+    [roomTypeIds]
+  );
+  const monthStartKey = React.useMemo(() => monthStarts.join(","), [monthStarts]);
 
   const [dataByMonth, setDataByMonth] = React.useState<Record<string, RoomTypeAvailability[]>>({});
   const [isLoading, setIsLoading] = React.useState(false);
   const [error, setError] = React.useState<Error | null>(null);
 
   React.useEffect(() => {
+    const controller = new AbortController();
     let isSubscribed = true;
     setIsLoading(true);
     setError(null);
@@ -99,7 +150,7 @@ export function useMultiMonthAvailability(
 
     Promise.all(
       monthStarts.map((monthStart) =>
-        getMonthlyAvailability(monthStart, roomTypeIds)
+        fetchMonthlyAvailability(monthStart, roomTypeKey, controller.signal)
       )
     )
       .then((payloads) => {
@@ -112,6 +163,7 @@ export function useMultiMonthAvailability(
       })
       .catch((err) => {
         if (!isSubscribed) return;
+        if (isAbortError(err)) return;
         setError(err as Error);
         setDataByMonth({});
       })
@@ -123,8 +175,9 @@ export function useMultiMonthAvailability(
 
     return () => {
       isSubscribed = false;
+      controller.abort();
     };
-  }, [monthStarts, roomTypeKey, roomTypeIds]);
+  }, [monthStartKey, roomTypeKey]);
 
   return { dataByMonth, isLoading, error };
 }

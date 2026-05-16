@@ -1,11 +1,10 @@
 "use client";
 
-import React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { useDataContext } from "@/context/data-context";
-import type { RoomType } from "@/data/types";
+import { useRoomTypePreview } from "@/hooks/use-room-type-preview";
+import type { RoomTypePreview } from "@/lib/room-types/preview";
 import {
   Card,
   CardContent,
@@ -20,7 +19,6 @@ import {
   CarouselPrevious,
 } from "@/components/ui/carousel";
 import { Icon } from "@/components/shared/icon";
-import type { IconName } from "@/lib/icons";
 import {
   Tooltip,
   TooltipContent,
@@ -28,39 +26,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-const normalizeName = (value: string) => value.split("[")[0].trim().toLowerCase();
-
-const amenityIconMap: Record<string, IconName> = {
-  "Free Wi-Fi": "Wifi",
-  "Air Conditioning": "AirVent",
-  "Flat-screen TV": "Tv",
-  "Mini-bar": "Refrigerator",
-  "Ocean View": "Waves",
-  "Private Balcony": "GalleryVertical",
-  "Ensuite Bathroom": "Bath",
-  "Room Service": "ConciergeBell",
-  "Lounge chairs": "Armchair",
-  "Washing Machine": "WashingMachine",
-  Refrigerator: "Refrigerator",
-  Bedroom: "Bed",
-  Oven: "CookingPot",
-  Wifi: "Wifi",
-  Bathroom: "Bath",
-  "Air Conditioner": "AirVent",
-  "Swimming Pool": "Waves",
-};
-
-const normalizeAmenityName = (value: string) =>
-  value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "");
-
-type AmenityDisplay = {
-  id: string;
-  name: string;
-  iconName: IconName;
-};
-
 type AmenityIconsProps = {
-  amenities: AmenityDisplay[];
+  amenities: RoomTypePreview["amenities"];
   gapClass: string;
 };
 
@@ -72,7 +39,7 @@ function AmenityIcons({ amenities, gapClass }: AmenityIconsProps) {
           <Tooltip delayDuration={0}>
             <TooltipTrigger asChild>
               <div className="h-5 w-7 cursor-pointer">
-                <Icon name={amenity.iconName} className="h-4 w-4 text-muted-foreground" />
+                <Icon name={amenity.icon} className="h-4 w-4 text-muted-foreground" />
               </div>
             </TooltipTrigger>
             <TooltipContent side="top" className="text-xs bg-white text-foreground border border-border">
@@ -88,77 +55,8 @@ function AmenityIcons({ amenities, gapClass }: AmenityIconsProps) {
 }
 
 export function RoomsShowcaseSection() {
-  const { roomTypes, amenities } = useDataContext();
-  const visibleRoomTypes = React.useMemo(
-    () => (roomTypes ?? []).filter((roomType) => roomType.isVisible !== false),
-    [roomTypes]
-  );
-
-  const featuredOrder = [
-    "AnnaDaan",
-    "Sant Bhojan Donation",
-    "Brahmbhoj",
-    "VidhyaDan",
-  ];
-
-  const placeholderImage = "/room-placeholder.svg";
-  const fallbackImages: Record<string, string> = {
-    annadaan: "/annakshetra.png",
-    "sant bhojan donation": "/Dining Hall.png",
-    brahmbhoj: "/Spiritual Spaces.png",
-    vidhyadan: "/gallery-room-05-2-1.png",
-  };
-
-  const toDisplayRoom = (roomType: RoomType) => {
-    const normalizedKey = normalizeName(roomType.name);
-    const imageUrl =
-      roomType.mainPhotoUrl ??
-      roomType.photos?.[0] ??
-      fallbackImages[normalizedKey] ??
-      placeholderImage;
-
-    const amenityRecords: AmenityDisplay[] = (roomType.amenities ?? [])
-      .map((amenityId) => amenities?.find((amenity) => amenity.id === amenityId))
-      .filter((amenity): amenity is NonNullable<typeof amenity> => Boolean(amenity))
-      .slice(0, 3)
-      .map((amenity) => {
-        const key = normalizeAmenityName(amenity.name);
-        const directMatch = amenityIconMap[amenity.name];
-        const normalizedMatch = Object.entries(amenityIconMap).find(
-          ([label]) => normalizeAmenityName(label) === key
-        )?.[1];
-        const iconName = directMatch ?? normalizedMatch ?? amenity.icon ?? "HelpCircle";
-
-        return { ...amenity, iconName };
-      });
-
-    return {
-      id: roomType.id,
-      name: roomType.name,
-      description: roomType.description ?? "",
-      imageUrl,
-      amenities: amenityRecords,
-    };
-  };
-
-  const featuredRoomTypes = featuredOrder
-    .map((name) =>
-      visibleRoomTypes.find(
-        (roomType) => normalizeName(roomType.name) === normalizeName(name)
-      )
-    )
-    .filter((roomType): roomType is RoomType => Boolean(roomType))
-    .map(toDisplayRoom);
-
-  const fallbackRoomTypes = visibleRoomTypes
-    .filter(
-      (roomType) =>
-        !featuredOrder.some((name) => normalizeName(roomType.name) === normalizeName(name))
-    )
-    .slice(0, 4)
-    .map(toDisplayRoom);
-
-  const roomsToDisplay = featuredRoomTypes.length > 0 ? featuredRoomTypes : fallbackRoomTypes;
+  const { roomTypes } = useRoomTypePreview();
+  const roomsToDisplay = roomTypes;
 
   return (
     <section className="bg-background py-10 sm:py-12">
@@ -189,6 +87,7 @@ export function RoomsShowcaseSection() {
                             fill
                             className="rounded-t-2xl object-cover"
                             priority={false}
+                            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
                           />
                         </div>
                         <CardContent className="flex flex-1 flex-col gap-4 p-4 bg-white">
@@ -229,6 +128,7 @@ export function RoomsShowcaseSection() {
                       fill
                       className="rounded-t-2xl object-cover"
                       priority={false}
+                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
                     />
                   </div>
                   <CardContent className="flex flex-1 flex-col gap-4 p-4 bg-white">

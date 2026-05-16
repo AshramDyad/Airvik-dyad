@@ -82,7 +82,13 @@ const tabs = [
   },
 ];
 
-export function SunilBhagatUnifiedSection() {
+type SunilBhagatUnifiedSectionProps = {
+  showIntro?: boolean;
+};
+
+export function SunilBhagatUnifiedSection({
+  showIntro = true,
+}: SunilBhagatUnifiedSectionProps) {
   const [activeTab, setActiveTab] = useState("life");
   const currentTab = tabs.find((tab) => tab.id === activeTab) || tabs[0];
   const tabRefs = useRef<{ [key: string]: HTMLButtonElement | null }>({});
@@ -102,27 +108,29 @@ export function SunilBhagatUnifiedSection() {
     <section className="bg-background py-10 sm:py-12 overflow-hidden">
       <div className="container mx-auto px-4">
         {/* Section Header */}
-        <motion.div
-          className="text-center space-y-4"
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, amount: 0.3 }}
-          transition={{ duration: 0.6, ease: "easeOut" }}
-        >
-          {/* Eyebrow */}
-          <p className="text-sm font-semibold uppercase tracking-widest text-primary">
-            About Swamiji
-          </p>
-          <h1 className="2xl:text-5xl md:text-4xl text-3xl font-bold text-foreground">
-            <span className="block sm:inline">Swamiji Sunil Bhagat</span>
-            <span className="sm:inline"> - Life & Service</span>
-          </h1>
-          <p className="text-base text-muted-foreground md:text-lg max-w-4xl mx-auto">
-            Explore Swamiji Sunil Bhagat&apos;s journey and leadership, his humanitarian initiatives, daily teachings, and practical guidance in seva, dharma and community life that shape SahajAnand Wellness.
-          </p>
-        </motion.div>
+        {showIntro ? (
+          <motion.div
+            className="text-center space-y-4"
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.3 }}
+            transition={{ duration: 0.6, ease: "easeOut" }}
+          >
+            {/* Eyebrow */}
+            <p className="text-sm font-semibold uppercase tracking-widest text-primary">
+              About Swamiji
+            </p>
+            <h1 className="2xl:text-5xl md:text-4xl text-3xl font-bold text-foreground">
+              <span className="block sm:inline">Swamiji Sunil Bhagat</span>
+              <span className="sm:inline"> - Life & Service</span>
+            </h1>
+            <p className="text-base text-muted-foreground md:text-lg max-w-4xl mx-auto">
+              Explore Swamiji Sunil Bhagat&apos;s journey and leadership, his humanitarian initiatives, daily teachings, and practical guidance in seva, dharma and community life that shape SahajAnand Wellness.
+            </p>
+          </motion.div>
+        ) : null}
 
-        <div className="max-w-7xl mx-auto mt-12">
+        <div className={`max-w-7xl mx-auto ${showIntro ? "mt-12" : ""}`.trim()}>
           {/* Modern Tab Navigation - Segmented Control */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}

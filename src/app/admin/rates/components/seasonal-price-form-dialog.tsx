@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/select";
 import type { SeasonalPrice } from "@/data/types";
 import { useDataContext } from "@/context/data-context";
+import type { AdminRateRoomTypeOption } from "./types";
 
 const seasonalPriceSchema = z
   .object({
@@ -50,15 +51,19 @@ const seasonalPriceSchema = z
 
 interface SeasonalPriceFormDialogProps {
   seasonalPrice?: SeasonalPrice;
+  roomTypes: AdminRateRoomTypeOption[];
+  onSaved?: () => void | Promise<void>;
   children: React.ReactNode;
 }
 
 export function SeasonalPriceFormDialog({
   seasonalPrice,
+  roomTypes,
+  onSaved,
   children,
 }: SeasonalPriceFormDialogProps) {
   const [open, setOpen] = React.useState(false);
-  const { roomTypes, addSeasonalPrice, updateSeasonalPrice } = useDataContext();
+  const { addSeasonalPrice, updateSeasonalPrice } = useDataContext();
   const isEditing = !!seasonalPrice;
 
   const form = useForm<z.infer<typeof seasonalPriceSchema>>({
@@ -87,10 +92,12 @@ export function SeasonalPriceFormDialog({
   async function onSubmit(values: z.infer<typeof seasonalPriceSchema>) {
     try {
       if (isEditing && seasonalPrice) {
-        await updateSeasonalPrice(seasonalPrice.id, values);
+        await updateSeasonalPrice(seasonalPrice.id, values, seasonalPrice);
       } else {
-        await addSeasonalPrice(values);
+        const roomType = roomTypes.find((rt) => rt.id === values.roomTypeId);
+        await addSeasonalPrice(values, roomType?.name);
       }
+      await onSaved?.();
 
       toast.success(
         `Seasonal price ${isEditing ? "updated" : "created"} successfully!`

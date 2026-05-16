@@ -18,9 +18,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import type { RoomType } from "@/data/types";
+import type { Amenity, RoomType } from "@/data/types";
 import { Icon } from "@/components/shared/icon";
-import { useDataContext } from "@/context/data-context";
 import type { EnhancedBookingSearchFormValues } from "./booking-widget";
 import { useCurrencyFormatter } from "@/hooks/use-currency";
 
@@ -42,6 +41,7 @@ interface RoomTypeCardProps {
   isSelectionComplete: boolean;
   hasSearched: boolean;
   searchValues?: BookingSearchFormValues | EnhancedBookingSearchFormValues | null;
+  amenities?: Amenity[];
 }
 
 export function RoomTypeCard({
@@ -51,8 +51,9 @@ export function RoomTypeCard({
   isSelectionComplete,
   hasSearched,
   searchValues,
+  amenities,
 }: RoomTypeCardProps) {
-  const { amenities: allAmenities } = useDataContext();
+  const allAmenities = amenities ?? [];
   const formatCurrency = useCurrencyFormatter();
 
   const detailsLink = React.useMemo(() => {

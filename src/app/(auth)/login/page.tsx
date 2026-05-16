@@ -1,5 +1,5 @@
-import { UserLogin } from "@/components/auth/user/login";
+import { UserLoginLoader } from "@/components/auth/user/login-loader";
 
 export default function LoginPage() {
-  return <UserLogin />;
+  return <UserLoginLoader />;
 }

@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { formatCurrency } from "@/lib/currency";
 import { Button } from "@/components/ui/button";
-import Link from "next/link";
 import type { DonationReceipt } from "@/lib/donations/receipt-storage";
 import { getDonationReceipt } from "@/lib/donations/receipt-storage";
 
@@ -44,7 +43,7 @@ export function DonationSuccessCard({ donationId, fallbackCurrency }: DonationSu
           payment reference.
         </p>
         <Button asChild variant="secondary" className="mt-4">
-          <Link href="/donate">Return to donations</Link>
+          <a href="/donate">Return to donations</a>
         </Button>
       </div>
     );
@@ -87,10 +86,10 @@ export function DonationSuccessCard({ donationId, fallbackCurrency }: DonationSu
 
       <div className="mt-8 flex flex-wrap gap-3">
         <Button asChild>
-          <Link href="/donate">Make another donation</Link>
+          <a href="/donate">Make another donation</a>
         </Button>
         <Button asChild variant="outline">
-          <Link href="/">Back to homepage</Link>
+          <a href="/">Back to homepage</a>
         </Button>
       </div>
     </div>

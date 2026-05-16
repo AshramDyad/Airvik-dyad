@@ -1,5 +1,4 @@
 import { Skeleton } from "@/components/ui/skeleton";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
 
 export function RoomDetailsSkeleton() {
   return (
@@ -127,7 +126,7 @@ export function RoomDetailsSkeleton() {
 
           {/* Booking Card Skeleton */}
           <div className="lg:col-span-2 mt-8 lg:mt-0 shadow-lg rounded-xl border border-gray-100">
-            <Card className="sticky top-32 bg-white border-0 overflow-hidden p-6">
+            <div className="sticky top-32 overflow-hidden rounded-2xl bg-white p-6 text-foreground">
               {/* Price Display Section */}
               <div className="p-6 bg-orange-50 rounded-xl mb-6">
                 <Skeleton className="h-3 w-12 mb-1" />
@@ -213,7 +212,7 @@ export function RoomDetailsSkeleton() {
                 {/* Disclaimer Text Skeleton */}
                 <Skeleton className="h-3 w-3/4 mx-auto" />
               </div>
-            </Card>
+            </div>
           </div>
         </div>
 
@@ -222,15 +221,18 @@ export function RoomDetailsSkeleton() {
           <Skeleton className="h-8 w-48 mb-8" />
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {[...Array(3)].map((_, i) => (
-              <Card key={i} className="overflow-hidden">
+              <div
+                key={i}
+                className="overflow-hidden rounded-2xl border border-border/50 bg-card text-foreground"
+              >
                 <Skeleton className="h-48 w-full" />
-                <CardContent className="p-4 space-y-2">
+                <div className="p-4 space-y-2">
                   <Skeleton className="h-6 w-3/4" />
                   <Skeleton className="h-4 w-full" />
                   <Skeleton className="h-4 w-full" />
                   <Skeleton className="h-10 w-full mt-4" />
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             ))}
           </div>
         </div>

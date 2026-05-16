@@ -1,12 +1,9 @@
-import { Suspense } from "react";
-import Link from "next/link";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getCategories } from "@/lib/api";
 import { countPosts, getPosts } from "@/lib/server/posts";
-import { PostsTable } from "@/components/admin/posts/posts-table";
-import { PostsFilters } from "@/components/admin/posts/posts-filters";
 import { requirePageFeature } from "@/lib/server/page-auth";
+import { PostsIndexLoader } from "./posts-index-loader";
 
 export default async function PostsPage({
   searchParams,
@@ -43,22 +40,19 @@ export default async function PostsPage({
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold tracking-tight">Posts</h1>
         <Button asChild>
-          <Link href="/admin/posts/create">
+          <a href="/admin/posts/create">
             <Plus className="mr-2 h-4 w-4" />
             Add Post
-          </Link>
+          </a>
         </Button>
       </div>
 
-      <PostsFilters
+      <PostsIndexLoader
         categories={categories}
+        posts={posts}
         postCounts={{ total: totalPosts, drafts: draftPosts }}
         activeStatus={activeStatus}
       />
-
-      <Suspense fallback={<div>Loading posts...</div>}>
-        <PostsTable posts={posts} showDraftBadge={activeStatus !== "draft"} />
-      </Suspense>
     </div>
   );
 }

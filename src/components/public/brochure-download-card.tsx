@@ -1,31 +1,10 @@
-"use client";
-
-import * as React from "react";
-import { Download, Eye, Link2, Check } from "lucide-react";
+import { Download, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
+import { BrochureCopyLinkButtonLoader } from "./brochure-copy-link-button-loader";
 
 const BROCHURE_PDF_PATH = "/sahajanand-wellness-brochure.pdf";
 
 export function BrochureDownloadCard() {
-  const [copied, setCopied] = React.useState(false);
-
-  const handleCopyLink = async () => {
-    try {
-      const pdfUrl = `${window.location.origin}${BROCHURE_PDF_PATH}`;
-      await navigator.clipboard.writeText(pdfUrl);
-      setCopied(true);
-      toast.success("Link copied to clipboard");
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      toast.error("Failed to copy link");
-    }
-  };
-
-  const handleView = () => {
-    window.open(BROCHURE_PDF_PATH, "_blank");
-  };
-
   return (
     <div className="rounded-2xl border border-border/40 bg-white p-8 shadow-lg max-w-2xl w-full space-y-6">
       <div className="flex flex-col items-center gap-3 text-center">
@@ -43,9 +22,15 @@ export function BrochureDownloadCard() {
       </div>
 
       <div className="flex flex-col gap-3">
-        <Button onClick={handleView} variant="outline" className="w-full">
-          <Eye />
-          View Brochure
+        <Button variant="outline" className="w-full" asChild>
+          <a
+            href={BROCHURE_PDF_PATH}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <Eye />
+            View Brochure
+          </a>
         </Button>
         <Button asChild className="w-full">
           <a
@@ -56,10 +41,7 @@ export function BrochureDownloadCard() {
             Download Brochure
           </a>
         </Button>
-        <Button variant="outline" className="w-full" onClick={handleCopyLink}>
-          {copied ? <Check /> : <Link2 />}
-          {copied ? "Link Copied!" : "Copy Share Link"}
-        </Button>
+        <BrochureCopyLinkButtonLoader pdfPath={BROCHURE_PDF_PATH} />
       </div>
     </div>
   );

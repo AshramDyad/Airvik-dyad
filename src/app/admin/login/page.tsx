@@ -1,5 +1,5 @@
-import { AdminLogin } from "@/components/auth/admin/login";
+import { AdminLoginLoader } from "@/components/auth/admin/login-loader";
 
 export default function AdminLoginPage() {
-  return <AdminLogin />;
+  return <AdminLoginLoader />;
 }

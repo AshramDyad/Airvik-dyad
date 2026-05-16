@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { ManualReceipt } from "@/data/types";
 import { createServerSupabaseClient } from "@/integrations/supabase/server";
 import { requireFeature, HttpError } from "@/lib/server/auth";
+import { MANUAL_RECEIPT_SELECT_COLUMNS } from "../columns";
 
 const PAYMENT_METHODS = [
   "Cash",
@@ -149,7 +150,7 @@ export async function PATCH(
       .from("manual_receipts")
       .update(updates)
       .eq("id", id)
-      .select("*")
+      .select(MANUAL_RECEIPT_SELECT_COLUMNS)
       .maybeSingle();
 
     if (error) {

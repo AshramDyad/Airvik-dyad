@@ -46,8 +46,9 @@ const nextConfig: NextConfig = {
     ignoreDuringBuilds: true,
   },
   images: {
+    loader: "custom",
+    loaderFile: "./supabase-image-loader.js",
     remotePatterns: imageRemotePatterns,
-    unoptimized: true,
   },
   webpack: (config) => {
     if (process.env.NODE_ENV === "development") {

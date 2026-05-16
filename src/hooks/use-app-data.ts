@@ -1,8 +1,13 @@
 "use client";
 
 import * as React from "react";
+import { usePathname } from "next/navigation";
 import { useSessionContext } from "@/context/session-context";
 import { useActivityLogger } from "@/hooks/use-activity-logger";
+import {
+  getAppDataLoadPlan,
+  isAppDataDatasetEnabled,
+} from "@/hooks/app-data-load-plan";
 import * as api from "@/lib/api";
 import { extractChangedFields } from "@/lib/activity/change-detector";
 import { authorizedFetch } from "@/lib/auth/client-session";
@@ -34,7 +39,12 @@ import type {
   AdminActivityLogInput,
 } from "@/data/types";
 
-const mapDbRole = (role: Role & { hierarchy_level?: number }): Role => ({
+type RoleRow = Pick<Role, "id" | "name"> &
+  Partial<Pick<Role, "permissions" | "hierarchyLevel">> & {
+    hierarchy_level?: number;
+  };
+
+const mapDbRole = (role: RoleRow): Role => ({
   id: role.id,
   name: role.name,
   permissions: role.permissions ?? [],
@@ -136,6 +146,21 @@ const normalizeRoomOccupancies = (
   });
 };
 
+const definedReservationUpdate = (
+  updatedData: Partial<Omit<Reservation, "id">>
+): Partial<Omit<Reservation, "id">> =>
+  Object.fromEntries(
+    Object.entries(updatedData).filter(([, value]) => typeof value !== "undefined")
+  ) as Partial<Omit<Reservation, "id">>;
+
+const mergeReservationUpdate = (
+  reservation: Reservation,
+  updatedData: Partial<Omit<Reservation, "id">>
+): Reservation => ({
+  ...reservation,
+  ...definedReservationUpdate(updatedData),
+});
+
 const applyRoomOccupancyAssignments = async (
   reservationsList: Reservation[],
   assignments: RoomOccupancyAssignment[]
@@ -173,20 +198,22 @@ const applyRoomOccupancyAssignments = async (
         return reservation;
       }
 
-      const { data, error } = await api.updateReservation(reservation.id, {
+      const updatedData = {
         adultCount: adults,
         childCount: children,
         numberOfGuests: guests,
-      });
+      };
 
-      if (error || !data) {
+      const { error } = await api.updateReservationWithoutReturning(
+        reservation.id,
+        updatedData
+      );
+
+      if (error) {
         return reservation;
       }
 
-      return {
-        ...data,
-        folio: reservation.folio,
-      };
+      return mergeReservationUpdate(reservation, updatedData);
     })
   );
 
@@ -215,6 +242,24 @@ type ReservationsApiPayload = {
   data: BookingSummary[];
   nextOffset: number | null;
   count?: number | null;
+};
+
+type BookingDetailsApiPayload = {
+  data: {
+    reservations: Reservation[];
+    guest: Guest | null;
+    rooms?: Room[];
+    roomTypes?: RoomType[];
+    ratePlans?: RatePlan[];
+  };
+};
+
+type PublicPropertyApiPayload = {
+  data: Partial<Property> | null;
+};
+
+type HousekeepersApiPayload = {
+  data: User[];
 };
 
 type FetchReservationsArgs = {
@@ -252,8 +297,63 @@ const fetchReservationsFromApi = async (
   return (await response.json()) as ReservationsApiPayload;
 };
 
+const fetchBookingDetailsFromApi = async (
+  id: string
+): Promise<BookingDetailsApiPayload> => {
+  const response = await authorizedFetch(
+    `/api/admin/reservations/${encodeURIComponent(id)}/booking`,
+    {
+      cache: "no-store",
+    }
+  );
+
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || "Failed to load reservation");
+  }
+
+  return (await response.json()) as BookingDetailsApiPayload;
+};
+
+const fetchPublicPropertyFromApi = async (): Promise<{
+  data: Partial<Property> | null;
+  error: null;
+}> => {
+  const response = await authorizedFetch("/api/public/property", {
+    cache: "force-cache",
+  });
+
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || "Failed to load public property");
+  }
+
+  const payload = (await response.json()) as PublicPropertyApiPayload;
+  return { data: payload.data ?? null, error: null };
+};
+
+const fetchHousekeepersFromApi = async (): Promise<{ data: User[] }> => {
+  const response = await authorizedFetch("/api/admin/housekeepers", {
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || "Failed to load housekeepers");
+  }
+
+  const payload = (await response.json()) as HousekeepersApiPayload;
+  return { data: payload.data ?? [] };
+};
+
+const getLocalDateKey = (date = new Date()) =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
+    date.getDate()
+  ).padStart(2, "0")}`;
+
 export function useAppData() {
   const { session, isLoading: isSessionLoading } = useSessionContext();
+  const pathname = usePathname();
   const { logActivity } = useActivityLogger();
   const recordActivity = React.useCallback(
     (entry: AdminActivityLogInput) => logActivity(entry),
@@ -265,6 +365,10 @@ export function useAppData() {
       .join(" ")
       .trim();
   const userId = session?.user?.id ?? null;
+  const loadPlan = React.useMemo(
+    () => getAppDataLoadPlan({ pathname, userId }),
+    [pathname, userId]
+  );
   const [isLoading, setIsLoading] = React.useState(true);
   const [isRefreshing, setIsRefreshing] = React.useState(false);
   const hasHydratedRef = React.useRef(false);
@@ -273,6 +377,9 @@ export function useAppData() {
   const [isBookingLookupLoading, setIsBookingLookupLoading] = React.useState(false);
   const [lookupStatus, setLookupStatus] = React.useState<Record<string, 'pending' | 'success' | 'error'>>({});
   const [activeBookingReservations, setActiveBookingReservations] = React.useState<Reservation[]>([]);
+  const [activeBookingRooms, setActiveBookingRooms] = React.useState<Room[]>([]);
+  const [activeBookingRoomTypes, setActiveBookingRoomTypes] = React.useState<RoomType[]>([]);
+  const [activeBookingRatePlans, setActiveBookingRatePlans] = React.useState<RatePlan[]>([]);
   const [reservationsTotalCount, setReservationsTotalCount] = React.useState<number>(0);
   const [property, setProperty] = React.useState<Property>(defaultProperty);
   const [bookings, setBookings] = React.useState<BookingSummary[]>([]);
@@ -308,50 +415,37 @@ export function useAppData() {
       setLookupStatus(prev => ({ ...prev, [id]: 'pending' }));
 
       try {
-        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
-        let targetBookingId = "";
+        const { data } = await fetchBookingDetailsFromApi(id);
+        const siblings = data.reservations ?? [];
 
-        if (isUUID) {
-          console.log(`[Lookup] Fetching by UUID: ${id}`);
-          const { data: res } = await api.getReservationById(id);
-          if (res) {
-            targetBookingId = res.bookingId;
-            console.log(`[Lookup] Found bookingId: ${targetBookingId} for UUID: ${id}`);
-            // Fetch guest if not in current state
-            if (res.guestId) {
-              const { data: guestData } = await api.getGuestById(res.guestId);
-              if (guestData) {
-                setGuests(prev => {
-                  if (prev.some(g => g.id === guestData.id)) return prev;
-                  return [...prev, guestData];
-                });
-              }
-            }
-          } else {
-            console.warn(`[Lookup] No reservation found for UUID: ${id}`);
-          }
-        } else {
-          console.log(`[Lookup] Assuming ID is booking code: ${id}`);
-          targetBookingId = id;
+        if (data.guest) {
+          setGuests(prev => {
+            if (prev.some(g => g.id === data.guest?.id)) return prev;
+            return [...prev, data.guest!];
+          });
         }
 
-        if (targetBookingId) {
-          console.log(`[Lookup] Fetching siblings for bookingId: ${targetBookingId}`);
-          const { data: siblings } = await api.getReservationsByBookingId(targetBookingId);
-          if (siblings && siblings.length > 0) {
-            console.log(`[Lookup] Successfully found ${siblings.length} records for ${targetBookingId}`);
-            setActiveBookingReservations(siblings);
-            setLookupStatus(prev => ({ ...prev, [id]: 'success' }));
-          } else {
-            console.warn(`[Lookup] No records found for bookingId: ${targetBookingId}`);
-            setLookupStatus(prev => ({ ...prev, [id]: 'error' }));
-          }
+        if (siblings.length > 0) {
+          console.log(`[Lookup] Successfully found ${siblings.length} records for ${id}`);
+          setActiveBookingReservations(siblings);
+          setActiveBookingRooms(data.rooms ?? []);
+          setActiveBookingRoomTypes(data.roomTypes ?? []);
+          setActiveBookingRatePlans(data.ratePlans ?? []);
+          setLookupStatus(prev => ({ ...prev, [id]: 'success' }));
         } else {
-          console.warn(`[Lookup] Could not resolve targetBookingId for ${id}`);
+          console.warn(`[Lookup] No records found for ${id}`);
+          setActiveBookingReservations([]);
+          setActiveBookingRooms([]);
+          setActiveBookingRoomTypes([]);
+          setActiveBookingRatePlans([]);
           setLookupStatus(prev => ({ ...prev, [id]: 'error' }));
         }
       } catch (error) {
         console.error(`[Lookup] Error during lookup for ${id}:`, error);
+        setActiveBookingReservations([]);
+        setActiveBookingRooms([]);
+        setActiveBookingRoomTypes([]);
+        setActiveBookingRatePlans([]);
         setLookupStatus(prev => ({ ...prev, [id]: 'error' }));
       } finally {
         setIsBookingLookupLoading(false);
@@ -392,6 +486,14 @@ export function useAppData() {
     const keepExisting = options?.keepExisting ?? false;
     const alreadyHydrated = hasHydratedRef.current;
     const shouldUseLoadingState = !alreadyHydrated || !keepExisting;
+    const normalizedPathname =
+      pathname && pathname.length > 1 && pathname.endsWith("/")
+        ? pathname.slice(0, -1)
+        : pathname ?? "/";
+    const isReservationDetailLookupRoute =
+      normalizedPathname.startsWith("/admin/reservations/") &&
+      normalizedPathname !== "/admin/reservations/new" &&
+      !normalizedPathname.endsWith("/edit");
 
     if (shouldUseLoadingState) {
       setIsLoading(true);
@@ -401,7 +503,41 @@ export function useAppData() {
     }
 
     try {
-      console.log(`[AppData] Fetching global data (userId: ${userId})`);
+      if (loadPlan.mode === "none") {
+        console.log(`[AppData] Skipping global data for route ${pathname ?? "/"}`);
+        setGuests([]);
+        setRooms([]);
+        setRatePlans([]);
+        setSeasonalPrices([]);
+        setPropertyClosures([]);
+        setRoles([]);
+        setAmenities([]);
+        setStickyNotes([]);
+        setUsers([]);
+        setHousekeepingAssignments([]);
+        setBookings([]);
+        setReservations([]);
+        setActiveBookingReservations([]);
+        setActiveBookingRooms([]);
+        setActiveBookingRoomTypes([]);
+        setActiveBookingRatePlans([]);
+        setTodayReservations([]);
+        setReservationsTotalCount(0);
+        setRoomTypes([]);
+        setRoomCategories([]);
+        if (!alreadyHydrated) {
+          hasHydratedRef.current = true;
+        }
+        return;
+      }
+
+      const canLoad = (dataset: Parameters<typeof isAppDataDatasetEnabled>[1]) =>
+        isAppDataDatasetEnabled(loadPlan, dataset);
+
+      console.log(
+        `[AppData] Fetching ${loadPlan.mode} data (userId: ${userId ?? "none"})`
+      );
+      const todayDate = getLocalDateKey();
       const [
         propertyRes, guestsRes, roomsRes, roomTypesRes, roomCategoriesRes, ratePlansRes,
         seasonalPricesRes, propertyClosuresRes,
@@ -409,21 +545,44 @@ export function useAppData() {
         roomTypeAmenitiesRes,
         dashboardReservationsRes
       ] = await Promise.all([
-        api.getProperty(),
-        userId ? api.getGuests() : Promise.resolve({ data: [] }),
-        api.getRooms(),
-        api.getRoomTypes(),
-        api.getRoomCategories(),
-        api.getRatePlans(),
-        api.getSeasonalPrices(),
-        api.getPropertyClosures().then(data => ({ data })).catch(() => ({ data: [] as PropertyClosure[] })),
-        userId ? api.getRoles() : Promise.resolve({ data: [] }),
-        api.getAmenities(),
-        userId ? api.getStickyNotes(userId) : Promise.resolve({ data: [] }),
-        userId ? api.getUsers() : Promise.resolve({ data: [] }),
-        userId ? api.getHousekeepingAssignments() : Promise.resolve({ data: [] }),
-        api.getRoomTypeAmenities(),
-        userId
+        canLoad("property")
+          ? loadPlan.mode === "admin"
+            ? api.getProperty()
+            : fetchPublicPropertyFromApi()
+          : Promise.resolve({ data: null, error: null }),
+        canLoad("guests") ? api.getGuests() : Promise.resolve({ data: [] }),
+        canLoad("rooms") ? api.getRooms() : Promise.resolve({ data: [] }),
+        canLoad("roomTypes") ? api.getRoomTypes() : Promise.resolve({ data: [] }),
+        canLoad("roomCategories")
+          ? api.getRoomCategories()
+          : Promise.resolve({ data: [] }),
+        canLoad("ratePlans") ? api.getRatePlans() : Promise.resolve({ data: [] }),
+        canLoad("seasonalPrices")
+          ? api.getSeasonalPrices()
+          : Promise.resolve({ data: [] }),
+        canLoad("propertyClosures")
+          ? api
+              .getPropertyClosures()
+              .then(data => ({ data }))
+              .catch(() => ({ data: [] as PropertyClosure[] }))
+          : Promise.resolve({ data: [] as PropertyClosure[] }),
+        canLoad("roles") ? api.getRoles() : Promise.resolve({ data: [] }),
+        canLoad("amenities") ? api.getAmenities() : Promise.resolve({ data: [] }),
+        canLoad("stickyNotes") && userId
+          ? api.getStickyNotes(userId)
+          : Promise.resolve({ data: [] }),
+        canLoad("users")
+          ? api.getUsers()
+          : canLoad("housekeepers")
+            ? fetchHousekeepersFromApi()
+            : Promise.resolve({ data: [] }),
+        canLoad("housekeepingAssignments")
+          ? api.getHousekeepingAssignments(todayDate)
+          : Promise.resolve({ data: [] }),
+        canLoad("roomTypeAmenities")
+          ? api.getRoomTypeAmenities()
+          : Promise.resolve({ data: [] }),
+        canLoad("dashboardReservations")
           ? fetchReservationsFromApi({ limit: 1000, offset: 0, includeCount: true })
           : Promise.resolve({ data: [], nextOffset: null, count: 0 } as ReservationsApiPayload)
       ]);
@@ -436,33 +595,32 @@ export function useAppData() {
         return api.fromDbRoomType({ ...rt, amenities: amenitiesForRoomType });
       });
 
-      if (!userId) {
-        console.log("[AppData] No user session found, clearing state");
+      if (loadPlan.mode !== "admin") {
+        console.log(`[AppData] Applied ${loadPlan.mode} public data plan`);
         if (propertyRes.data) setProperty({ ...defaultProperty, ...propertyRes.data });
         setGuests([]);
-        setRooms(roomsRes.data || []);
-        setRatePlans(ratePlansRes.data || []);
-        setSeasonalPrices(seasonalPricesRes.data || []);
-        setPropertyClosures(propertyClosuresRes.data || []);
+        setRooms(canLoad("rooms") ? roomsRes.data || [] : []);
+        setRatePlans(canLoad("ratePlans") ? ratePlansRes.data || [] : []);
+        setSeasonalPrices(canLoad("seasonalPrices") ? seasonalPricesRes.data || [] : []);
+        setPropertyClosures(canLoad("propertyClosures") ? propertyClosuresRes.data || [] : []);
         setRoles([]);
-        setAmenities(amenitiesRes.data || []);
+        setAmenities(canLoad("amenities") ? amenitiesRes.data || [] : []);
         setStickyNotes([]);
         setUsers([]);
         setHousekeepingAssignments([]);
         setBookings([]);
         setReservations([]);
+        setActiveBookingReservations([]);
+        setActiveBookingRooms([]);
+        setActiveBookingRoomTypes([]);
+        setActiveBookingRatePlans([]);
         setTodayReservations([]);
         setReservationsTotalCount(0);
         setIsReservationsInitialLoading(false);
-        setRoomTypes(roomTypesData);
-        setRoomCategories(roomCategoriesRes.data || []);
+        setRoomTypes(canLoad("roomTypes") ? roomTypesData : []);
+        setRoomCategories([]);
         if (!alreadyHydrated) {
           hasHydratedRef.current = true;
-        }
-        if (shouldUseLoadingState) {
-          setIsLoading(false);
-        } else {
-          setIsRefreshing(false);
         }
         return;
       }
@@ -484,6 +642,12 @@ export function useAppData() {
 
       setTodayReservations(sortReservationsByBookingDate(flatReservations));
       setReservations(sortReservationsByBookingDate(flatReservations));
+      if (!isReservationDetailLookupRoute) {
+        setActiveBookingReservations([]);
+        setActiveBookingRooms([]);
+        setActiveBookingRoomTypes([]);
+        setActiveBookingRatePlans([]);
+      }
       setReservationsTotalCount(dashboardReservationsRes.count ?? 0);
       setIsReservationsInitialLoading(false);
 
@@ -504,28 +668,11 @@ export function useAppData() {
       }
       setIsReservationsInitialLoading(false);
     }
-  }, [userId, isSessionLoading]);
+  }, [loadPlan, pathname, userId, isSessionLoading]);
 
   React.useEffect(() => {
     fetchData();
   }, [fetchData]);
-
-  // Lazy-load full reservations in the background after initial render
-  React.useEffect(() => {
-    if (isLoading || isSessionLoading || !userId) return;
-
-    let cancelled = false;
-    api.getReservations().then((res) => {
-      if (cancelled) return;
-      if (Array.isArray(res.data)) {
-        setReservations(sortReservationsByBookingDate(res.data));
-      }
-    }).catch((err) => {
-      console.error("[AppData] Failed to lazy-load reservations:", err);
-    });
-
-    return () => { cancelled = true; };
-  }, [isLoading, isSessionLoading, userId]);
 
   const refreshReservations = React.useCallback(() => fetchData({ keepExisting: true }), [fetchData]);
 
@@ -535,9 +682,27 @@ export function useAppData() {
 
   const updateProperty = async (updatedData: Partial<Omit<Property, "id">>) => {
     const changedFields = extractChangedFields(property, updatedData);
-    const { data, error } = property.id === "default-property-id"
-      ? await api.createProperty(updatedData)
-      : await api.updateProperty(property.id, updatedData);
+    if (property.id !== "default-property-id") {
+      const updatedProperty: Property = { ...property, ...updatedData };
+      const { error } = await api.updatePropertyWithoutReturning(
+        property.id,
+        updatedData,
+      );
+      if (error) throw error;
+      setProperty({ ...defaultProperty, ...updatedProperty });
+      recordActivity({
+        section: "property",
+        entityType: "property",
+        entityId: updatedProperty.id,
+        entityLabel: updatedProperty.name,
+        action: "property_updated",
+        details: "Updated property settings",
+        metadata: changedFields.length ? { changedFields } : undefined,
+      });
+      return;
+    }
+
+    const { data, error } = await api.createProperty(updatedData);
     if (error) throw error;
     setProperty({ ...defaultProperty, ...data });
     recordActivity({
@@ -570,13 +735,39 @@ export function useAppData() {
     return data;
   };
 
-  const updateGuest = async (guestId: string, updatedData: Partial<Omit<Guest, "id">>) => {
-    const previousGuest = guests.find((g) => g.id === guestId);
+  const updateGuest = async (
+    guestId: string,
+    updatedData: Partial<Omit<Guest, "id">>,
+    existingGuest?: Guest
+  ) => {
+    const previousGuest = existingGuest ?? guests.find((g) => g.id === guestId);
+    if (previousGuest) {
+      const updatedGuest: Guest = { ...previousGuest, ...updatedData };
+      const { error } = await api.updateGuestWithoutReturning(
+        guestId,
+        updatedData,
+      );
+      if (error) throw error;
+      setGuests(prev => prev.map(g => g.id === guestId ? updatedGuest : g));
+      const label = formatName(updatedGuest.firstName, updatedGuest.lastName) || updatedGuest.email;
+      const changedFields = extractChangedFields(previousGuest, updatedData);
+      recordActivity({
+        section: "guests",
+        entityType: "guest",
+        entityId: guestId,
+        entityLabel: label,
+        action: "guest_updated",
+        details: `Updated guest ${label}`,
+        metadata: changedFields.length ? { changedFields } : undefined,
+      });
+      return;
+    }
+
     const { data, error } = await api.updateGuest(guestId, updatedData);
     if (error) throw error;
     setGuests(prev => prev.map(g => g.id === guestId ? data : g));
     const label = formatName(data.firstName, data.lastName) || data.email;
-    const changedFields = extractChangedFields(previousGuest, updatedData);
+    const changedFields = extractChangedFields(undefined, updatedData);
     recordActivity({
       section: "guests",
       entityType: "guest",
@@ -741,12 +932,48 @@ export function useAppData() {
   };
 
   const updateReservation = async (reservationId: string, updatedData: Partial<Omit<Reservation, "id">>) => {
-    const previousReservation = reservations.find((reservation) => reservation.id === reservationId);
+    const previousReservation =
+      reservations.find((reservation) => reservation.id === reservationId) ??
+      activeBookingReservations.find((reservation) => reservation.id === reservationId);
+    const updateForState = definedReservationUpdate(updatedData);
+
+    if (previousReservation) {
+      const { error } = await api.updateReservationWithoutReturning(
+        reservationId,
+        updatedData
+      );
+      if (error) throw error;
+
+      const updatedReservation = mergeReservationUpdate(previousReservation, updatedData);
+      const mergeIntoReservations = (prev: Reservation[]) =>
+        prev.map((reservation) =>
+          reservation.id === reservationId
+            ? mergeReservationUpdate(reservation, updatedData)
+            : reservation
+        );
+      setReservations(mergeIntoReservations);
+      setActiveBookingReservations(mergeIntoReservations);
+      triggerReservationsCacheRevalidation();
+      const changedFields = extractChangedFields(previousReservation, updateForState);
+      recordActivity({
+        section: "reservations",
+        entityType: "reservation",
+        entityId: reservationId,
+        entityLabel: updatedReservation.bookingId,
+        action: "reservation_updated",
+        details: `Updated reservation ${updatedReservation.bookingId}`,
+        metadata: changedFields.length ? { changedFields } : undefined,
+      });
+      return;
+    }
+
     const { data, error } = await api.updateReservation(reservationId, updatedData);
     if (error) throw error;
+    if (!data) throw new Error("Failed to update reservation");
     setReservations(prev => prev.map(r => r.id === reservationId ? { ...r, ...data } : r));
+    setActiveBookingReservations(prev => prev.map(r => r.id === reservationId ? { ...r, ...data } : r));
     triggerReservationsCacheRevalidation();
-    const changedFields = extractChangedFields(previousReservation, updatedData);
+    const changedFields = extractChangedFields(undefined, updateForState);
     recordActivity({
       section: "reservations",
       entityType: "reservation",
@@ -778,6 +1005,83 @@ export function useAppData() {
     bookingId: string,
     status: ReservationStatus
   ) => {
+    const knownReservationsById = new Map<string, Reservation>();
+    reservations.forEach((reservation) => {
+      if (reservation.bookingId === bookingId) {
+        knownReservationsById.set(reservation.id, reservation);
+      }
+    });
+    activeBookingReservations.forEach((reservation) => {
+      if (reservation.bookingId === bookingId) {
+        knownReservationsById.set(reservation.id, reservation);
+      }
+    });
+    bookings.forEach((booking) => {
+      booking.subRows?.forEach((reservation) => {
+        if (reservation.bookingId === bookingId) {
+          knownReservationsById.set(reservation.id, reservation);
+        }
+      });
+    });
+
+    const knownReservations = Array.from(knownReservationsById.values());
+
+    if (knownReservations.length > 0) {
+      const { error } = await api.updateBookingReservationsStatusWithoutReturning(
+        bookingId,
+        status
+      );
+      if (error) throw error;
+
+      const affectedIds = new Set(knownReservations.map((reservation) => reservation.id));
+      const withUpdatedStatus = <T extends Reservation>(reservation: T): T =>
+        affectedIds.has(reservation.id) ? { ...reservation, status } : reservation;
+
+      setReservations((prev) => prev.map(withUpdatedStatus));
+      setActiveBookingReservations((prev) => prev.map(withUpdatedStatus));
+      setTodayReservations((prev) => prev.map(withUpdatedStatus));
+      setBookings((prev) =>
+        prev.map((booking) =>
+          booking.bookingId === bookingId
+            ? {
+              ...booking,
+              status,
+              subRows: booking.subRows.map(withUpdatedStatus),
+            }
+            : booking
+        )
+      );
+      triggerReservationsCacheRevalidation();
+
+      knownReservations.forEach((reservation) => {
+        const updatedReservation = { ...reservation, status };
+        recordActivity({
+          section: "reservations",
+          entityType: "reservation",
+          entityId: updatedReservation.id,
+          entityLabel: updatedReservation.bookingId,
+          action: "reservation_status_updated",
+          details: `Changed reservation status to ${status}`,
+          metadata: {
+            status,
+            bookingId,
+            roomId: updatedReservation.roomId,
+          },
+        });
+      });
+
+      recordActivity({
+        section: "reservations",
+        entityType: "reservation",
+        entityId: bookingId,
+        entityLabel: bookingId,
+        action: "reservation_status_updated",
+        details: `Changed booking ${bookingId} status to ${status} for ${knownReservations.length} rooms`,
+        metadata: { status, bookingId, affectedReservations: knownReservations.length },
+      });
+      return;
+    }
+
     const { data, error } = await api.updateBookingReservationsStatus(
       bookingId,
       status
@@ -939,8 +1243,13 @@ export function useAppData() {
     });
   };
 
-  const updateRoomType = async (roomTypeId: string, updatedData: Partial<Omit<RoomType, "id">>) => {
-    const existingRoomType = roomTypes.find((roomType) => roomType.id === roomTypeId);
+  const updateRoomType = async (
+    roomTypeId: string,
+    updatedData: Partial<Omit<RoomType, "id">>,
+    localRoomType?: RoomType
+  ) => {
+    const existingRoomType =
+      localRoomType ?? roomTypes.find((roomType) => roomType.id === roomTypeId);
     if (!existingRoomType) {
       throw new Error("Room type not found.");
     }
@@ -980,8 +1289,14 @@ export function useAppData() {
   };
 
   const addRoom = async (roomData: Omit<Room, "id">) => {
-    const { data: newRoom, error } = await api.addRoom(roomData);
-    if (error) throw error;
+    const { data: roomId, error } = await api.addRoomIdOnly(roomData);
+    if (error || !roomId) {
+      throw error ?? new Error("Failed to create room");
+    }
+    const newRoom: Room = {
+      id: roomId,
+      ...roomData,
+    };
     setRooms(prev => [...prev, newRoom]);
     recordActivity({
       section: "rooms",
@@ -994,12 +1309,34 @@ export function useAppData() {
     });
   };
 
-  const updateRoom = async (roomId: string, updatedData: Partial<Omit<Room, "id">>) => {
-    const previousRoom = rooms.find((room) => room.id === roomId);
+  const updateRoom = async (
+    roomId: string,
+    updatedData: Partial<Omit<Room, "id">>,
+    existingRoom?: Room
+  ) => {
+    const previousRoom = existingRoom ?? rooms.find((room) => room.id === roomId);
+    if (previousRoom) {
+      const updatedRoom: Room = { ...previousRoom, ...updatedData };
+      const { error } = await api.updateRoomWithoutReturning(roomId, updatedData);
+      if (error) throw error;
+      setRooms(prev => prev.map(r => r.id === roomId ? updatedRoom : r));
+      const changedFields = extractChangedFields(previousRoom, updatedData);
+      recordActivity({
+        section: "rooms",
+        entityType: "room",
+        entityId: roomId,
+        entityLabel: updatedRoom.roomNumber,
+        action: "room_updated",
+        details: `Updated room ${updatedRoom.roomNumber}`,
+        metadata: changedFields.length ? { changedFields } : undefined,
+      });
+      return;
+    }
+
     const { data: updatedRoom, error } = await api.updateRoom(roomId, updatedData);
     if (error) throw error;
     setRooms(prev => prev.map(r => r.id === roomId ? updatedRoom : r));
-    const changedFields = extractChangedFields(previousRoom, updatedData);
+    const changedFields = extractChangedFields(undefined, updatedData);
     recordActivity({
       section: "rooms",
       entityType: "room",
@@ -1011,8 +1348,8 @@ export function useAppData() {
     });
   };
 
-  const deleteRoom = async (roomId: string) => {
-    const room = rooms.find((r) => r.id === roomId);
+  const deleteRoom = async (roomId: string, existingRoom?: Room) => {
+    const room = existingRoom ?? rooms.find((r) => r.id === roomId);
     const { error } = await api.deleteRoom(roomId);
     if (error) { console.error(error); return false; }
     setRooms(prev => prev.filter(r => r.id !== roomId));
@@ -1029,8 +1366,11 @@ export function useAppData() {
     return true;
   };
 
-  const deleteRoomType = async (roomTypeId: string) => {
-    const roomType = roomTypes.find((rt) => rt.id === roomTypeId);
+  const deleteRoomType = async (
+    roomTypeId: string,
+    localRoomType?: RoomType
+  ) => {
+    const roomType = localRoomType ?? roomTypes.find((rt) => rt.id === roomTypeId);
     const { error } = await api.deleteRoomType(roomTypeId);
     if (error) { console.error(error); return false; }
     setRoomTypes(prev => prev.filter(rt => rt.id !== roomTypeId));
@@ -1048,25 +1388,62 @@ export function useAppData() {
   };
 
   const addRoomCategory = async (roomCategoryData: Omit<RoomCategory, "id">): Promise<void> => {
-    const { data, error } = await api.addRoomCategory(roomCategoryData);
-    if (error) throw error;
-    setRoomCategories(prev => [...prev, data]);
+    const { data: roomCategoryId, error } = await api.addRoomCategoryIdOnly(roomCategoryData);
+    if (error || !roomCategoryId) {
+      throw error ?? new Error("Failed to create room category");
+    }
+    const createdCategory: RoomCategory = {
+      id: roomCategoryId,
+      ...roomCategoryData,
+    };
+    setRoomCategories(prev => [...prev, createdCategory]);
     recordActivity({
       section: "room_categories",
       entityType: "room_category",
-      entityId: data.id,
-      entityLabel: data.name,
+      entityId: createdCategory.id,
+      entityLabel: createdCategory.name,
       action: "room_category_created",
-      details: `Created room category ${data.name}`,
+      details: `Created room category ${createdCategory.name}`,
     });
   };
 
-  const updateRoomCategory = async (roomCategoryId: string, updatedData: Partial<Omit<RoomCategory, "id">>): Promise<void> => {
-    const previousRoomCategory = roomCategories.find((rc) => rc.id === roomCategoryId);
+  const updateRoomCategory = async (
+    roomCategoryId: string,
+    updatedData: Partial<Omit<RoomCategory, "id">>,
+    existingCategory?: RoomCategory
+  ): Promise<void> => {
+    const previousRoomCategory =
+      existingCategory ?? roomCategories.find((rc) => rc.id === roomCategoryId);
+    if (previousRoomCategory) {
+      const updatedRoomCategory: RoomCategory = {
+        ...previousRoomCategory,
+        ...updatedData,
+      };
+      const { error } = await api.updateRoomCategoryWithoutReturning(
+        roomCategoryId,
+        updatedData,
+      );
+      if (error) throw error;
+      setRoomCategories(prev =>
+        prev.map(rc => rc.id === roomCategoryId ? updatedRoomCategory : rc)
+      );
+      const changedFields = extractChangedFields(previousRoomCategory, updatedData);
+      recordActivity({
+        section: "room_categories",
+        entityType: "room_category",
+        entityId: roomCategoryId,
+        entityLabel: updatedRoomCategory.name,
+        action: "room_category_updated",
+        details: `Updated room category ${updatedRoomCategory.name}`,
+        metadata: changedFields.length ? { changedFields } : undefined,
+      });
+      return;
+    }
+
     const { data, error } = await api.updateRoomCategory(roomCategoryId, updatedData);
     if (error) throw error;
     setRoomCategories(prev => prev.map(rc => rc.id === roomCategoryId ? data : rc));
-    const changedFields = extractChangedFields(previousRoomCategory, updatedData);
+    const changedFields = extractChangedFields(undefined, updatedData);
     recordActivity({
       section: "room_categories",
       entityType: "room_category",
@@ -1078,8 +1455,12 @@ export function useAppData() {
     });
   };
 
-  const deleteRoomCategory = async (roomCategoryId: string): Promise<boolean> => {
-    const roomCategory = roomCategories.find((rc) => rc.id === roomCategoryId);
+  const deleteRoomCategory = async (
+    roomCategoryId: string,
+    existingCategory?: RoomCategory
+  ): Promise<boolean> => {
+    const roomCategory =
+      existingCategory ?? roomCategories.find((rc) => rc.id === roomCategoryId);
     const { error } = await api.deleteRoomCategory(roomCategoryId);
     if (error) { console.error(error); return false; }
     setRoomCategories(prev => prev.filter(rc => rc.id !== roomCategoryId));
@@ -1097,25 +1478,54 @@ export function useAppData() {
   };
 
   const addRatePlan = async (ratePlanData: Omit<RatePlan, "id">) => {
-    const { data, error } = await api.addRatePlan(ratePlanData);
-    if (error) throw error;
-    setRatePlans(prev => [...prev, data]);
+    const { data: ratePlanId, error } = await api.addRatePlanIdOnly(ratePlanData);
+    if (error || !ratePlanId) {
+      throw error ?? new Error("Failed to create rate plan");
+    }
+    const createdRatePlan: RatePlan = {
+      id: ratePlanId,
+      ...ratePlanData,
+    };
+    setRatePlans(prev => [...prev, createdRatePlan]);
     recordActivity({
       section: "rate_plans",
       entityType: "rate_plan",
-      entityId: data.id,
-      entityLabel: data.name,
+      entityId: createdRatePlan.id,
+      entityLabel: createdRatePlan.name,
       action: "rate_plan_created",
-      details: `Created rate plan ${data.name}`,
+      details: `Created rate plan ${createdRatePlan.name}`,
     });
   };
 
-  const updateRatePlan = async (ratePlanId: string, updatedData: Partial<Omit<RatePlan, "id">>) => {
-    const previousRatePlan = ratePlans.find((rp) => rp.id === ratePlanId);
+  const updateRatePlan = async (
+    ratePlanId: string,
+    updatedData: Partial<Omit<RatePlan, "id">>,
+    existingRatePlan?: RatePlan
+  ) => {
+    const previousRatePlan =
+      existingRatePlan ?? ratePlans.find((rp) => rp.id === ratePlanId);
+    if (previousRatePlan) {
+      const updatedRatePlan: RatePlan = { ...previousRatePlan, ...updatedData };
+      const { error } = await api.updateRatePlanWithoutReturning(ratePlanId, updatedData);
+      if (error) throw error;
+      setRatePlans(prev => prev.map(rp => rp.id === ratePlanId ? updatedRatePlan : rp));
+      const changedFields = extractChangedFields(previousRatePlan, updatedData);
+      recordActivity({
+        section: "rate_plans",
+        entityType: "rate_plan",
+        entityId: ratePlanId,
+        entityLabel: updatedRatePlan.name,
+        action: "rate_plan_updated",
+        details: `Updated rate plan ${updatedRatePlan.name}`,
+        metadata: changedFields.length ? { changedFields } : undefined,
+      });
+      return;
+    }
+
     const { data, error } = await api.updateRatePlan(ratePlanId, updatedData);
     if (error) throw error;
     setRatePlans(prev => prev.map(rp => rp.id === ratePlanId ? data : rp));
-    const changedFields = extractChangedFields(previousRatePlan, updatedData);
+    const changedFields = extractChangedFields(undefined, updatedData);
     recordActivity({
       section: "rate_plans",
       entityType: "rate_plan",
@@ -1127,8 +1537,11 @@ export function useAppData() {
     });
   };
 
-  const deleteRatePlan = async (ratePlanId: string) => {
-    const ratePlan = ratePlans.find((rp) => rp.id === ratePlanId);
+  const deleteRatePlan = async (
+    ratePlanId: string,
+    existingRatePlan?: RatePlan
+  ) => {
+    const ratePlan = existingRatePlan ?? ratePlans.find((rp) => rp.id === ratePlanId);
     const { error } = await api.deleteRatePlan(ratePlanId);
     if (error) { console.error(error); return false; }
     setRatePlans(prev => prev.filter(rp => rp.id !== ratePlanId));
@@ -1145,23 +1558,55 @@ export function useAppData() {
     return true;
   };
 
-  const addSeasonalPrice = async (data: Omit<SeasonalPrice, "id">) => {
-    const { data: created, error } = await api.addSeasonalPrice(data);
-    if (error || !created) throw error ?? new Error("Failed to create seasonal price");
+  const addSeasonalPrice = async (
+    data: Omit<SeasonalPrice, "id">,
+    roomTypeName?: string
+  ) => {
+    const { data: seasonalPriceId, error } = await api.addSeasonalPriceIdOnly(data);
+    if (error || !seasonalPriceId) {
+      throw error ?? new Error("Failed to create seasonal price");
+    }
+    const created: SeasonalPrice = {
+      id: seasonalPriceId,
+      ...data,
+    };
     setSeasonalPrices(prev => [...prev, created]);
-    const roomType = roomTypes.find(rt => rt.id === created.roomTypeId);
+    const roomTypeLabel =
+      roomTypeName ?? roomTypes.find(rt => rt.id === created.roomTypeId)?.name;
     recordActivity({
       section: "seasonal_prices",
       entityType: "seasonal_price",
       entityId: created.id,
-      entityLabel: created.name || `${roomType?.name ?? "Room"} seasonal price`,
+      entityLabel: created.name || `${roomTypeLabel ?? "Room"} seasonal price`,
       action: "seasonal_price_created",
-      details: `Created seasonal price ${created.name || ""} for ${roomType?.name ?? "room"}`,
+      details: `Created seasonal price ${created.name || ""} for ${roomTypeLabel ?? "room"}`,
     });
     return created;
   };
 
-  const updateSeasonalPrice = async (id: string, updatedData: Partial<Omit<SeasonalPrice, "id">>) => {
+  const updateSeasonalPrice = async (
+    id: string,
+    updatedData: Partial<Omit<SeasonalPrice, "id">>,
+    existingSeasonalPrice?: SeasonalPrice
+  ) => {
+    const previousSeasonalPrice =
+      existingSeasonalPrice ?? seasonalPrices.find(sp => sp.id === id);
+    if (previousSeasonalPrice) {
+      const updated: SeasonalPrice = { ...previousSeasonalPrice, ...updatedData };
+      const { error } = await api.updateSeasonalPriceWithoutReturning(id, updatedData);
+      if (error) throw error;
+      setSeasonalPrices(prev => prev.map(sp => sp.id === id ? updated : sp));
+      recordActivity({
+        section: "seasonal_prices",
+        entityType: "seasonal_price",
+        entityId: id,
+        entityLabel: updated.name || id,
+        action: "seasonal_price_updated",
+        details: `Updated seasonal price ${updated.name || ""}`,
+      });
+      return;
+    }
+
     const { data: updated, error } = await api.updateSeasonalPrice(id, updatedData);
     if (error || !updated) throw error ?? new Error("Failed to update seasonal price");
     setSeasonalPrices(prev => prev.map(sp => sp.id === id ? updated : sp));
@@ -1175,8 +1620,12 @@ export function useAppData() {
     });
   };
 
-  const deleteSeasonalPrice = async (id: string) => {
-    const existing = seasonalPrices.find(sp => sp.id === id);
+  const deleteSeasonalPrice = async (
+    id: string,
+    existingSeasonalPrice?: SeasonalPrice
+  ) => {
+    const existing =
+      existingSeasonalPrice ?? seasonalPrices.find(sp => sp.id === id);
     const { error } = await api.deleteSeasonalPrice(id);
     if (error) { console.error(error); return false; }
     setSeasonalPrices(prev => prev.filter(sp => sp.id !== id));
@@ -1194,8 +1643,14 @@ export function useAppData() {
   };
 
   const addPropertyClosure = async (data: Omit<PropertyClosure, "id">) => {
-    const { data: created, error } = await api.addPropertyClosure(data);
-    if (error || !created) throw error ?? new Error("Failed to create property closure");
+    const { data: closureId, error } = await api.addPropertyClosureIdOnly(data);
+    if (error || !closureId) {
+      throw error ?? new Error("Failed to create property closure");
+    }
+    const created: PropertyClosure = {
+      id: closureId,
+      ...data,
+    };
     setPropertyClosures(prev => [...prev, created]);
     recordActivity({
       section: "settings",
@@ -1208,7 +1663,32 @@ export function useAppData() {
     return created;
   };
 
-  const updatePropertyClosure = async (id: string, updatedData: Partial<Omit<PropertyClosure, "id">>) => {
+  const updatePropertyClosure = async (
+    id: string,
+    updatedData: Partial<Omit<PropertyClosure, "id">>,
+    existingClosure?: PropertyClosure
+  ) => {
+    const previousClosure =
+      existingClosure ?? propertyClosures.find(c => c.id === id);
+    if (previousClosure) {
+      const updatedClosure: PropertyClosure = { ...previousClosure, ...updatedData };
+      const { error } = await api.updatePropertyClosureWithoutReturning(
+        id,
+        updatedData,
+      );
+      if (error) throw error;
+      setPropertyClosures(prev => prev.map(c => c.id === id ? updatedClosure : c));
+      recordActivity({
+        section: "settings",
+        entityType: "property",
+        entityId: id,
+        entityLabel: updatedClosure.reason || `Closure ${updatedClosure.startDate} – ${updatedClosure.endDate}`,
+        action: "property_closure_updated",
+        details: `Updated blocked dates ${updatedClosure.startDate} to ${updatedClosure.endDate}`,
+      });
+      return;
+    }
+
     const { data: updated, error } = await api.updatePropertyClosure(id, updatedData);
     if (error || !updated) throw error ?? new Error("Failed to update property closure");
     setPropertyClosures(prev => prev.map(c => c.id === id ? updated : c));
@@ -1222,8 +1702,11 @@ export function useAppData() {
     });
   };
 
-  const deletePropertyClosure = async (id: string) => {
-    const existing = propertyClosures.find(c => c.id === id);
+  const deletePropertyClosure = async (
+    id: string,
+    existingClosure?: PropertyClosure
+  ) => {
+    const existing = existingClosure ?? propertyClosures.find(c => c.id === id);
     const { error } = await api.deletePropertyClosure(id);
     if (error) { console.error(error); return false; }
     setPropertyClosures(prev => prev.filter(c => c.id !== id));
@@ -1241,28 +1724,55 @@ export function useAppData() {
   };
 
   const addRole = async (roleData: Omit<Role, "id">) => {
-    const { data, error } = await api.addRole(roleData);
-    if (error) throw error;
-    const mappedRole = mapDbRole(data as Role & { hierarchy_level?: number });
-    setRoles(prev => [...prev, mappedRole]);
+    const { data: roleId, error } = await api.addRoleIdOnly(roleData);
+    if (error || !roleId) {
+      throw error ?? new Error("Failed to create role");
+    }
+    const createdRole: Role = {
+      id: roleId,
+      ...roleData,
+    };
+    setRoles(prev => [...prev, createdRole]);
     recordActivity({
       section: "roles",
       entityType: "role",
-      entityId: mappedRole.id,
-      entityLabel: mappedRole.name,
+      entityId: createdRole.id,
+      entityLabel: createdRole.name,
       action: "role_created",
-      details: `Created role ${mappedRole.name}`,
-      metadata: { permissions: mappedRole.permissions, hierarchyLevel: mappedRole.hierarchyLevel },
+      details: `Created role ${createdRole.name}`,
+      metadata: { permissions: createdRole.permissions, hierarchyLevel: createdRole.hierarchyLevel },
     });
   };
 
-  const updateRole = async (roleId: string, updatedData: Partial<Omit<Role, "id">>) => {
-    const previousRole = roles.find((role) => role.id === roleId);
+  const updateRole = async (
+    roleId: string,
+    updatedData: Partial<Omit<Role, "id">>,
+    existingRole?: Role
+  ) => {
+    const previousRole = existingRole ?? roles.find((role) => role.id === roleId);
+    if (previousRole) {
+      const updatedRole: Role = { ...previousRole, ...updatedData };
+      const { error } = await api.updateRoleWithoutReturning(roleId, updatedData);
+      if (error) throw error;
+      setRoles(prev => prev.map(r => r.id === roleId ? updatedRole : r));
+      const changedFields = extractChangedFields(previousRole, updatedData);
+      recordActivity({
+        section: "roles",
+        entityType: "role",
+        entityId: roleId,
+        entityLabel: updatedRole.name,
+        action: "role_updated",
+        details: `Updated role ${updatedRole.name}`,
+        metadata: changedFields.length ? { changedFields } : undefined,
+      });
+      return;
+    }
+
     const { data, error } = await api.updateRole(roleId, updatedData);
     if (error) throw error;
     const mappedRole = mapDbRole(data as Role & { hierarchy_level?: number });
     setRoles(prev => prev.map(r => r.id === roleId ? mappedRole : r));
-    const changedFields = extractChangedFields(previousRole, updatedData);
+    const changedFields = extractChangedFields(undefined, updatedData);
     recordActivity({
       section: "roles",
       entityType: "role",
@@ -1292,8 +1802,12 @@ export function useAppData() {
     return true;
   };
 
-  const updateUser = async (userId: string, updatedData: Partial<Omit<User, "id">>) => {
-    const targetUser = users.find((user) => user.id === userId);
+  const updateUser = async (
+    userId: string,
+    updatedData: Partial<Omit<User, "id">>,
+    existingUser?: User
+  ) => {
+    const targetUser = existingUser ?? users.find((user) => user.id === userId);
     const payload: UserProfileUpdate = {};
     if (typeof updatedData.name !== "undefined") {
       payload.name = updatedData.name;
@@ -1306,10 +1820,31 @@ export function useAppData() {
       return;
     }
 
+    if (targetUser) {
+      const updatedUser: User = { ...targetUser, ...payload };
+      const { error } = await api.updateUserProfileWithoutReturning(
+        userId,
+        payload,
+      );
+      if (error) throw error;
+      setUsers(prev => prev.map(u => u.id === userId ? updatedUser : u));
+      const changedFields = extractChangedFields(targetUser, payload);
+      recordActivity({
+        section: "users",
+        entityType: "user",
+        entityId: userId,
+        entityLabel: updatedUser.name ?? userId,
+        action: "user_updated",
+        details: `Updated user ${updatedUser.name ?? userId}`,
+        metadata: changedFields.length ? { changedFields } : undefined,
+      });
+      return;
+    }
+
     const { data, error } = await api.updateUserProfile(userId, payload);
     if (error || !data) throw error ?? new Error("Failed to update user profile");
     setUsers(prev => prev.map(u => u.id === userId ? { ...u, name: data.name, roleId: data.role_id } : u));
-    const changedFields = extractChangedFields(targetUser, payload);
+    const changedFields = extractChangedFields(undefined, payload);
     recordActivity({
       section: "users",
       entityType: "user",
@@ -1346,26 +1881,70 @@ export function useAppData() {
     else setUsers(data || []);
   }, []);
 
+  const refetchRoles = React.useCallback(async () => {
+    const { data, error } = await api.getRoles();
+    if (error) console.error("Error refetching roles:", error);
+    else setRoles((data || []).map(mapDbRole));
+  }, []);
+
+  const refetchAmenities = React.useCallback(async () => {
+    const { data, error } = await api.getAmenities();
+    if (error) console.error("Error refetching amenities:", error);
+    else setAmenities(data || []);
+  }, []);
+
   const addAmenity = async (amenityData: Omit<Amenity, "id">) => {
-    const { data, error } = await api.addAmenity(amenityData);
-    if (error) throw error;
-    setAmenities(prev => [...prev, data]);
+    const { data: amenityId, error } = await api.addAmenityIdOnly(amenityData);
+    if (error || !amenityId) {
+      throw error ?? new Error("Failed to create amenity");
+    }
+    const createdAmenity: Amenity = {
+      id: amenityId,
+      ...amenityData,
+    };
+    setAmenities(prev => [...prev, createdAmenity]);
     recordActivity({
       section: "amenities",
       entityType: "amenity",
-      entityId: data.id,
-      entityLabel: data.name,
+      entityId: createdAmenity.id,
+      entityLabel: createdAmenity.name,
       action: "amenity_created",
-      details: `Created amenity ${data.name}`,
+      details: `Created amenity ${createdAmenity.name}`,
     });
   };
 
-  const updateAmenity = async (amenityId: string, updatedData: Partial<Omit<Amenity, "id">>) => {
-    const previousAmenity = amenities.find((amenity) => amenity.id === amenityId);
+  const updateAmenity = async (
+    amenityId: string,
+    updatedData: Partial<Omit<Amenity, "id">>,
+    existingAmenity?: Amenity
+  ) => {
+    const previousAmenity =
+      existingAmenity ?? amenities.find((amenity) => amenity.id === amenityId);
+    if (previousAmenity) {
+      const updatedAmenity: Amenity = { ...previousAmenity, ...updatedData };
+      const { error } = await api.updateAmenityWithoutReturning(
+        amenityId,
+        updatedData,
+      );
+      if (error) throw error;
+      setAmenities(prev => prev.map(a => a.id === amenityId ? updatedAmenity : a));
+      const changedFields = extractChangedFields(previousAmenity, updatedData);
+      recordActivity({
+        section: "amenities",
+        entityType: "amenity",
+        entityId: amenityId,
+        entityLabel: updatedAmenity.name,
+        action: "amenity_updated",
+        details: `Updated amenity ${updatedAmenity.name}`,
+        metadata: changedFields.length ? { changedFields } : undefined,
+      });
+      return;
+    }
+
     const { data, error } = await api.updateAmenity(amenityId, updatedData);
     if (error) throw error;
     setAmenities(prev => prev.map(a => a.id === amenityId ? data : a));
-    const changedFields = extractChangedFields(previousAmenity, updatedData);
+    const changedFields = extractChangedFields(undefined, updatedData);
     recordActivity({
       section: "amenities",
       entityType: "amenity",
@@ -1397,25 +1976,58 @@ export function useAppData() {
 
   const addStickyNote = async (noteData: Omit<StickyNote, "id" | "createdAt">) => {
     if (!userId) throw new Error("User must be authenticated to add sticky notes");
-    const { data, error } = await api.addStickyNote({ ...noteData, user_id: userId });
-    if (error) throw error;
-    setStickyNotes(prev => [...prev, data]);
+    const { data: noteId, error } = await api.addStickyNoteIdOnly({ ...noteData, user_id: userId });
+    if (error || !noteId) {
+      throw error ?? new Error("Failed to create sticky note");
+    }
+    const createdNote: StickyNote = {
+      id: noteId,
+      ...noteData,
+      createdAt: new Date().toISOString(),
+    };
+    setStickyNotes(prev => [...prev, createdNote]);
     recordActivity({
       section: "sticky_notes",
       entityType: "sticky_note",
-      entityId: data.id,
-      entityLabel: data.title,
+      entityId: createdNote.id,
+      entityLabel: createdNote.title,
       action: "sticky_note_created",
-      details: `Created note ${data.title}`,
+      details: `Created note ${createdNote.title}`,
     });
   };
 
-  const updateStickyNote = async (noteId: string, updatedData: Partial<Omit<StickyNote, "id" | "createdAt">>) => {
-    const previousNote = stickyNotes.find((note) => note.id === noteId);
+  const updateStickyNote = async (
+    noteId: string,
+    updatedData: Partial<Omit<StickyNote, "id" | "createdAt">>,
+    existingNote?: StickyNote
+  ) => {
+    const previousNote =
+      existingNote ?? stickyNotes.find((note) => note.id === noteId);
+    if (previousNote) {
+      const updatedNote: StickyNote = { ...previousNote, ...updatedData };
+      const { error } = await api.updateStickyNoteWithoutReturning(
+        noteId,
+        updatedData,
+      );
+      if (error) throw error;
+      setStickyNotes(prev => prev.map(n => n.id === noteId ? updatedNote : n));
+      const changedFields = extractChangedFields(previousNote, updatedData);
+      recordActivity({
+        section: "sticky_notes",
+        entityType: "sticky_note",
+        entityId: noteId,
+        entityLabel: updatedNote.title,
+        action: "sticky_note_updated",
+        details: `Updated note ${updatedNote.title}`,
+        metadata: changedFields.length ? { changedFields } : undefined,
+      });
+      return;
+    }
+
     const { data, error } = await api.updateStickyNote(noteId, updatedData);
     if (error) throw error;
     setStickyNotes(prev => prev.map(n => n.id === noteId ? data : n));
-    const changedFields = extractChangedFields(previousNote, updatedData);
+    const changedFields = extractChangedFields(undefined, updatedData);
     recordActivity({
       section: "sticky_notes",
       entityType: "sticky_note",
@@ -1504,6 +2116,9 @@ export function useAppData() {
     isSessionLoading,
     lookupStatus,
     activeBookingReservations,
+    activeBookingRooms,
+    activeBookingRoomTypes,
+    activeBookingRatePlans,
     reservationsTotalCount,
     property,
     bookings,
@@ -1528,6 +2143,8 @@ export function useAppData() {
     addReservation,
     addRoomsToBooking,
     refetchUsers,
+    refetchRoles,
+    refetchAmenities,
     updateGuest,
     updateReservation,
     updateReservationStatus,

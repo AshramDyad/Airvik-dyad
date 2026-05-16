@@ -20,7 +20,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import type { ReservationWithDetails } from "@/app/admin/reservations/components/columns";
-import { useDataContext } from "@/context/data-context";
+import type { RatePlan } from "@/data/types";
 import {
   DEFAULT_BOOKING_ID_FALLBACK,
   formatBookingCode,
@@ -28,10 +28,10 @@ import {
 
 interface StayDetailsCardProps {
   reservation: ReservationWithDetails;
+  ratePlans: RatePlan[];
 }
 
-export function StayDetailsCard({ reservation }: StayDetailsCardProps) {
-  const { ratePlans } = useDataContext();
+export function StayDetailsCard({ reservation, ratePlans }: StayDetailsCardProps) {
   const ratePlan = reservation.ratePlanId
     ? ratePlans.find((rp) => rp.id === reservation.ratePlanId)
     : null;

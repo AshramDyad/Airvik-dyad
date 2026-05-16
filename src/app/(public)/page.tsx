@@ -1,17 +1,7 @@
-"use client";
-
 import Image from "next/image";
-import { motion, type Variants } from "framer-motion";
-import { MessageSquareHeart, HeartHandshake } from "lucide-react";
 import { FeatureCard } from "@/components/marketing/home/FeatureCard";
-import { WelcomeSection } from "@/components/marketing/home/WelcomeSection";
-import { VideoSection } from "@/components/marketing/home/VideoSection";
-import { RoomsShowcaseSection } from "@/components/marketing/home/RoomsShowcaseSection";
-import { ReviewSection } from "@/components/marketing/home/ReviewSection";
-import { GallerySection } from "@/components/marketing/home/GallerySection";
-import { SupportActionsSection, type SupportAction } from "@/components/marketing/home/SupportActionsSection";
 import { Marquee } from "@/components/marketing/layout/Marquee";
-import { EventBannerModal } from "@/components/marketing/home/EventBannerModal";
+import { HomeDeferredSectionsLoader } from "./home-deferred-sections-loader";
 
 type Feature = {
   title: string;
@@ -50,27 +40,6 @@ const features: Feature[] = [
   },
 ];
 
-const supportActions: SupportAction[] = [
-  {
-    eyebrow: "FEEDBACK",
-    title: "Share your peaceful reflections",
-    description:
-      "Tell us your gentle thoughts what touched your heart, what felt special, or where we can grow.Your reflections help us serve every seeker with more care and devotion.",
-    href: "/feedback",
-    ctaLabel: "Go to feedback",
-    icon: MessageSquareHeart,
-  },
-  {
-    eyebrow: "DONATE",
-    title: "Support daily seva initiatives",
-    description:
-      "Your contribution helps us continue essential seva daily meals, wellness stays, spiritual gatherings, and ongoing cleanliness of the ashram surroundings.",
-    href: "/donate",
-    ctaLabel: "Visit donate page",
-    icon: HeartHandshake,
-  },
-];
-
 /**
  * Root page component that renders the Sahajanand Wellness home page layout.
  *
@@ -81,32 +50,9 @@ const supportActions: SupportAction[] = [
  * @returns The JSX element representing the complete home page.
  */
 export default function HomePage() {
-  const containerVariants: Variants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.2,
-      },
-    },
-  };
-
-  const itemVariants: Variants = {
-    hidden: { y: 20, opacity: 0 },
-    visible: {
-      y: 0,
-      opacity: 1,
-      transition: {
-        duration: 0.6,
-        ease: [0.16, 1, 0.3, 1],
-      },
-    },
-  };
-
   const newLocal = "relative mb-10 md:mb-20";
   return (
     <div className="bg-background text-foreground">
-      <EventBannerModal />
       {/* Hero Section */}
       <section className="relative w-full h-[70vh] min-h-[500px]">
         <Image
@@ -116,19 +62,12 @@ export default function HomePage() {
           style={{ objectFit: "cover" }}
           quality={100}
           priority
+          sizes="100vw"
         />
         <div className="absolute inset-0 bg-black/40" />
         <div className="relative z-10 flex flex-col items-center justify-center h-full text-center text-white">
-          <motion.div
-            className="max-w-4xl px-4"
-            initial="hidden" 
-            animate="visible"
-            variants={containerVariants}
-          >
-            <motion.div
-              variants={itemVariants}
-              className="flex justify-center"
-            >
+          <div className="max-w-4xl px-4">
+            <div className="flex justify-center">
               <Image
                 src="/Swami-narayan.png"
                 alt="Sahajanand Wellness"
@@ -137,43 +76,27 @@ export default function HomePage() {
                 quality={100}
                 className="size-32 sm:size-52 object-contain"
               />
-            </motion.div>
-            <motion.p
-              variants={itemVariants}
-              className="text-sm sm:text-md font-semibold tracking-widest text-primary-foreground/80 mb-2 sm:mb-4 uppercase"
-            >
+            </div>
+            <p className="text-sm sm:text-md font-semibold tracking-widest text-primary-foreground/80 mb-2 sm:mb-4 uppercase">
               Welcome To
-            </motion.p>
-            <motion.h1
-              variants={itemVariants}
-              className="text-4xl sm:text-5xl lg:text-7xl font-bold font-serif leading-tight"
-            >
+            </p>
+            <h1 className="text-4xl sm:text-5xl lg:text-7xl font-bold font-serif leading-tight">
               Sahajanand Wellness
-            </motion.h1>
-            <motion.p
-              variants={itemVariants}
-              className="mt-3 text-base sm:text-lg font-medium tracking-wider text-primary-foreground/90 uppercase"
-            >
+            </h1>
+            <p className="mt-3 text-base sm:text-lg font-medium tracking-wider text-primary-foreground/90 uppercase">
               WELLNESS - THE BEST GIFT TO YOURSELF
-            </motion.p>
-          </motion.div>
+            </p>
+          </div>
         </div>
       </section>
 
       {/* Features Section */}
       <section className={newLocal}>
         <div className="container mx-auto px-4 -mt-16">
-          <motion.div
-            className="grid grid-cols-1 lg:grid-cols-3 xl:gap-8 gap-6 items-center"
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, amount: 0.2 }}
-            variants={containerVariants}
-          >
+          <div className="grid grid-cols-1 lg:grid-cols-3 xl:gap-8 gap-6 items-center">
             {features.map((feature) => (
-              <motion.div
+              <div
                 key={feature.title}
-                variants={itemVariants}
                 className={feature.desktopPositionClass}
               >
                 <FeatureCard
@@ -186,30 +109,13 @@ export default function HomePage() {
                     feature.highlighted ? "" : "lg:h-[400px]"
                   }`}
                 />
-              </motion.div>
+              </div>
             ))}
-          </motion.div>
+          </div>
         </div>
       </section>
 
-      {/* Welcome Section */}
-
-      <WelcomeSection />
-
-      {/* Gallery Section */}
-      <GallerySection />
-
-      {/* Video Section */}
-      <VideoSection />
-      <RoomsShowcaseSection />
-
-      {/* Review Section */}
-      <ReviewSection />
-
-      {/* Support Actions Section */}
-      <SupportActionsSection actions={supportActions} />
-
-
+      <HomeDeferredSectionsLoader />
       <Marquee />
     </div>
   );

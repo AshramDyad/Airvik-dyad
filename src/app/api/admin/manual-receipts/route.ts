@@ -4,6 +4,11 @@ import { z } from "zod";
 import type { ManualReceipt } from "@/data/types";
 import { createServerSupabaseClient } from "@/integrations/supabase/server";
 import { requireFeature, HttpError } from "@/lib/server/auth";
+import { MANUAL_RECEIPT_SELECT_COLUMNS } from "./columns";
+
+const cacheHeaders = {
+  "Cache-Control": "private, no-store",
+};
 
 const PAYMENT_METHODS = [
   "Cash",
@@ -109,31 +114,36 @@ export async function GET(request: Request) {
     const supabase = createServerSupabaseClient();
     const { data, error } = await supabase
       .from("manual_receipts")
-      .select("*")
+      .select(MANUAL_RECEIPT_SELECT_COLUMNS)
       .order("created_at", { ascending: false });
 
     if (error) {
       console.error("Failed to fetch manual receipts", error);
       return NextResponse.json(
         { message: "Unable to load receipts." },
-        { status: 500 },
+        { status: 500, headers: cacheHeaders },
       );
     }
 
-    return NextResponse.json({
-      data: (data ?? []).map((row) => mapRow(row as unknown as DbManualReceipt)),
-    });
+    return NextResponse.json(
+      {
+        data: (data ?? []).map((row) =>
+          mapRow(row as unknown as DbManualReceipt),
+        ),
+      },
+      { headers: cacheHeaders },
+    );
   } catch (error) {
     if (error instanceof HttpError) {
       return NextResponse.json(
         { message: error.message },
-        { status: error.status },
+        { status: error.status, headers: cacheHeaders },
       );
     }
     console.error("Unexpected manual receipts fetch error", error);
     return NextResponse.json(
       { message: "Unexpected error while loading receipts." },
-      { status: 500 },
+      { status: 500, headers: cacheHeaders },
     );
   }
 }
@@ -183,38 +193,38 @@ export async function POST(request: Request) {
         donation_in: parsed.donationIn || null,
         payment_mode: parsed.paymentMode || null,
       })
-      .select("*")
+      .select(MANUAL_RECEIPT_SELECT_COLUMNS)
       .single();
 
     if (error) {
       console.error("Failed to insert manual receipt", error);
       return NextResponse.json(
         { message: "Unable to save receipt." },
-        { status: 500 },
+        { status: 500, headers: cacheHeaders },
       );
     }
 
     return NextResponse.json(
       { data: mapRow(data as unknown as DbManualReceipt) },
-      { status: 201 },
+      { status: 201, headers: cacheHeaders },
     );
   } catch (error) {
     if (error instanceof HttpError) {
       return NextResponse.json(
         { message: error.message },
-        { status: error.status },
+        { status: error.status, headers: cacheHeaders },
       );
     }
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { message: "Invalid data", issues: error.flatten().fieldErrors },
-        { status: 400 },
+        { status: 400, headers: cacheHeaders },
       );
     }
     console.error("Unexpected manual receipt create error", error);
     return NextResponse.json(
       { message: "Unexpected error while saving receipt." },
-      { status: 500 },
+      { status: 500, headers: cacheHeaders },
     );
   }
 }

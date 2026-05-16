@@ -1,14 +1,5 @@
-"use client";
-
-import { AvailabilityCalendar } from "@/components/shared/availability-calendar";
-import { PermissionGate } from "@/components/admin/permission-gate";
+import { CalendarPanelLoader } from "./calendar-panel-loader";
 
 export default function CalendarPage() {
-  return (
-    <PermissionGate feature="calendar">
-      <div>
-        <AvailabilityCalendar />
-      </div>
-    </PermissionGate>
-  );
+  return <CalendarPanelLoader />;
 }

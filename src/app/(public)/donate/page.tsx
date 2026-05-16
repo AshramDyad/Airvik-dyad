@@ -1,8 +1,8 @@
 import { DonationHero } from "@/components/donations/donation-hero";
 import { ImpactStatsGrid } from "@/components/donations/impact-stats-grid";
-import { DonationForm } from "@/components/donations/donation-form";
+import { DonationFormLoader } from "@/components/donations/donation-form-loader";
 import { TrustSignals } from "@/components/donations/trust-signals";
-import { DonationFaqAccordion } from "@/components/donations/faq-accordion";
+import { DonationFaqAccordionLoader } from "@/components/donations/faq-accordion-loader";
 import { getDonationStats } from "@/lib/api/donations";
 import { getPropertyCurrency } from "@/lib/server/property";
 
@@ -11,6 +11,8 @@ export const metadata = {
   description: "Support Sahajanand Wellness with a tax-deductible contribution and keep seva alive in Rishikesh.",
 };
 
+export const revalidate = 300;
+
 export default async function DonatePage() {
   const [stats, currency] = await Promise.all([getDonationStats(), getPropertyCurrency()]);
 
@@ -18,9 +20,9 @@ export default async function DonatePage() {
     <div className="space-y-0">
       <DonationHero />
       <ImpactStatsGrid stats={stats} currency={currency} />
-      <DonationForm currency={currency} />
+      <DonationFormLoader currency={currency} />
       <TrustSignals />
-      <DonationFaqAccordion />
+      <DonationFaqAccordionLoader />
     </div>
   );
 }

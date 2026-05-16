@@ -1,9 +1,15 @@
 import { Post } from "@/data/types";
+import { createClient } from "@supabase/supabase-js";
+import { unstable_cache } from "next/cache";
 import {
+  DB_POST_WITH_CATEGORIES_SELECT_COLUMNS,
   DbPostWithCategories,
   fromDbPostWithCategories,
 } from "@/lib/api/blog-mappers";
 import { getServerSupabaseClient } from "@/lib/server/supabase";
+
+export const PUBLIC_POSTS_CACHE_TAG = "public-posts";
+export const PUBLIC_POSTS_REVALIDATE_SECONDS = 3600;
 
 type PostSearchParams = {
   month?: string;
@@ -22,9 +28,26 @@ type PostCategoryRow = {
 };
 
 type ServerSupabaseClient = Awaited<ReturnType<typeof getServerSupabaseClient>>;
+type PostsSupabaseClient = Pick<ServerSupabaseClient, "from">;
+
+const createPublicReadClient = (): PostsSupabaseClient | null => {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return null;
+  }
+
+  return createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
+};
 
 const attachAuthors = async (
-  supabase: ServerSupabaseClient,
+  supabase: PostsSupabaseClient,
   posts: Post[]
 ): Promise<Post[]> => {
   const uniqueAuthorIds = Array.from(
@@ -86,13 +109,13 @@ const getMonthRange = (month?: string) => {
 };
 
 const buildPostsQuery = (
-  supabase: ServerSupabaseClient,
+  supabase: PostsSupabaseClient,
   searchParams?: PostSearchParams,
   selectOptions?: { head?: boolean; count?: "exact" | "planned" | "estimated" }
 ) => {
   let query = supabase
     .from("posts")
-    .select("*, categories:post_categories(categories(*))", selectOptions)
+    .select(DB_POST_WITH_CATEGORIES_SELECT_COLUMNS, selectOptions)
     .order("created_at", { ascending: false });
 
   if (searchParams?.status) {
@@ -112,7 +135,7 @@ const buildPostsQuery = (
 };
 
 const getPostIdsForCategory = async (
-  supabase: ServerSupabaseClient,
+  supabase: PostsSupabaseClient,
   categoryId?: string
 ): Promise<string[] | null> => {
   if (!categoryId) {
@@ -152,16 +175,45 @@ export const getPosts = async (
     throw error;
   }
 
-  const typedPosts = (data ?? []) as DbPostWithCategories[];
+  const typedPosts = (data ?? []) as unknown as DbPostWithCategories[];
   const mappedPosts = typedPosts.map(fromDbPostWithCategories);
   return attachAuthors(supabase, mappedPosts);
 };
+
+async function getPublishedPostsUncached(): Promise<Post[]> {
+  const supabase = createPublicReadClient();
+  if (!supabase) {
+    return [];
+  }
+
+  const { data, error } = await buildPostsQuery(supabase, {
+    status: "published",
+  });
+
+  if (error) {
+    console.error("Error fetching public published posts", error);
+    return [];
+  }
+
+  const typedPosts = (data ?? []) as unknown as DbPostWithCategories[];
+  const mappedPosts = typedPosts.map(fromDbPostWithCategories);
+  return attachAuthors(supabase, mappedPosts);
+}
+
+export const getPublishedPosts = unstable_cache(
+  getPublishedPostsUncached,
+  ["public-published-posts"],
+  {
+    revalidate: PUBLIC_POSTS_REVALIDATE_SECONDS,
+    tags: [PUBLIC_POSTS_CACHE_TAG],
+  }
+);
 
 export const getPostById = async (id: string): Promise<Post> => {
   const supabase = await getServerSupabaseClient();
   const { data, error } = await supabase
     .from("posts")
-    .select("*, categories:post_categories(categories(*))")
+    .select(DB_POST_WITH_CATEGORIES_SELECT_COLUMNS)
     .eq("id", id)
     .single();
 
@@ -169,7 +221,7 @@ export const getPostById = async (id: string): Promise<Post> => {
     throw error;
   }
 
-  const post = fromDbPostWithCategories(data as DbPostWithCategories);
+  const post = fromDbPostWithCategories(data as unknown as DbPostWithCategories);
   const [withAuthor] = await attachAuthors(supabase, [post]);
   return withAuthor ?? post;
 };
@@ -178,7 +230,7 @@ export const getPostBySlug = async (slug: string): Promise<Post | null> => {
   const supabase = await getServerSupabaseClient();
   const { data, error } = await supabase
     .from("posts")
-    .select("*, categories:post_categories(categories(*))")
+    .select(DB_POST_WITH_CATEGORIES_SELECT_COLUMNS)
     .eq("slug", slug)
     .eq("status", "published")
     .maybeSingle();
@@ -191,10 +243,48 @@ export const getPostBySlug = async (slug: string): Promise<Post | null> => {
     return null;
   }
 
-  const post = fromDbPostWithCategories(data as DbPostWithCategories);
+  const post = fromDbPostWithCategories(data as unknown as DbPostWithCategories);
   const [withAuthor] = await attachAuthors(supabase, [post]);
   return withAuthor ?? post;
 };
+
+async function getPublishedPostBySlugUncached(
+  slug: string
+): Promise<Post | null> {
+  const supabase = createPublicReadClient();
+  if (!supabase) {
+    return null;
+  }
+
+  const { data, error } = await supabase
+    .from("posts")
+    .select(DB_POST_WITH_CATEGORIES_SELECT_COLUMNS)
+    .eq("slug", slug)
+    .eq("status", "published")
+    .maybeSingle();
+
+  if (error) {
+    console.error("Error fetching public post by slug", error);
+    return null;
+  }
+
+  if (!data) {
+    return null;
+  }
+
+  const post = fromDbPostWithCategories(data as unknown as DbPostWithCategories);
+  const [withAuthor] = await attachAuthors(supabase, [post]);
+  return withAuthor ?? post;
+}
+
+export const getPublishedPostBySlug = unstable_cache(
+  getPublishedPostBySlugUncached,
+  ["public-published-post-by-slug"],
+  {
+    revalidate: PUBLIC_POSTS_REVALIDATE_SECONDS,
+    tags: [PUBLIC_POSTS_CACHE_TAG],
+  }
+);
 
 export const countPosts = async (
   searchParams?: PostSearchParams

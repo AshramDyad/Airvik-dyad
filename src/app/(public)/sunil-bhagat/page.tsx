@@ -1,13 +1,13 @@
-"use client";
-
-import { SunilBhagatUnifiedSection } from "@/components/marketing/about/sunil-bhagat-unified-section";
-import { SwamiSpeechSection } from "@/components/marketing/about/swami-speech-section";
+import { SunilBhagatIntro } from "./sunil-bhagat-intro";
+import { SunilBhagatProfileLoader } from "./sunil-bhagat-profile-loader";
+import { SunilBhagatSectionsLoader } from "./sunil-bhagat-sections-loader";
 
 export default function SunilBhagatPage() {
   return (
     <div className="bg-background text-foreground">
-      <SunilBhagatUnifiedSection />
-      <SwamiSpeechSection />
+      <SunilBhagatIntro />
+      <SunilBhagatProfileLoader />
+      <SunilBhagatSectionsLoader />
     </div>
   );
 }

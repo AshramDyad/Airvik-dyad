@@ -1,8 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { donationFormSchema } from "@/lib/validators/donation";
-import { createDonationRecord, updateDonationRecord } from "@/lib/api/donations";
+import {
+  createDonationRecord,
+  updateDonationRecordWithoutReturning,
+} from "@/lib/api/donations";
 import { getRazorpayClient, isRazorpayMockMode } from "@/lib/razorpay";
 import type { DonationReceipt } from "@/lib/donations/receipt-storage";
+
+const cacheHeaders = {
+  "Cache-Control": "private, no-store",
+};
+const noStoreJson = (body: unknown, init?: ResponseInit) =>
+  NextResponse.json(body, { ...init, headers: cacheHeaders });
 
 function buildReceipt(params: {
   donationId: string;
@@ -24,6 +33,20 @@ function buildReceipt(params: {
     message: params.donation.message,
     paymentId: params.paymentId,
     timestamp: new Date().toISOString(),
+  };
+}
+
+function toCheckoutOrder(order: {
+  id: string;
+  amount: number;
+  currency: string;
+  status?: string;
+}) {
+  return {
+    id: order.id,
+    amount: order.amount,
+    currency: order.currency,
+    status: order.status,
   };
 }
 
@@ -64,7 +87,7 @@ export async function POST(request: NextRequest) {
     if (mockMode) {
       const mockOrderId = `order_mock_${donation.id}`;
       const mockPaymentId = `pay_mock_${Math.random().toString(36).slice(2, 10)}`;
-      await updateDonationRecord(donation.id, {
+      await updateDonationRecordWithoutReturning(donation.id, {
         razorpayOrderId: mockOrderId,
         razorpayPaymentId: mockPaymentId,
         paymentStatus: "paid",
@@ -82,7 +105,7 @@ export async function POST(request: NextRequest) {
         paymentId: mockPaymentId,
       });
 
-      return NextResponse.json({
+      return noStoreJson({
         mock: true,
         donation: {
           id: donation.id,
@@ -110,13 +133,13 @@ export async function POST(request: NextRequest) {
       payment_capture: 1,
     });
 
-    await updateDonationRecord(donation.id, {
+    await updateDonationRecordWithoutReturning(donation.id, {
       razorpayOrderId: order.id,
     });
 
-    return NextResponse.json({
+    return noStoreJson({
       keyId: publicKey,
-      order,
+      order: toCheckoutOrder(order),
       donation: {
         id: donation.id,
         donorName: donation.donorName,
@@ -130,7 +153,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Failed to create Razorpay order", error);
-    return NextResponse.json(
+    return noStoreJson(
       { message: error instanceof Error ? error.message : "Unable to create order" },
       { status: 400 },
     );

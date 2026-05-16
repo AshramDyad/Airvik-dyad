@@ -13,7 +13,11 @@ import { AmenitiesDataTable } from "./amenities-data-table";
 import { columns } from "./amenities-columns";
 
 export function AmenitiesManagement() {
-  const { amenities } = useDataContext();
+  const { amenities, refetchAmenities } = useDataContext();
+
+  React.useEffect(() => {
+    void refetchAmenities();
+  }, [refetchAmenities]);
 
   return (
     <Card>

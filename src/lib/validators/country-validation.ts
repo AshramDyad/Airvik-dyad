@@ -1,5 +1,3 @@
-import { isValidCountryCode } from '../countries';
-
 // Countries without postal codes
 const NO_POSTAL_CODES: string[] = [
   'AE', 'AG', 'AW', 'BS', 'BQ', 'CV', 'CI', 'CK', 'CM', 'CU', 'DJ', 'DM', 'ER',
@@ -106,5 +104,5 @@ export function validatePincodeByCountry(pincode: string, countryCode: string): 
 }
 
 export function validateCountryCode(countryCode: string): boolean {
-  return isValidCountryCode(countryCode);
+  return /^[A-Z]{2}$/i.test(countryCode.trim());
 }

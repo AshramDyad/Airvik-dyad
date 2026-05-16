@@ -91,7 +91,7 @@ export function UserFormDialog({
       }
 
       if (isEditing && user) {
-        updateUser(user.id, { name: values.name, roleId: values.roleId });
+        await updateUser(user.id, { name: values.name, roleId: values.roleId }, user);
         toast.success("User updated successfully!");
         await refetchUsers();
         setOpen(false);

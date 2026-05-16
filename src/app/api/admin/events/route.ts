@@ -1,4 +1,5 @@
 import { createSessionClient } from "@/integrations/supabase/server";
+import { EVENT_SELECT_COLUMNS } from "@/lib/server/cache-config";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -11,6 +12,13 @@ const eventSchema = z.object({
   endsAt: z.string().optional(),
 });
 
+const cacheHeaders = {
+  "Cache-Control": "private, no-store",
+};
+
+const noStoreJson = (body: unknown, init?: ResponseInit) =>
+  NextResponse.json(body, { ...init, headers: cacheHeaders });
+
 export async function POST(request: Request) {
   try {
     // 1. Create a cookie-aware Supabase client
@@ -19,7 +27,7 @@ export async function POST(request: Request) {
     // 2. Check authentication (this is critical for RLS and updated_by)
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
-      return NextResponse.json(
+      return noStoreJson(
         { error: "Access denied: Unauthenticated user" },
         { status: 401 }
       );
@@ -44,11 +52,11 @@ export async function POST(request: Request) {
     const { data, error } = await supabase
       .from("event_banners")
       .insert(dbPayload)
-      .select()
+      .select(EVENT_SELECT_COLUMNS)
       .single();
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return noStoreJson({ error: error.message }, { status: 500 });
     }
 
     // 6. Handle active status toggle if requested (using RPC)
@@ -64,12 +72,12 @@ export async function POST(request: Request) {
       }
     }
 
-    return NextResponse.json({ data }, { status: 201 });
+    return noStoreJson({ data }, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: error.errors }, { status: 400 });
+      return noStoreJson({ error: error.errors }, { status: 400 });
     }
-    return NextResponse.json(
+    return noStoreJson(
       { error: error instanceof Error ? error.message : "Internal Server Error" },
       { status: 500 }
     );

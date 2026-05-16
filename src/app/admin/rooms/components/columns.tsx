@@ -15,15 +15,19 @@ import {
 import { Badge } from "@/components/ui/badge"
 import type { Room } from "@/data/types"
 import { RoomFormDialog } from "./room-form-dialog"
-import { useDataContext } from "@/context/data-context"
+import type { AdminRoomTypeSummary } from "./types"
 
-function RoomImageCell({ room }: { room: Room }) {
-  const { roomTypes } = useDataContext()
+function RoomImageCell({
+  room,
+  roomTypes,
+}: {
+  room: Room
+  roomTypes: AdminRoomTypeSummary[]
+}) {
   const roomType = roomTypes.find((rt) => rt.id === room.roomTypeId)
   const imageUrl =
     room.photos?.[0] ||
     roomType?.mainPhotoUrl ||
-    roomType?.photos?.[0] ||
     "/room-placeholder.svg"
 
   return (
@@ -40,8 +44,13 @@ function RoomImageCell({ room }: { room: Room }) {
   )
 }
 
-function RoomTypeCell({ roomTypeId }: { roomTypeId: string }) {
-  const { roomTypes } = useDataContext()
+function RoomTypeCell({
+  roomTypeId,
+  roomTypes,
+}: {
+  roomTypeId: string
+  roomTypes: AdminRoomTypeSummary[]
+}) {
   const roomType = roomTypes.find((rt) => rt.id === roomTypeId)
 
   return <span>{roomType?.name || "Unknown"}</span>
@@ -51,7 +60,12 @@ export const columns: ColumnDef<Room>[] = [
   {
     id: "image",
     header: "Image",
-    cell: ({ row }) => <RoomImageCell room={row.original} />,
+    cell: ({ row, table }) => (
+      <RoomImageCell
+        room={row.original}
+        roomTypes={table.options.meta?.roomTypes ?? []}
+      />
+    ),
   },
   {
     accessorKey: "roomNumber",
@@ -60,9 +74,14 @@ export const columns: ColumnDef<Room>[] = [
   {
     accessorKey: "roomTypeId",
     header: "Room Type",
-    cell: ({ row }) => {
+    cell: ({ row, table }) => {
       const roomTypeId = row.getValue("roomTypeId") as string
-      return <RoomTypeCell roomTypeId={roomTypeId} />
+      return (
+        <RoomTypeCell
+          roomTypeId={roomTypeId}
+          roomTypes={table.options.meta?.roomTypes ?? []}
+        />
+      )
     },
   },
   {
@@ -90,7 +109,12 @@ export const columns: ColumnDef<Room>[] = [
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>Actions</DropdownMenuLabel>
             {hasPermission?.("update:room") && (
-                <RoomFormDialog room={room}>
+                <RoomFormDialog
+                  room={room}
+                  rooms={table.options.data as Room[]}
+                  roomTypes={table.options.meta?.roomTypes ?? []}
+                  onSaved={() => table.options.meta?.refreshData?.()}
+                >
                     <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
                         Edit
                     </DropdownMenuItem>

@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { HttpError, requireFeature } from "@/lib/server/auth";
 import { createServerSupabaseClient } from "@/integrations/supabase/server";
 import {
+  BOOKINGS_SUMMARY_SELECT_COLUMNS,
   DbBookingSummaryRow,
   mapBookingSummaryRow,
 } from "@/server/reservations/cache";
@@ -31,7 +32,7 @@ async function fetchAll(
   while (offset < HARD_CAP) {
     const { data, error } = await supabase
       .from("bookings_summary_view")
-      .select("*")
+      .select(BOOKINGS_SUMMARY_SELECT_COLUMNS)
       .eq(column, value)
       .order("booking_id", { ascending: true })
       .range(offset, offset + PAGE - 1);

@@ -1,9 +1,8 @@
-import Link from "next/link";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { requirePageFeature } from "@/lib/server/page-auth";
 import { getAllEvents } from "@/lib/server/events";
-import { EventsTable } from "@/components/admin/events/events-table";
+import { EventsTableLoader } from "@/components/admin/events/events-table-loader";
 
 export default async function EventsPage() {
   await requirePageFeature("eventBanner");
@@ -19,14 +18,14 @@ export default async function EventsPage() {
             </p>
         </div>
         <Button asChild>
-          <Link href="/admin/events/create">
+          <a href="/admin/events/create">
             <Plus className="mr-2 h-4 w-4" />
             Add Event
-          </Link>
+          </a>
         </Button>
       </div>
 
-      <EventsTable events={events} />
+      <EventsTableLoader events={events} />
     </div>
   );
 }

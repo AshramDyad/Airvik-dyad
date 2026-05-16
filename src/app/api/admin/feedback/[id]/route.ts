@@ -6,6 +6,7 @@ import type { Feedback } from "@/data/types";
 import { getServerSupabaseClient } from "@/lib/server/supabase";
 import { HttpError, requireFeature } from "@/lib/server/auth";
 import { logAdminActivityFromProfile } from "@/lib/activity/server";
+import { ADMIN_FEEDBACK_SELECT_COLUMNS } from "../columns";
 
 const feedbackStatusValues = ["new", "in_review", "resolved"] as const;
 
@@ -105,7 +106,7 @@ export async function PATCH(
       .from("feedback")
       .update(updates)
       .eq("id", id)
-      .select("*")
+      .select(ADMIN_FEEDBACK_SELECT_COLUMNS)
       .maybeSingle();
 
     if (error) {

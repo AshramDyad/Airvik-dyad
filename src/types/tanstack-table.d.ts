@@ -10,6 +10,10 @@ declare module '@tanstack/react-table' {
       checkOutReservation?: (reservation: TData) => void
       openCancelDialog?: (reservation: TData) => void
       openDeleteDialog?: (item: TData) => void
+      onItemSaved?: (item: TData) => void
+      refreshData?: () => void | Promise<void>
+      amenities?: Array<{ id: string; name: string }>
+      roomTypes?: Array<{ id: string; name: string; mainPhotoUrl?: string }>
       hasPermission?: (permission: Permission) => boolean
     }
 }

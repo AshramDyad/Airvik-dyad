@@ -1,5 +1,5 @@
 import { requirePageFeature } from "@/lib/server/page-auth";
-import { EventForm } from "@/components/admin/events/event-form";
+import { EventFormLoader } from "@/components/admin/events/event-form-loader";
 
 export default async function CreateEventPage() {
   await requirePageFeature("eventBanner");
@@ -12,7 +12,7 @@ export default async function CreateEventPage() {
           Add a new event. You can choose to make it the active homepage banner immediately.
         </p>
       </div>
-      <EventForm />
+      <EventFormLoader />
     </div>
   );
 }

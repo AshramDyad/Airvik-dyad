@@ -36,11 +36,13 @@ const roomCategorySchema = z.object({
 
 interface RoomCategoryFormDialogProps {
   roomCategory?: RoomCategory;
+  onSaved?: () => void | Promise<void>;
   children: React.ReactNode;
 }
 
 export function RoomCategoryFormDialog({
   roomCategory,
+  onSaved,
   children,
 }: RoomCategoryFormDialogProps) {
   const [open, setOpen] = React.useState(false);
@@ -63,7 +65,7 @@ export function RoomCategoryFormDialog({
 
     try {
       if (isEditing && roomCategory) {
-        await updateRoomCategory(roomCategory.id, processedValues);
+        await updateRoomCategory(roomCategory.id, processedValues, roomCategory);
       } else {
         await addRoomCategory(processedValues);
       }
@@ -71,6 +73,7 @@ export function RoomCategoryFormDialog({
       toast.success(
         `Room category ${isEditing ? "updated" : "created"} successfully!`
       );
+      await onSaved?.();
       form.reset();
       setOpen(false);
     } catch (error) {

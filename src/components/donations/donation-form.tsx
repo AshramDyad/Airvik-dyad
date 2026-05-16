@@ -111,6 +111,7 @@ export function DonationForm({ currency }: DonationFormProps) {
       const response = await fetch("/api/donations/create-order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        cache: "no-store",
         body: JSON.stringify(values),
       });
 
@@ -159,6 +160,7 @@ export function DonationForm({ currency }: DonationFormProps) {
             const verifyRes = await fetch("/api/donations/verify-payment", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
+              cache: "no-store",
               body: JSON.stringify({
                 donationId: data.donation.id,
                 razorpay_order_id: response.razorpay_order_id,

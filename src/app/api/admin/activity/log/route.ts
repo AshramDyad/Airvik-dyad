@@ -16,6 +16,13 @@ const BodySchema = z.object({
   metadata: z.record(z.any()).optional(),
 });
 
+const cacheHeaders = {
+  "Cache-Control": "private, no-store",
+};
+
+const noStoreJson = (body: unknown, init?: ResponseInit) =>
+  NextResponse.json(body, { ...init, headers: cacheHeaders });
+
 export async function POST(request: Request) {
   try {
     const profile = await requireAdminProfile(request);
@@ -40,19 +47,19 @@ export async function POST(request: Request) {
       entry,
     });
 
-    return NextResponse.json({ success: true });
+    return noStoreJson({ success: true });
   } catch (error) {
     if (error instanceof HttpError) {
-      return NextResponse.json({ message: error.message }, { status: error.status });
+      return noStoreJson({ message: error.message }, { status: error.status });
     }
     if (error instanceof z.ZodError) {
-      return NextResponse.json(
+      return noStoreJson(
         { message: "Invalid activity payload", issues: error.flatten().fieldErrors },
         { status: 400 }
       );
     }
     console.error("Failed to log admin activity via route", error);
-    return NextResponse.json(
+    return noStoreJson(
       { message: "Failed to log admin activity" },
       { status: 500 }
     );

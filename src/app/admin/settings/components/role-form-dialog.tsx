@@ -117,7 +117,7 @@ export function RoleFormDialog({
     }
 
     if (isEditing && role) {
-      updateRole(role.id, roleData);
+      updateRole(role.id, roleData, role);
     } else {
       addRole(roleData);
     }

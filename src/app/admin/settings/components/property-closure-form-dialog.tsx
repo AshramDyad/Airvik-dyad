@@ -32,7 +32,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { PropertyClosure } from "@/data/types";
+import type { PropertyClosure, RoomType } from "@/data/types";
 import { useDataContext } from "@/context/data-context";
 
 const closureSchema = z
@@ -48,19 +48,25 @@ const closureSchema = z
   });
 
 type ClosureFormValues = z.infer<typeof closureSchema>;
+type RoomTypeOption = Pick<RoomType, "id" | "name">;
 
 interface PropertyClosureFormDialogProps {
   closure?: PropertyClosure;
+  propertyId: string;
+  roomTypes: RoomTypeOption[];
+  onSaved?: () => void | Promise<void>;
   children: React.ReactNode;
 }
 
 export function PropertyClosureFormDialog({
   closure,
+  propertyId,
+  roomTypes,
+  onSaved,
   children,
 }: PropertyClosureFormDialogProps) {
   const [open, setOpen] = React.useState(false);
-  const { property, roomTypes, addPropertyClosure, updatePropertyClosure } =
-    useDataContext();
+  const { addPropertyClosure, updatePropertyClosure } = useDataContext();
   const isEditing = !!closure;
 
   const form = useForm<ClosureFormValues>({
@@ -87,7 +93,7 @@ export function PropertyClosureFormDialog({
   async function onSubmit(values: ClosureFormValues) {
     try {
       const closureData: Omit<PropertyClosure, "id"> = {
-        propertyId: property.id,
+        propertyId,
         startDate: values.startDate,
         endDate: values.endDate,
         roomTypeId: (values.roomTypeId && values.roomTypeId !== "__all__") ? values.roomTypeId : undefined,
@@ -95,7 +101,7 @@ export function PropertyClosureFormDialog({
       };
 
       if (isEditing && closure) {
-        await updatePropertyClosure(closure.id, closureData);
+        await updatePropertyClosure(closure.id, closureData, closure);
       } else {
         await addPropertyClosure(closureData);
       }
@@ -103,6 +109,7 @@ export function PropertyClosureFormDialog({
       toast.success(
         `Blocked dates ${isEditing ? "updated" : "created"} successfully.`
       );
+      await onSaved?.();
       form.reset();
       setOpen(false);
     } catch (error) {

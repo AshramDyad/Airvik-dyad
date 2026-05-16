@@ -1,16 +1,26 @@
 "use server";
 
 import "server-only";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag, unstable_cache } from "next/cache";
 import { z } from "zod";
 
 import type { Review } from "@/data/types";
-import { reviewRowSchema, mapReviewRow } from "@/lib/reviews";
+import {
+  reviewRowSchema,
+  mapReviewRow,
+  publicReviewRowSchema,
+  mapPublicReviewRow,
+  type PublicReview,
+} from "@/lib/reviews";
 import { createServerSupabaseClient, createSessionClient } from "@/integrations/supabase/server";
 import { requirePagePermissions } from "@/lib/server/page-auth";
-
-// Column selection to reduce egress
-const REVIEW_SELECT_COLUMNS = 'id, reviewer_name, reviewer_title, content, image_url, is_published, created_at, updated_at, updated_by' as const;
+import {
+  PUBLIC_REVIEW_SELECT_COLUMNS,
+  PUBLIC_REVIEWS_MAX_LIMIT,
+  REVIEW_SELECT_COLUMNS,
+  REVIEWS_CACHE_TAG,
+  REVIEWS_REVALIDATE_SECONDS,
+} from "@/lib/server/cache-config";
 
 const reviewFormSchema = z.object({
   reviewerName: z.string().trim().min(1).max(150),
@@ -21,6 +31,7 @@ const reviewFormSchema = z.object({
 });
 
 const revalidateReviewPaths = () => {
+  revalidateTag(REVIEWS_CACHE_TAG);
   revalidatePath("/admin/reviews");
   revalidatePath("/admin/testimonials");
   revalidatePath("/");
@@ -31,6 +42,19 @@ const mapRows = (rows: unknown[] | null): Review[] =>
     .map((row) => reviewRowSchema.safeParse(row))
     .filter((result): result is { success: true; data: z.infer<typeof reviewRowSchema> } => result.success)
     .map((result) => mapReviewRow(result.data));
+
+const mapPublicRows = (rows: unknown[] | null): PublicReview[] =>
+  (rows ?? [])
+    .map((row) => publicReviewRowSchema.safeParse(row))
+    .filter(
+      (
+        result,
+      ): result is {
+        success: true;
+        data: z.infer<typeof publicReviewRowSchema>;
+      } => result.success,
+    )
+    .map((result) => mapPublicReviewRow(result.data));
 
 export async function getAllReviews(): Promise<Review[]> {
   await requirePagePermissions("read:review");
@@ -70,21 +94,40 @@ export async function getReviewById(id: string): Promise<Review | null> {
   return mapReviewRow(parsed);
 }
 
-export async function getPublishedReviews(limit = 10): Promise<Review[]> {
+const normalizePublishedReviewLimit = (limit = 10): number => {
+  const numericLimit = Number.isFinite(limit) ? Math.floor(limit) : 10;
+  return Math.min(Math.max(numericLimit, 1), PUBLIC_REVIEWS_MAX_LIMIT);
+};
+
+async function getPublishedReviewsUncached(limit = 10): Promise<PublicReview[]> {
+  const normalizedLimit = normalizePublishedReviewLimit(limit);
   const supabase = createServerSupabaseClient();
   const { data, error } = await supabase
     .from("testimonials")
-    .select(REVIEW_SELECT_COLUMNS)
+    .select(PUBLIC_REVIEW_SELECT_COLUMNS)
     .eq("is_published", true)
     .order("created_at", { ascending: false })
-    .limit(limit);
+    .limit(normalizedLimit);
 
   if (error) {
     console.error("Error fetching published reviews", error);
     throw new Error("Failed to fetch reviews");
   }
 
-  return mapRows(data);
+  return mapPublicRows(data);
+}
+
+const publishedReviewsCache = unstable_cache(
+  async (limit: number) => getPublishedReviewsUncached(limit),
+  ["published-reviews"],
+  {
+    revalidate: REVIEWS_REVALIDATE_SECONDS,
+    tags: [REVIEWS_CACHE_TAG],
+  }
+);
+
+export async function getPublishedReviews(limit = 10): Promise<PublicReview[]> {
+  return publishedReviewsCache(normalizePublishedReviewLimit(limit));
 }
 
 type FormPayload = z.infer<typeof reviewFormSchema>;
@@ -110,7 +153,7 @@ export async function createReview(rawData: FormPayload): Promise<Review> {
   const { data, error } = await supabase
     .from("testimonials")
     .insert(insertPayload)
-    .select("*")
+    .select(REVIEW_SELECT_COLUMNS)
     .single();
 
   if (error) {

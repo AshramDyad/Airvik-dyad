@@ -13,13 +13,16 @@ type DbRoomLink = {
   updated_at: string;
 };
 
+export const EXTERNAL_ROOM_LINK_SELECT_COLUMNS =
+  "id, source, external_label, room_id, created_at, updated_at" as const;
+
 export async function fetchExternalRoomLinks(
   client: SupabaseClient,
   source: string = VIKBOOKING_SOURCE
 ): Promise<ExternalRoomLink[]> {
   const { data, error } = await client
     .from("external_room_links")
-    .select("id, source, external_label, room_id, created_at, updated_at")
+    .select(EXTERNAL_ROOM_LINK_SELECT_COLUMNS)
     .eq("source", source)
     .order("external_label", { ascending: true });
 
@@ -77,8 +80,8 @@ export function resolveRoomMappings(
 export async function upsertExternalRoomLink(
   client: SupabaseClient,
   payload: { source: string; externalLabel: string; roomId: string }
-): Promise<ExternalRoomLink> {
-  const { data, error } = await client
+): Promise<void> {
+  const { error } = await client
     .from("external_room_links")
     .upsert(
       {
@@ -87,13 +90,9 @@ export async function upsertExternalRoomLink(
         room_id: payload.roomId,
       },
       { onConflict: "source,external_label" }
-    )
-    .select()
-    .single();
+    );
 
   if (error) {
     throw error;
   }
-
-  return mapRoomLink(data as DbRoomLink);
 }

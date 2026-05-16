@@ -3,6 +3,13 @@ import { NextResponse } from "next/server";
 import { HttpError, requireFeature } from "@/lib/server/auth";
 import { sendWhatsAppFile } from "@/lib/whatsapp";
 
+const cacheHeaders = {
+  "Cache-Control": "private, no-store",
+};
+
+const noStoreJson = (body: unknown, init?: ResponseInit) =>
+  NextResponse.json(body, { ...init, headers: cacheHeaders });
+
 function normalizePhone(phone: string): string {
   const digits = phone.replace(/\D/g, "");
   // 10-digit Indian number → prepend 91
@@ -17,9 +24,9 @@ export async function POST(request: Request) {
     await requireFeature(request, ["reservations", "donations"]);
   } catch (error) {
     if (error instanceof HttpError) {
-      return NextResponse.json({ message: error.message }, { status: error.status });
+      return noStoreJson({ message: error.message }, { status: error.status });
     }
-    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    return noStoreJson({ message: "Unauthorized" }, { status: 401 });
   }
 
   try {
@@ -28,16 +35,16 @@ export async function POST(request: Request) {
     const file = formData.get("file");
 
     if (!phone || typeof phone !== "string") {
-      return NextResponse.json({ message: "Phone number is required" }, { status: 400 });
+      return noStoreJson({ message: "Phone number is required" }, { status: 400 });
     }
 
     if (!file || !(file instanceof File)) {
-      return NextResponse.json({ message: "File is required" }, { status: 400 });
+      return noStoreJson({ message: "File is required" }, { status: 400 });
     }
 
     const normalizedPhone = normalizePhone(phone);
     if (!normalizedPhone) {
-      return NextResponse.json({ message: "Invalid phone number" }, { status: 400 });
+      return noStoreJson({ message: "Invalid phone number" }, { status: 400 });
     }
 
     const result = await sendWhatsAppFile(
@@ -47,12 +54,12 @@ export async function POST(request: Request) {
     );
 
     if (!result.success) {
-      return NextResponse.json({ message: result.error }, { status: 502 });
+      return noStoreJson({ message: result.error }, { status: 502 });
     }
 
-    return NextResponse.json({ success: true });
+    return new Response(null, { status: 204, headers: cacheHeaders });
   } catch (error) {
     console.error("[send-invoice-whatsapp] Error:", error);
-    return NextResponse.json({ message: "Internal server error" }, { status: 500 });
+    return noStoreJson({ message: "Internal server error" }, { status: 500 });
   }
 }

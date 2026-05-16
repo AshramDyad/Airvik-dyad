@@ -16,7 +16,6 @@ import type {
   ReservationStatus,
   Category,
   Post,
-  RoomTypeAvailability,
   BookingRestriction,
   PropertyClosure,
   AdminActivityLog,
@@ -24,7 +23,6 @@ import type {
   ActivityEntityType,
   AdminActivityLogPayload,
 } from "@/data/types";
-import { mapMonthlyAvailabilityRow, MonthlyAvailabilityRow } from "@/lib/availability";
 import {
   DbCategory,
   DbPost,
@@ -38,9 +36,42 @@ import {
 const INTERNAL_FOLIO_SOURCE = "internal" as const;
 
 // Column selection constants to reduce egress
-const PROPERTY_SELECT_COLUMNS = 'id, name, description, address, city, state, country, phone, email, currency, timezone, tax_rate, tax_enabled, logo_url' as const;
+export const PROPERTY_SELECT_COLUMNS =
+  "id, name, address, phone, email, logo_url, photos, google_maps_url, timezone, currency, allowSameDayTurnover:allow_same_day_turnover, showPartialDays:show_partial_days, defaultUnitsView:default_units_view, tax_enabled, tax_percentage, trust_registration_no, trust_date, pan_no, certificate_no" as const;
 const GUEST_SELECT_COLUMNS = 'id, first_name, last_name, email, phone, address, pincode, city, state, country, created_at' as const;
 const ROOM_SELECT_COLUMNS = 'id, room_number, room_type_id, status, photos' as const;
+export const ROOM_TYPE_SELECT_COLUMNS =
+  "id, name, description, max_occupancy, min_occupancy, max_children, category_id, bed_types, price, photos, main_photo_url, is_visible" as const;
+export const ROOM_CATEGORY_SELECT_COLUMNS = "id, name, description" as const;
+export const RATE_PLAN_SELECT_COLUMNS = "id, name, price, rules" as const;
+export const AMENITY_SELECT_COLUMNS = "id, name, icon" as const;
+export const ROOM_TYPE_AMENITY_SELECT_COLUMNS = "room_type_id, amenity_id" as const;
+export const ROOM_TYPE_WITH_AMENITIES_SELECT_COLUMNS =
+  `${ROOM_TYPE_SELECT_COLUMNS}, room_type_amenities(amenity_id)` as const;
+export const SEASONAL_PRICE_SELECT_COLUMNS =
+  "id, room_type_id, name, price, start_date, end_date" as const;
+export const ROLE_SELECT_COLUMNS = "id, name, permissions, hierarchy_level" as const;
+export const USER_PROFILE_SELECT_COLUMNS =
+  `id, name, role_id, roles:roles(${ROLE_SELECT_COLUMNS})` as const;
+export const PROFILE_SELECT_COLUMNS = "id, name, role_id" as const;
+export const STICKY_NOTE_SELECT_COLUMNS =
+  "id, title, description, color, createdAt:created_at" as const;
+export const HOUSEKEEPING_ASSIGNMENT_SELECT_COLUMNS =
+  "roomId:room_id, assignedTo:assigned_to, date, status" as const;
+export const BOOKING_RESTRICTION_SELECT_COLUMNS =
+  "id, name, restriction_type, value, start_date, end_date, room_type_id, created_at, updated_at" as const;
+export const PROPERTY_CLOSURE_SELECT_COLUMNS =
+  "id, property_id, room_type_id, start_date, end_date, reason" as const;
+export const ADMIN_ACTIVITY_LOG_SELECT_COLUMNS =
+  "id, actor_user_id, actor_role, actor_name, section, entity_type, entity_id, entity_label, action, details, amount_minor, metadata, created_at" as const;
+export const CATEGORY_SELECT_COLUMNS =
+  "id, name, slug, description, parent_id, created_at" as const;
+export const POST_SELECT_COLUMNS =
+  "id, title, slug, content, excerpt, featured_image, status, published_at, author_id, created_at, updated_at" as const;
+export const FOLIO_ITEM_SELECT_COLUMNS =
+  "id, reservation_id, description, amount, timestamp, payment_method, transaction_id, external_source, external_reference, external_metadata" as const;
+export const RESERVATION_SELECT_COLUMNS =
+  `id, booking_id, guest_id, room_id, rate_plan_id, check_in_date, check_out_date, number_of_guests, status, notes, total_amount, booking_date, source, payment_method, adult_count, child_count, tax_enabled_snapshot, tax_rate_snapshot, external_source, external_id, external_metadata, guest:guests(first_name,last_name,email,phone), folio:folio_items(${FOLIO_ITEM_SELECT_COLUMNS})` as const;
 
 type DbGuest = {
   id: string;
@@ -57,6 +88,27 @@ type DbGuest = {
 
 type DbCategoryUpdatePayload = Partial<
   Pick<DbCategory, "name" | "slug" | "description" | "parent_id">
+>;
+
+type DbCategoryIdRow = Pick<DbCategory, "id">;
+
+type DbCategoryInsertPayload = Pick<
+  DbCategory,
+  "name" | "slug" | "description" | "parent_id"
+>;
+
+type DbPostIdRow = Pick<DbPost, "id">;
+
+type DbPostInsertPayload = Pick<
+  DbPost,
+  | "title"
+  | "slug"
+  | "content"
+  | "excerpt"
+  | "featured_image"
+  | "status"
+  | "published_at"
+  | "author_id"
 >;
 
 type GuestUpdatePayload = Partial<
@@ -92,6 +144,9 @@ type DbRoomType = {
   name: string;
   description: string;
   max_occupancy: number;
+  min_occupancy?: number | null;
+  max_children?: number | null;
+  category_id?: string | null;
   bed_types: string[];
   price: number | null;
   amenities?: string[] | null;
@@ -258,6 +313,19 @@ type UpdateUserProfilePayload = Partial<{
   roleId: string;
 }>;
 
+const toDbUserProfilePayload = (
+  updatedData: UpdateUserProfilePayload
+): Record<string, unknown> => {
+  const payload: Record<string, unknown> = {};
+  if (typeof updatedData.name !== "undefined") {
+    payload.name = updatedData.name;
+  }
+  if (typeof updatedData.roleId !== "undefined") {
+    payload.role_id = updatedData.roleId;
+  }
+  return payload;
+};
+
 const toDbRolePayload = (roleData: Partial<Role>): Record<string, unknown> => {
   const payload: Record<string, unknown> = {};
   if (typeof roleData.name !== "undefined") {
@@ -418,6 +486,9 @@ export const fromDbRoomType = (dbRoomType: DbRoomType): RoomType => ({
   name: dbRoomType.name,
   description: dbRoomType.description,
   maxOccupancy: dbRoomType.max_occupancy,
+  minOccupancy: dbRoomType.min_occupancy ?? undefined,
+  maxChildren: dbRoomType.max_children ?? undefined,
+  categoryId: dbRoomType.category_id ?? undefined,
   bedTypes: dbRoomType.bed_types,
   price: dbRoomType.price ?? 0,
   amenities: dbRoomType.amenities ?? [],
@@ -591,6 +662,7 @@ export const uploadFile = async (file: File): Promise<string> => {
     method: "POST",
     body: formData,
     credentials: "include",
+    cache: "no-store",
   });
 
   let payload: UploadResponse & { error?: string } | undefined;
@@ -622,7 +694,7 @@ export const getAdminActivityLogs = async (
 
   let query = supabase
     .from('admin_activity_logs')
-    .select('*', { count: 'exact' })
+    .select(ADMIN_ACTIVITY_LOG_SELECT_COLUMNS, { count: 'exact' })
     .order('created_at', { ascending: false })
     .range(from, to);
 
@@ -713,7 +785,7 @@ export const getProperty = async (): Promise<{
 }> => {
   const { data, error } = await supabase
     .from('properties')
-    .select('*')
+    .select(PROPERTY_SELECT_COLUMNS)
     .limit(1)
     .single();
 
@@ -723,8 +795,10 @@ export const getProperty = async (): Promise<{
 
   return { data: data as Property, error: null };
 };
-export const updateProperty = (id: string, updatedData: Partial<Property>) => supabase.from('properties').update(updatedData).eq('id', id).select().single();
-export const createProperty = (propertyData: Partial<Property>) => supabase.from('properties').insert([propertyData]).select().single();
+export const updateProperty = (id: string, updatedData: Partial<Property>) => supabase.from('properties').update(updatedData).eq('id', id).select(PROPERTY_SELECT_COLUMNS).single();
+export const updatePropertyWithoutReturning = (id: string, updatedData: Partial<Property>) =>
+  supabase.from('properties').update(updatedData).eq('id', id);
+export const createProperty = (propertyData: Partial<Property>) => supabase.from('properties').insert([propertyData]).select(PROPERTY_SELECT_COLUMNS).single();
 
 // Guests
 const GUEST_PAGE_SIZE = 1000;
@@ -822,15 +896,17 @@ export const getOrCreateGuestByEmail = async (
   return { data: fromDbGuest(data as unknown as DbGuest), error: null };
 };
 export const addGuest = async (guestData: Omit<Guest, "id">) => {
-  const { data, error, ...rest } = await supabase.from('guests').insert([toDbGuest(guestData)]).select().single();
+  const { data, error, ...rest } = await supabase.from('guests').insert([toDbGuest(guestData)]).select(GUEST_SELECT_COLUMNS).single();
   if (error || !data) return { data, error, ...rest };
   return { data: fromDbGuest(data), error, ...rest };
 };
 export const updateGuest = async (id: string, updatedData: Partial<Guest>) => {
-  const { data, error, ...rest } = await supabase.from('guests').update(toDbGuest(updatedData)).eq('id', id).select().single();
+  const { data, error, ...rest } = await supabase.from('guests').update(toDbGuest(updatedData)).eq('id', id).select(GUEST_SELECT_COLUMNS).single();
   if (error || !data) return { data, error, ...rest };
   return { data: fromDbGuest(data), error, ...rest };
 };
+export const updateGuestWithoutReturning = (id: string, updatedData: Partial<Guest>) =>
+  supabase.from('guests').update(toDbGuest(updatedData)).eq('id', id);
 export const deleteGuest = (id: string) => supabase.from('guests').delete().eq('id', id);
 
 // Reservations
@@ -857,12 +933,9 @@ export const getReservationsPage = async (
 ) => {
   const { limit, offset, includeCount } = normalizePageParams(params);
   const toIndex = offset + limit - 1;
-  const reservationColumns =
-    '*, guest:guests(first_name,last_name,email,phone), folio:folio_items(*)';
-
   const { data, error, status, statusText, count } = await supabase
     .from('reservations')
-    .select(reservationColumns, includeCount ? { count: 'estimated' } : undefined)
+    .select(RESERVATION_SELECT_COLUMNS, includeCount ? { count: 'estimated' } : undefined)
     .order('booking_date', { ascending: false, nullsFirst: false })
     .order('id', { ascending: false })
     .range(offset, toIndex);
@@ -878,7 +951,7 @@ export const getReservationsPage = async (
   }
 
   return {
-    data: (data as DbReservation[]).map(fromDbReservation),
+    data: (data as unknown as DbReservation[]).map(fromDbReservation),
     error: null,
     status,
     statusText,
@@ -898,7 +971,7 @@ export const getReservations = async () => {
     const includeCount = fromIndex === 0;
     const { data, error, status: pageStatus, statusText: pageStatusText, count: pageCount } = await supabase
       .from('reservations')
-      .select('*, guest:guests(first_name,last_name,email,phone), folio:folio_items(*)', includeCount ? { count: 'estimated' } : undefined)
+      .select(RESERVATION_SELECT_COLUMNS, includeCount ? { count: 'estimated' } : undefined)
       .order('booking_date', { ascending: false, nullsFirst: false })
       .order('id', { ascending: false })
       .range(fromIndex, toIndex);
@@ -923,7 +996,7 @@ export const getReservations = async () => {
       };
     }
 
-    const pageRows = (data ?? []) as DbReservation[];
+    const pageRows = (data ?? []) as unknown as DbReservation[];
     aggregatedRows.push(...pageRows);
 
     if (pageRows.length < RESERVATION_PAGE_SIZE) {
@@ -982,7 +1055,7 @@ export const getTotalBookingsCount = async () => {
 export const getReservationById = async (id: string) => {
   const { data, error, ...rest } = await supabase
     .from('reservations')
-    .select('*, guest:guests(first_name,last_name,email,phone), folio:folio_items(*)')
+    .select(RESERVATION_SELECT_COLUMNS)
     .eq('id', id)
     .single();
   if (error || !data) return { data: null, error, ...rest };
@@ -992,7 +1065,7 @@ export const getReservationById = async (id: string) => {
 export const getReservationsByBookingId = async (bookingId: string) => {
   const { data, error, ...rest } = await supabase
     .from('reservations')
-    .select('*, guest:guests(first_name,last_name,email,phone), folio:folio_items(*)')
+    .select(RESERVATION_SELECT_COLUMNS)
     .eq('booking_id', bookingId);
 
   if (error || !data) return { data: [], error, ...rest };
@@ -1003,9 +1076,9 @@ export const addReservation = async (reservationsData: DbReservationInsert[]) =>
   const { data, error, ...rest } = await supabase
     .from('reservations')
     .insert(reservationsData)
-    .select();
+    .select(RESERVATION_SELECT_COLUMNS);
   if (error || !data) return { data, error, ...rest };
-  const typedData = data as DbReservation[];
+  const typedData = data as unknown as DbReservation[];
   return { data: typedData.map(fromDbReservation), error, ...rest };
 };
 
@@ -1061,10 +1134,12 @@ export const createReservationsWithTotal = async (
   return { data: typedData.map(fromDbReservation), error: null };
 };
 export const updateReservation = async (id: string, updatedData: Partial<Reservation>) => {
-  const { data, error, ...rest } = await supabase.from('reservations').update(toDbReservation(updatedData)).eq('id', id).select().single();
+  const { data, error, ...rest } = await supabase.from('reservations').update(toDbReservation(updatedData)).eq('id', id).select(RESERVATION_SELECT_COLUMNS).single();
   if (error || !data) return { data, error, ...rest };
-  return { data: fromDbReservation(data), error, ...rest };
+  return { data: fromDbReservation(data as unknown as DbReservation), error, ...rest };
 };
+export const updateReservationWithoutReturning = (id: string, updatedData: Partial<Reservation>) =>
+  supabase.from('reservations').update(toDbReservation(updatedData)).eq('id', id);
 export const updateReservationStatus = (id: string, status: string) =>
   supabase.from("reservations").update({ status }).eq("id", id);
 
@@ -1076,17 +1151,28 @@ export const updateBookingReservationsStatus = async (
     .from("reservations")
     .update({ status })
     .eq("booking_id", bookingId)
-    .select();
+    .select(RESERVATION_SELECT_COLUMNS);
 
   if (error || !data) {
     return { data: [], error };
   }
 
-  return { data: data.map(fromDbReservation), error: null };
+  return {
+    data: (data as unknown as DbReservation[]).map(fromDbReservation),
+    error: null,
+  };
 };
+export const updateBookingReservationsStatusWithoutReturning = (
+  bookingId: string,
+  status: ReservationStatus
+) =>
+  supabase
+    .from("reservations")
+    .update({ status })
+    .eq("booking_id", bookingId);
 
 // Folio Items
-export const getFolioItems = () => supabase.from('folio_items').select('*');
+export const getFolioItems = () => supabase.from('folio_items').select(FOLIO_ITEM_SELECT_COLUMNS);
 export const addFolioItem = (itemData: FolioItemInsertPayload) =>
   supabase
     .from('folio_items')
@@ -1103,7 +1189,7 @@ export const addFolioItem = (itemData: FolioItemInsertPayload) =>
         ...(itemData.timestamp ? { timestamp: itemData.timestamp } : {}),
       },
     ])
-    .select()
+    .select(FOLIO_ITEM_SELECT_COLUMNS)
     .single();
 
 // Reservation Activity Logs (compat helpers)
@@ -1154,20 +1240,34 @@ export const getRooms = async () => {
   return { data: data.map(fromDbRoom), error, ...rest };
 };
 export const addRoom = async (roomData: Omit<Room, "id">) => {
-  const { data, error, ...rest } = await supabase.from('rooms').insert([toDbRoom(roomData)]).select().single();
+  const { data, error, ...rest } = await supabase.from('rooms').insert([toDbRoom(roomData)]).select(ROOM_SELECT_COLUMNS).single();
   if (error || !data) return { data, error, ...rest };
   return { data: fromDbRoom(data), error, ...rest };
+};
+export const addRoomIdOnly = async (roomData: Omit<Room, "id">) => {
+  const { data, error, ...rest } = await supabase
+    .from('rooms')
+    .insert([toDbRoom(roomData)])
+    .select('id')
+    .single();
+  return {
+    data: (data as { id?: string } | null)?.id ?? null,
+    error,
+    ...rest,
+  };
 };
 export const updateRoom = async (id: string, updatedData: Partial<Room>) => {
-  const { data, error, ...rest } = await supabase.from('rooms').update(toDbRoom(updatedData)).eq('id', id).select().single();
+  const { data, error, ...rest } = await supabase.from('rooms').update(toDbRoom(updatedData)).eq('id', id).select(ROOM_SELECT_COLUMNS).single();
   if (error || !data) return { data, error, ...rest };
   return { data: fromDbRoom(data), error, ...rest };
 };
+export const updateRoomWithoutReturning = (id: string, updatedData: Partial<Room>) =>
+  supabase.from('rooms').update(toDbRoom(updatedData)).eq('id', id);
 export const deleteRoom = (id: string) => supabase.from('rooms').delete().eq('id', id);
 
 // Room Types
-export const getRoomTypes = () => supabase.from('room_types').select('*');
-export const getRoomTypeAmenities = () => supabase.from('room_type_amenities').select('*');
+export const getRoomTypes = () => supabase.from('room_types').select(ROOM_TYPE_SELECT_COLUMNS);
+export const getRoomTypeAmenities = () => supabase.from('room_type_amenities').select(ROOM_TYPE_AMENITY_SELECT_COLUMNS);
 export const upsertRoomType = (roomTypeData: RoomTypeUpsertInput) => {
   const params = {
     p_id: roomTypeData.id ?? null,
@@ -1186,16 +1286,32 @@ export const upsertRoomType = (roomTypeData: RoomTypeUpsertInput) => {
 export const deleteRoomType = (id: string) => supabase.from('room_types').delete().eq('id', id);
 
 // Room Categories
-export const getRoomCategories = () => supabase.from('room_categories').select('*');
-export const addRoomCategory = (roomCategoryData: Omit<RoomCategory, "id">) => supabase.from('room_categories').insert([roomCategoryData]).select().single();
-export const updateRoomCategory = (id: string, updatedData: Partial<RoomCategory>) => supabase.from('room_categories').update(updatedData).eq('id', id).select().single();
+export const getRoomCategories = () => supabase.from('room_categories').select(ROOM_CATEGORY_SELECT_COLUMNS);
+export const addRoomCategory = (roomCategoryData: Omit<RoomCategory, "id">) => supabase.from('room_categories').insert([roomCategoryData]).select(ROOM_CATEGORY_SELECT_COLUMNS).single();
+export const addRoomCategoryIdOnly = async (roomCategoryData: Omit<RoomCategory, "id">) => {
+  const { data, error, ...rest } = await supabase
+    .from('room_categories')
+    .insert([roomCategoryData])
+    .select('id')
+    .single();
+  return {
+    data: (data as { id?: string } | null)?.id ?? null,
+    error,
+    ...rest,
+  };
+};
+export const updateRoomCategory = (id: string, updatedData: Partial<RoomCategory>) => supabase.from('room_categories').update(updatedData).eq('id', id).select(ROOM_CATEGORY_SELECT_COLUMNS).single();
+export const updateRoomCategoryWithoutReturning = (
+  id: string,
+  updatedData: Partial<RoomCategory>
+) => supabase.from('room_categories').update(updatedData).eq('id', id);
 export const deleteRoomCategory = (id: string) => supabase.from('room_categories').delete().eq('id', id);
 
 // New function for Room Details Page
 export const getRoomTypeWithAmenities = async (id: string) => {
   const { data, error } = await supabase
     .from('room_types')
-    .select('*, room_type_amenities (amenity_id)')
+    .select(ROOM_TYPE_WITH_AMENITIES_SELECT_COLUMNS)
     .eq('id', id)
     .single();
 
@@ -1219,9 +1335,23 @@ export const getRoomTypeWithAmenities = async (id: string) => {
 
 
 // Rate Plans
-export const getRatePlans = () => supabase.from('rate_plans').select('*');
-export const addRatePlan = (ratePlanData: Omit<RatePlan, "id">) => supabase.from('rate_plans').insert([ratePlanData]).select().single();
-export const updateRatePlan = (id: string, updatedData: Partial<RatePlan>) => supabase.from('rate_plans').update(updatedData).eq('id', id).select().single();
+export const getRatePlans = () => supabase.from('rate_plans').select(RATE_PLAN_SELECT_COLUMNS);
+export const addRatePlan = (ratePlanData: Omit<RatePlan, "id">) => supabase.from('rate_plans').insert([ratePlanData]).select(RATE_PLAN_SELECT_COLUMNS).single();
+export const addRatePlanIdOnly = async (ratePlanData: Omit<RatePlan, "id">) => {
+  const { data, error, ...rest } = await supabase
+    .from('rate_plans')
+    .insert([ratePlanData])
+    .select('id')
+    .single();
+  return {
+    data: (data as { id?: string } | null)?.id ?? null,
+    error,
+    ...rest,
+  };
+};
+export const updateRatePlan = (id: string, updatedData: Partial<RatePlan>) => supabase.from('rate_plans').update(updatedData).eq('id', id).select(RATE_PLAN_SELECT_COLUMNS).single();
+export const updateRatePlanWithoutReturning = (id: string, updatedData: Partial<RatePlan>) =>
+  supabase.from('rate_plans').update(updatedData).eq('id', id);
 export const deleteRatePlan = (id: string) => supabase.from('rate_plans').delete().eq('id', id);
 
 // Seasonal Prices
@@ -1259,7 +1389,7 @@ const toDbSeasonalPrice = (
 export const getSeasonalPrices = async () => {
   const { data, error, ...rest } = await supabase
     .from('seasonal_prices')
-    .select('*')
+    .select(SEASONAL_PRICE_SELECT_COLUMNS)
     .order('start_date');
   if (error || !data) return { data: [] as SeasonalPrice[], error, ...rest };
   return { data: (data as DbSeasonalPrice[]).map(fromDbSeasonalPrice), error, ...rest };
@@ -1269,10 +1399,22 @@ export const addSeasonalPrice = async (seasonalPriceData: Omit<SeasonalPrice, "i
   const { data, error, ...rest } = await supabase
     .from('seasonal_prices')
     .insert([toDbSeasonalPrice(seasonalPriceData)])
-    .select()
+    .select(SEASONAL_PRICE_SELECT_COLUMNS)
     .single();
   if (error || !data) return { data: null, error, ...rest };
   return { data: fromDbSeasonalPrice(data as DbSeasonalPrice), error, ...rest };
+};
+export const addSeasonalPriceIdOnly = async (seasonalPriceData: Omit<SeasonalPrice, "id">) => {
+  const { data, error, ...rest } = await supabase
+    .from('seasonal_prices')
+    .insert([toDbSeasonalPrice(seasonalPriceData)])
+    .select('id')
+    .single();
+  return {
+    data: (data as { id?: string } | null)?.id ?? null,
+    error,
+    ...rest,
+  };
 };
 
 export const updateSeasonalPrice = async (id: string, updatedData: Partial<SeasonalPrice>) => {
@@ -1280,57 +1422,104 @@ export const updateSeasonalPrice = async (id: string, updatedData: Partial<Seaso
     .from('seasonal_prices')
     .update(toDbSeasonalPrice(updatedData))
     .eq('id', id)
-    .select()
+    .select(SEASONAL_PRICE_SELECT_COLUMNS)
     .single();
   if (error || !data) return { data: null, error, ...rest };
   return { data: fromDbSeasonalPrice(data as DbSeasonalPrice), error, ...rest };
 };
+export const updateSeasonalPriceWithoutReturning = (
+  id: string,
+  updatedData: Partial<SeasonalPrice>
+) => supabase.from('seasonal_prices').update(toDbSeasonalPrice(updatedData)).eq('id', id);
 
 export const deleteSeasonalPrice = (id: string) =>
   supabase.from('seasonal_prices').delete().eq('id', id);
 
 // Roles
-export const getRoles = () => supabase.from('roles').select('*');
-export const addRole = (roleData: Omit<Role, "id">) => supabase.from('roles').insert([toDbRolePayload(roleData)]).select().single();
-export const updateRole = (id: string, updatedData: Partial<Role>) => supabase.from('roles').update(toDbRolePayload(updatedData)).eq('id', id).select().single();
+export const getRoles = () => supabase.from('roles').select(ROLE_SELECT_COLUMNS);
+export const addRole = (roleData: Omit<Role, "id">) => supabase.from('roles').insert([toDbRolePayload(roleData)]).select(ROLE_SELECT_COLUMNS).single();
+export const addRoleIdOnly = async (roleData: Omit<Role, "id">) => {
+  const { data, error, ...rest } = await supabase
+    .from('roles')
+    .insert([toDbRolePayload(roleData)])
+    .select('id')
+    .single();
+  return {
+    data: (data as { id?: string } | null)?.id ?? null,
+    error,
+    ...rest,
+  };
+};
+export const updateRole = (id: string, updatedData: Partial<Role>) => supabase.from('roles').update(toDbRolePayload(updatedData)).eq('id', id).select(ROLE_SELECT_COLUMNS).single();
+export const updateRoleWithoutReturning = (id: string, updatedData: Partial<Role>) =>
+  supabase.from('roles').update(toDbRolePayload(updatedData)).eq('id', id);
 export const deleteRole = (id: string) => supabase.from('roles').delete().eq('id', id);
 
 // Users & Profiles
 export const getUsers = () => supabase.functions.invoke('get-users');
 export const updateUserProfile = (id: string, updatedData: UpdateUserProfilePayload) => {
-  const payload: Record<string, unknown> = {};
-  if (typeof updatedData.name !== "undefined") {
-    payload.name = updatedData.name;
-  }
-  if (typeof updatedData.roleId !== "undefined") {
-    payload.role_id = updatedData.roleId;
-  }
-  return supabase.from('profiles').update(payload).eq('id', id).select().single();
+  return supabase.from('profiles').update(toDbUserProfilePayload(updatedData)).eq('id', id).select(PROFILE_SELECT_COLUMNS).single();
 };
+export const updateUserProfileWithoutReturning = (
+  id: string,
+  updatedData: UpdateUserProfilePayload
+) => supabase.from('profiles').update(toDbUserProfilePayload(updatedData)).eq('id', id);
 export const deleteAuthUser = (id: string) => supabase.functions.invoke('delete-user', { body: { userIdToDelete: id } });
-export const getUserProfile = (id: string) => supabase.from('profiles').select('*, roles(*)').eq('id', id).single();
+export const getUserProfile = (id: string) => supabase.from('profiles').select(USER_PROFILE_SELECT_COLUMNS).eq('id', id).single();
 
 // Amenities
-export const getAmenities = () => supabase.from('amenities').select('*');
-export const addAmenity = (amenityData: Omit<Amenity, "id">) => supabase.from('amenities').insert([amenityData]).select().single();
-export const updateAmenity = (id: string, updatedData: Partial<Amenity>) => supabase.from('amenities').update(updatedData).eq('id', id).select().single();
+export const getAmenities = () => supabase.from('amenities').select(AMENITY_SELECT_COLUMNS);
+export const addAmenity = (amenityData: Omit<Amenity, "id">) => supabase.from('amenities').insert([amenityData]).select(AMENITY_SELECT_COLUMNS).single();
+export const addAmenityIdOnly = async (amenityData: Omit<Amenity, "id">) => {
+  const { data, error, ...rest } = await supabase
+    .from('amenities')
+    .insert([amenityData])
+    .select('id')
+    .single();
+  return {
+    data: (data as { id?: string } | null)?.id ?? null,
+    error,
+    ...rest,
+  };
+};
+export const updateAmenity = (id: string, updatedData: Partial<Amenity>) => supabase.from('amenities').update(updatedData).eq('id', id).select(AMENITY_SELECT_COLUMNS).single();
+export const updateAmenityWithoutReturning = (id: string, updatedData: Partial<Amenity>) =>
+  supabase.from('amenities').update(updatedData).eq('id', id);
 export const deleteAmenity = (id: string) => supabase.from('amenities').delete().eq('id', id);
 
 // Sticky Notes
-export const getStickyNotes = (userId: string) => supabase.from('sticky_notes').select('*').eq('user_id', userId);
+export const getStickyNotes = (userId: string) => supabase.from('sticky_notes').select(STICKY_NOTE_SELECT_COLUMNS).eq('user_id', userId);
 export const addStickyNote = (noteData: StickyNoteInsertPayload) =>
-  supabase.from('sticky_notes').insert([noteData]).select().single();
-export const updateStickyNote = (id: string, updatedData: Partial<StickyNote>) => supabase.from('sticky_notes').update(updatedData).eq('id', id).select().single();
+  supabase.from('sticky_notes').insert([noteData]).select(STICKY_NOTE_SELECT_COLUMNS).single();
+export const addStickyNoteIdOnly = async (noteData: StickyNoteInsertPayload) => {
+  const { data, error, ...rest } = await supabase
+    .from('sticky_notes')
+    .insert([noteData])
+    .select('id')
+    .single();
+  return {
+    data: (data as { id?: string } | null)?.id ?? null,
+    error,
+    ...rest,
+  };
+};
+export const updateStickyNote = (id: string, updatedData: Partial<StickyNote>) => supabase.from('sticky_notes').update(updatedData).eq('id', id).select(STICKY_NOTE_SELECT_COLUMNS).single();
+export const updateStickyNoteWithoutReturning = (id: string, updatedData: Partial<StickyNote>) =>
+  supabase.from('sticky_notes').update(updatedData).eq('id', id);
 export const deleteStickyNote = (id: string) => supabase.from('sticky_notes').delete().eq('id', id);
 
 // Housekeeping
-export const getHousekeepingAssignments = () => supabase.from('housekeeping_assignments').select('*');
+export const getHousekeepingAssignments = (date: string) =>
+  supabase
+    .from('housekeeping_assignments')
+    .select(HOUSEKEEPING_ASSIGNMENT_SELECT_COLUMNS)
+    .eq('date', date);
 
 // Booking Restrictions
 export const getBookingRestrictions = async (): Promise<BookingRestriction[]> => {
   const { data, error } = await supabase
     .from('booking_restrictions')
-    .select('*')
+    .select(BOOKING_RESTRICTION_SELECT_COLUMNS)
     .order('created_at');
 
   if (error) throw error;
@@ -1373,7 +1562,7 @@ const toDbPropertyClosure = (
 export const getPropertyClosures = async (): Promise<PropertyClosure[]> => {
   const { data, error } = await supabase
     .from('property_closures')
-    .select('*')
+    .select(PROPERTY_CLOSURE_SELECT_COLUMNS)
     .order('start_date');
 
   if (error) throw error;
@@ -1386,11 +1575,22 @@ export const addPropertyClosure = async (
   const { data, error } = await supabase
     .from('property_closures')
     .insert([toDbPropertyClosure(closureData)])
-    .select()
+    .select(PROPERTY_CLOSURE_SELECT_COLUMNS)
     .single();
 
   if (error || !data) return { data: null, error };
   return { data: fromDbPropertyClosure(data as DbPropertyClosure), error: null };
+};
+export const addPropertyClosureIdOnly = async (
+  closureData: Omit<PropertyClosure, "id">
+): Promise<{ data: string | null; error: PostgrestError | null }> => {
+  const { data, error } = await supabase
+    .from('property_closures')
+    .insert([toDbPropertyClosure(closureData)])
+    .select('id')
+    .single();
+
+  return { data: (data as { id?: string } | null)?.id ?? null, error };
 };
 
 export const updatePropertyClosure = async (
@@ -1401,31 +1601,24 @@ export const updatePropertyClosure = async (
     .from('property_closures')
     .update(toDbPropertyClosure(updatedData))
     .eq('id', id)
-    .select()
+    .select(PROPERTY_CLOSURE_SELECT_COLUMNS)
     .single();
 
   if (error || !data) return { data: null, error };
   return { data: fromDbPropertyClosure(data as DbPropertyClosure), error: null };
 };
 
+export const updatePropertyClosureWithoutReturning = (
+  id: string,
+  updatedData: Partial<Omit<PropertyClosure, "id">>
+) =>
+  supabase
+    .from('property_closures')
+    .update(toDbPropertyClosure(updatedData))
+    .eq('id', id);
+
 export const deletePropertyClosure = (id: string) =>
   supabase.from('property_closures').delete().eq('id', id);
-
-export const getMonthlyAvailability = async (
-  monthStart: string,
-  roomTypeIds?: string[]
-): Promise<RoomTypeAvailability[]> => {
-  const { data, error } = await supabase.rpc('get_monthly_availability', {
-    p_month_start: monthStart,
-    p_room_type_ids:
-      roomTypeIds && roomTypeIds.length > 0 ? roomTypeIds : null,
-  });
-
-  if (error) throw error;
-  return (data ?? []).map((row: MonthlyAvailabilityRow) =>
-    mapMonthlyAvailabilityRow(row)
-  );
-};
 
 export type BookingValidationResult = {
   isValid: boolean;
@@ -1491,54 +1684,97 @@ export const validateBookingRequest = async (
 
 // Categories
 export const getCategories = async () => {
-  const { error } = await supabase.from('categories').select('*, _count:posts(count)');
-  if (error) throw error;
-  // Note: _count from supabase usually requires setup or mapped differently if it's not a direct relation count with foreign keys properly set up for implicit count.
-  // Usually supabase returns { count } inside the relation if using .select('*, posts(count)').
-  // For this simple implementation, we might just get raw data.
-  // Let's stick to basic fetch for now and refine count later or assume 'posts(count)' works if relation exists.
-  // But types might be tricky.
-  const { data: categories, error: catError } = await supabase.from('categories').select('*').order('name');
+  const { data: categories, error: catError } = await supabase
+    .from('categories')
+    .select(CATEGORY_SELECT_COLUMNS)
+    .order('name');
   if (catError) throw catError;
   return categories.map(fromDbCategory);
 };
 
 export const getCategoryById = async (id: string) => {
-  const { data, error } = await supabase.from('categories').select('*').eq('id', id).single();
+  const { data, error } = await supabase.from('categories').select(CATEGORY_SELECT_COLUMNS).eq('id', id).single();
   if (error) throw error;
   return fromDbCategory(data);
 };
 
-export const createCategory = async (categoryData: Omit<Category, "id" | "created_at" | "_count">) => {
-  const { data, error } = await supabase.from('categories').insert([{
-    name: categoryData.name,
-    slug: categoryData.slug,
-    description: categoryData.description,
-    parent_id: categoryData.parent_id,
-  }]).select().single();
+type CategoryCreateData = Omit<Category, "id" | "created_at" | "_count">;
+
+const toDbCategoryInsertPayload = (
+  categoryData: CategoryCreateData
+): DbCategoryInsertPayload => ({
+  name: categoryData.name,
+  slug: categoryData.slug,
+  description: categoryData.description ?? null,
+  parent_id: categoryData.parent_id ?? null,
+});
+
+export const createCategory = async (categoryData: CategoryCreateData) => {
+  const { data, error } = await supabase
+    .from('categories')
+    .insert([toDbCategoryInsertPayload(categoryData)])
+    .select(CATEGORY_SELECT_COLUMNS)
+    .single();
 
   if (error) throw error;
   return fromDbCategory(data);
+};
+
+export const createCategoryIdOnly = async (
+  categoryData: CategoryCreateData
+) => {
+  const { data, error } = await supabase
+    .from('categories')
+    .insert([toDbCategoryInsertPayload(categoryData)])
+    .select('id')
+    .single();
+
+  if (error) throw error;
+
+  const categoryId = (data as DbCategoryIdRow | null)?.id;
+  if (!categoryId) {
+    throw new Error("Created category id was not returned");
+  }
+
+  return categoryId;
+};
+
+const toDbCategoryUpdatePayload = (
+  categoryData: Partial<Category>
+): DbCategoryUpdatePayload => {
+  const updatePayload: DbCategoryUpdatePayload = {};
+  if (categoryData.name) updatePayload.name = categoryData.name;
+  if (categoryData.slug) updatePayload.slug = categoryData.slug;
+  if (categoryData.description !== undefined) updatePayload.description = categoryData.description;
+  if (categoryData.parent_id !== undefined) updatePayload.parent_id = categoryData.parent_id;
+  return updatePayload;
 };
 
 export const updateCategory = async (
   id: string,
   categoryData: Partial<Category>
 ) => {
-  const updatePayload: DbCategoryUpdatePayload = {};
-  if (categoryData.name) updatePayload.name = categoryData.name;
-  if (categoryData.slug) updatePayload.slug = categoryData.slug;
-  if (categoryData.description !== undefined) updatePayload.description = categoryData.description;
-  if (categoryData.parent_id !== undefined) updatePayload.parent_id = categoryData.parent_id;
+  const updatePayload = toDbCategoryUpdatePayload(categoryData);
 
   const { data, error } = await supabase
     .from('categories')
     .update(updatePayload)
     .eq('id', id)
-    .select()
+    .select(CATEGORY_SELECT_COLUMNS)
     .single();
   if (error) throw error;
   return fromDbCategory(data as DbCategory);
+};
+
+export const updateCategoryWithoutReturning = async (
+  id: string,
+  categoryData: Partial<Category>
+) => {
+  const { error } = await supabase
+    .from('categories')
+    .update(toDbCategoryUpdatePayload(categoryData))
+    .eq('id', id);
+  if (error) throw error;
 };
 
 export const deleteCategory = async (id: string) => {
@@ -1546,27 +1782,40 @@ export const deleteCategory = async (id: string) => {
   if (error) throw error;
 };
 
-export const createPost = async (postData: Omit<Post, "id" | "created_at" | "updated_at" | "categories"> & { categoryIds?: string[] }) => {
+type PostCreateData = Omit<Post, "id" | "created_at" | "updated_at" | "categories"> & {
+  categoryIds?: string[];
+};
+
+const toDbPostInsertPayload = (postData: PostCreateData): DbPostInsertPayload => ({
+  title: postData.title,
+  slug: postData.slug,
+  content: postData.content ?? null,
+  excerpt: postData.excerpt ?? null,
+  featured_image: postData.featured_image ?? null,
+  status: postData.status,
+  published_at: postData.status === 'published' ? new Date().toISOString() : null,
+  author_id: postData.author_id // Assuming passed or handled by RLS default
+});
+
+const toPostCategoryInserts = (postId: string, categoryIds: string[]) =>
+  categoryIds.map(catId => ({
+    post_id: postId,
+    category_id: catId
+  }));
+
+export const createPost = async (postData: PostCreateData) => {
   // 1. Insert Post
-  const { data: post, error } = await supabase.from('posts').insert([{
-    title: postData.title,
-    slug: postData.slug,
-    content: postData.content,
-    excerpt: postData.excerpt,
-    featured_image: postData.featured_image,
-    status: postData.status,
-    published_at: postData.status === 'published' ? new Date().toISOString() : null,
-    author_id: postData.author_id // Assuming passed or handled by RLS default
-  }]).select().single();
+  const { data: post, error } = await supabase
+    .from('posts')
+    .insert([toDbPostInsertPayload(postData)])
+    .select(POST_SELECT_COLUMNS)
+    .single();
 
   if (error) throw error;
 
   // 2. Insert Categories
   if (postData.categoryIds && postData.categoryIds.length > 0) {
-    const categoryInserts = postData.categoryIds.map(catId => ({
-      post_id: post.id,
-      category_id: catId
-    }));
+    const categoryInserts = toPostCategoryInserts(post.id, postData.categoryIds);
     const { error: catError } = await supabase.from('post_categories').insert(categoryInserts);
     if (catError) throw catError; // Note: might want to rollback post if this fails
   }
@@ -1574,10 +1823,30 @@ export const createPost = async (postData: Omit<Post, "id" | "created_at" | "upd
   return fromDbPost(post);
 };
 
-export const updatePost = async (
-  id: string,
-  postData: Partial<Post> & { categoryIds?: string[] }
-) => {
+export const createPostWithoutReturning = async (postData: PostCreateData) => {
+  const { data: post, error } = await supabase
+    .from('posts')
+    .insert([toDbPostInsertPayload(postData)])
+    .select('id')
+    .single();
+
+  if (error) throw error;
+
+  const postId = (post as DbPostIdRow | null)?.id;
+  if (!postId) {
+    throw new Error("Created post id was not returned");
+  }
+
+  if (postData.categoryIds && postData.categoryIds.length > 0) {
+    const categoryInserts = toPostCategoryInserts(postId, postData.categoryIds);
+    const { error: catError } = await supabase.from('post_categories').insert(categoryInserts);
+    if (catError) throw catError;
+  }
+};
+
+type PostUpdateData = Partial<Post> & { categoryIds?: string[] };
+
+const toDbPostUpdatePayload = (postData: PostUpdateData): DbPostUpdatePayload => {
   const updatePayload: DbPostUpdatePayload = {
     updated_at: new Date().toISOString(),
   };
@@ -1592,30 +1861,56 @@ export const updatePost = async (
       updatePayload.published_at = new Date().toISOString();
     }
   }
+  return updatePayload;
+};
+
+const syncPostCategories = async (
+  id: string,
+  categoryIds?: string[]
+) => {
+  if (!categoryIds) {
+    return;
+  }
+
+  // Remove old
+  await supabase.from('post_categories').delete().eq('post_id', id);
+  // Add new
+  if (categoryIds.length > 0) {
+    const categoryInserts = toPostCategoryInserts(id, categoryIds);
+    await supabase.from('post_categories').insert(categoryInserts);
+  }
+};
+
+export const updatePost = async (
+  id: string,
+  postData: PostUpdateData
+) => {
+  const updatePayload = toDbPostUpdatePayload(postData);
 
   const { data: post, error } = await supabase
     .from('posts')
     .update(updatePayload)
     .eq('id', id)
-    .select()
+    .select(POST_SELECT_COLUMNS)
     .single();
   if (error) throw error;
 
-  // Update Categories (Sync)
-  if (postData.categoryIds) {
-    // Remove old
-    await supabase.from('post_categories').delete().eq('post_id', id);
-    // Add new
-    if (postData.categoryIds.length > 0) {
-      const categoryInserts = postData.categoryIds.map(catId => ({
-        post_id: id,
-        category_id: catId
-      }));
-      await supabase.from('post_categories').insert(categoryInserts);
-    }
-  }
+  await syncPostCategories(id, postData.categoryIds);
 
   return fromDbPost(post as DbPost);
+};
+
+export const updatePostWithoutReturning = async (
+  id: string,
+  postData: PostUpdateData
+) => {
+  const { error } = await supabase
+    .from('posts')
+    .update(toDbPostUpdatePayload(postData))
+    .eq('id', id);
+  if (error) throw error;
+
+  await syncPostCategories(id, postData.categoryIds);
 };
 
 export const deletePost = async (id: string) => {

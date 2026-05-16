@@ -25,9 +25,11 @@ export async function authorizedFetch(
     throw new Error("Please sign in again to continue.");
   }
 
-  const { retryOnUnauthorized = true, headers, ...rest } = options;
+  const { retryOnUnauthorized = true, headers, cache, ...rest } = options;
+  const cacheMode = cache ?? "no-store";
   const response = await fetch(input, {
     ...rest,
+    cache: cacheMode,
     headers: {
       ...(headers || {}),
       Authorization: `Bearer ${session.access_token}`,
@@ -41,6 +43,7 @@ export async function authorizedFetch(
     }
     return fetch(input, {
       ...rest,
+      cache: cacheMode,
       headers: {
         ...(headers || {}),
         Authorization: `Bearer ${refreshed.access_token}`,

@@ -38,6 +38,12 @@ type DbImportJobEntry = {
   updated_at: string;
 };
 
+export const IMPORT_JOB_SELECT_COLUMNS =
+  "id, source, status, file_name, file_hash, total_rows, processed_rows, error_rows, summary, metadata, created_by, created_at, completed_at, last_error" as const;
+
+export const IMPORT_JOB_ENTRY_SELECT_COLUMNS =
+  "id, job_id, row_number, status, message, payload, created_at, updated_at" as const;
+
 export interface CreateJobArgs {
   source: string;
   profileId: string;
@@ -65,7 +71,7 @@ export async function createImportJobRecord(
       metadata: args.metadata ?? {},
       created_by: args.profileId,
     })
-    .select()
+    .select(IMPORT_JOB_SELECT_COLUMNS)
     .single();
 
   if (error) {
@@ -103,7 +109,7 @@ export async function fetchJobById(
 ): Promise<ImportJob | null> {
   const { data, error } = await client
     .from("import_jobs")
-    .select()
+    .select(IMPORT_JOB_SELECT_COLUMNS)
     .eq("id", jobId)
     .maybeSingle();
 
@@ -125,7 +131,7 @@ export async function fetchJobWithEntries(
 
   const { data, error } = await client
     .from("import_job_entries")
-    .select()
+    .select(IMPORT_JOB_ENTRY_SELECT_COLUMNS)
     .eq("job_id", jobId)
     .order("row_number", { ascending: true });
 
@@ -163,7 +169,7 @@ export async function updateImportJob(
     .from("import_jobs")
     .update(payload)
     .eq("id", jobId)
-    .select()
+    .select(IMPORT_JOB_SELECT_COLUMNS)
     .single();
 
   if (error) {

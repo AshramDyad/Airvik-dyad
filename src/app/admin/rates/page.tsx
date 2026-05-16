@@ -1,20 +1,5 @@
-"use client";
-
-import { useDataContext } from "@/context/data-context";
-import { columns } from "./components/columns";
-import { RatePlansDataTable } from "./components/data-table";
-import { SeasonalPricesSection } from "./components/seasonal-prices-section";
-import { PermissionGate } from "@/components/admin/permission-gate";
+import { RatesPanelLoader } from "./rates-panel-loader";
 
 export default function RatesPage() {
-  const { ratePlans } = useDataContext();
-
-  return (
-    <PermissionGate feature="ratePlans">
-      <div className="space-y-6">
-        <RatePlansDataTable columns={columns} data={ratePlans} />
-        <SeasonalPricesSection />
-      </div>
-    </PermissionGate>
-  );
+  return <RatesPanelLoader />;
 }

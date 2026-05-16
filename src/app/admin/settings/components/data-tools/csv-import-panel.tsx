@@ -8,12 +8,16 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { useDataContext } from "@/context/data-context";
 import type { ImportJob, ImportJobEntryStatus, Room } from "@/data/types";
 import type { ImportIssue, SkipReportEntry } from "@/lib/importers/vikbooking/types";
 import { authorizedFetch } from "@/lib/auth/client-session";
 
 type PreviewRow = Record<string, unknown>;
+type RoomOption = Pick<Room, "id" | "roomNumber">;
+
+type RoomOptionsResponse = {
+  data?: RoomOption[];
+};
 
 type JobStatusResponse = {
   job: ImportJob;
@@ -25,7 +29,8 @@ type JobStatusResponse = {
 export function CsvImportPanel() {
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
   const pollIntervalRef = React.useRef<number | null>(null);
-  const { rooms = [] } = useDataContext();
+  const [rooms, setRooms] = React.useState<RoomOption[]>([]);
+  const [isRoomsLoading, setIsRoomsLoading] = React.useState(false);
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
   const [job, setJob] = React.useState<ImportJob | null>(null);
   const [issues, setIssues] = React.useState<ImportIssue[]>([]);
@@ -46,6 +51,41 @@ export function CsvImportPanel() {
     () => issues.some((issue) => issue.severity === "error"),
     [issues]
   );
+
+  const loadRoomOptions = React.useCallback(async () => {
+    setIsRoomsLoading(true);
+    try {
+      const response = await authorizedFetch("/api/admin/rooms/options", {
+        cache: "no-store",
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.message ?? "Unable to load room options");
+      }
+      const payload = (await response.json()) as RoomOptionsResponse;
+      setRooms(payload.data ?? []);
+    } catch (error) {
+      console.error(error);
+      toast.error((error as Error).message ?? "Unable to load room options");
+    } finally {
+      setIsRoomsLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    const needsRoomOptions =
+      missingRooms.length > 0 || missingRoomNumbers.length > 0;
+    if (!needsRoomOptions || rooms.length > 0 || isRoomsLoading) {
+      return;
+    }
+    void loadRoomOptions();
+  }, [
+    isRoomsLoading,
+    loadRoomOptions,
+    missingRoomNumbers.length,
+    missingRooms.length,
+    rooms.length,
+  ]);
 
   const progress = React.useMemo(() => {
     if (!job || job.totalRows === 0) return 0;
@@ -264,6 +304,10 @@ export function CsvImportPanel() {
       missingRoomNumbers.length === 0 &&
       job.totalRows > 0
   );
+  const previewRowLabel =
+    job && job.totalRows > previewRows.length
+      ? `first ${previewRows.length} of ${job.totalRows} rows`
+      : `${previewRows.length} rows`;
 
   return (
     <div className="space-y-6">
@@ -322,7 +366,7 @@ export function CsvImportPanel() {
           )}
           {previewRows.length > 0 && (
             <div className="rounded-md border border-border p-4">
-              <h4 className="mb-2 font-semibold">Preview ({previewRows.length} rows)</h4>
+              <h4 className="mb-2 font-semibold">Preview ({previewRowLabel})</h4>
               <div className="max-h-48 overflow-auto text-xs">
                 <table className="min-w-full">
                   <thead>
@@ -381,6 +425,7 @@ export function CsvImportPanel() {
                     key={label}
                     label={label}
                     rooms={rooms}
+                    isRoomsLoading={isRoomsLoading}
                     onSave={handleMapRoom}
                   />
                 ))}
@@ -405,6 +450,7 @@ export function CsvImportPanel() {
                     key={roomNumber}
                     roomNumber={roomNumber}
                     rooms={rooms}
+                    isRoomsLoading={isRoomsLoading}
                     onSave={handleMapRoomNumber}
                   />
                 ))}
@@ -520,11 +566,17 @@ export function CsvImportPanel() {
 
 type RoomMappingRowProps = {
   label: string;
-  rooms: Room[];
+  rooms: RoomOption[];
+  isRoomsLoading: boolean;
   onSave: (label: string, roomId: string) => Promise<void>;
 };
 
-function RoomMappingRow({ label, rooms, onSave }: RoomMappingRowProps) {
+function RoomMappingRow({
+  label,
+  rooms,
+  isRoomsLoading,
+  onSave,
+}: RoomMappingRowProps) {
   const [roomId, setRoomId] = React.useState<string>(rooms[0]?.id ?? "");
   const [isSaving, setIsSaving] = React.useState(false);
 
@@ -564,7 +616,9 @@ function RoomMappingRow({ label, rooms, onSave }: RoomMappingRowProps) {
         </select>
       ) : (
         <p className="text-sm text-destructive">
-          No rooms are available. Add rooms before mapping.
+          {isRoomsLoading
+            ? "Loading room options..."
+            : "No rooms are available. Add rooms before mapping."}
         </p>
       )}
       <Button onClick={handleSave} disabled={isSaving || !roomId}>
@@ -576,11 +630,17 @@ function RoomMappingRow({ label, rooms, onSave }: RoomMappingRowProps) {
 
 type RoomNumberMappingRowProps = {
   roomNumber: string;
-  rooms: Room[];
+  rooms: RoomOption[];
+  isRoomsLoading: boolean;
   onSave: (roomNumber: string, roomId: string) => Promise<void>;
 };
 
-function RoomNumberMappingRow({ roomNumber, rooms, onSave }: RoomNumberMappingRowProps) {
+function RoomNumberMappingRow({
+  roomNumber,
+  rooms,
+  isRoomsLoading,
+  onSave,
+}: RoomNumberMappingRowProps) {
   const [roomId, setRoomId] = React.useState<string>(rooms[0]?.id ?? "");
   const [isSaving, setIsSaving] = React.useState(false);
 
@@ -620,7 +680,9 @@ function RoomNumberMappingRow({ roomNumber, rooms, onSave }: RoomNumberMappingRo
         </select>
       ) : (
         <p className="text-sm text-destructive">
-          No rooms are available. Add rooms before mapping.
+          {isRoomsLoading
+            ? "Loading room options..."
+            : "No rooms are available. Add rooms before mapping."}
         </p>
       )}
       <Button onClick={handleSave} disabled={isSaving || !roomId}>

@@ -10,8 +10,8 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
-import { useDataContext } from "@/context/data-context";
-import type { Reservation, ReservationStatus } from "@/data/types";
+import type { ReservationStatus } from "@/data/types";
+import type { CalendarReservationDetail } from "@/lib/calendar/reservation-details";
 import { cn } from "@/lib/utils";
 import { isActiveReservationStatus } from "@/lib/reservations/status";
 
@@ -61,7 +61,7 @@ const mixedStatusStyle = {
 };
 
 interface ReservationDetail {
-  reservation: Reservation;
+  reservation: CalendarReservationDetail;
   guestName: string;
   customerTitle?: string | null;
   customerFirstName?: string | null;
@@ -95,6 +95,7 @@ interface ReservationHoverCardProps {
   children: React.ReactNode;
   reservationIds: string[];
   date: string;
+  reservationDetailsById: ReadonlyMap<string, CalendarReservationDetail>;
 }
 
 const BOOKING_ID_VISIBLE_LENGTH = 7 as const;
@@ -103,6 +104,13 @@ function formatBookingId(id: string): string {
   if (!id) return "-";
   if (id.length <= BOOKING_ID_VISIBLE_LENGTH) return id;
   return id.slice(-BOOKING_ID_VISIBLE_LENGTH);
+}
+
+function formatName(...parts: Array<string | null | undefined>): string {
+  return parts
+    .filter((value): value is string => Boolean(value && value.trim()))
+    .join(" ")
+    .trim();
 }
 
 function formatCustomerName(detail: ReservationDetail): string {
@@ -204,24 +212,21 @@ export function ReservationHoverCard({
   children,
   reservationIds,
   date,
+  reservationDetailsById,
 }: ReservationHoverCardProps) {
-  const { reservations, guests, rooms, roomTypes } = useDataContext();
   const hoverDate = React.useMemo(() => {
     const parsed = parseISO(date);
     return Number.isNaN(parsed.getTime()) ? null : parsed;
   }, [date]);
 
   const reservationDetails = React.useMemo<ReservationDetail[]>(() => {
-    const guestMap = new Map(guests.map((guest) => [guest.id, guest]));
-    const roomMap = new Map(rooms.map((room) => [room.id, room]));
-    const roomTypeMap = new Map(roomTypes.map((rt) => [rt.id, rt]));
-    const reservationMap = new Map(reservations.map((reservation) => [reservation.id, reservation]));
-
     const details: ReservationDetail[] = [];
     const targetBookingIds = new Set<string>();
     const seenReservationIds = new Set<string>();
 
-    const includeReservationDetail = (reservation: Reservation | undefined) => {
+    const includeReservationDetail = (
+      reservation: CalendarReservationDetail | undefined,
+    ) => {
       if (!reservation || seenReservationIds.has(reservation.id)) {
         return;
       }
@@ -234,24 +239,25 @@ export function ReservationHoverCard({
         }
       }
 
-      const guest = guestMap.get(reservation.guestId);
-      const room = roomMap.get(reservation.roomId);
-      const roomType = room ? roomTypeMap.get(room.roomTypeId) : undefined;
+      const snapshotName = formatName(
+        reservation.guestSnapshot?.firstName,
+        reservation.guestSnapshot?.lastName
+      );
 
       details.push({
         reservation,
-        guestName: guest ? `${guest.firstName} ${guest.lastName}` : "Unknown Guest",
+        guestName: snapshotName || "Unknown Guest",
         customerTitle: null,
-        customerFirstName: guest?.firstName ?? null,
-        customerLastName: guest?.lastName ?? null,
+        customerFirstName: reservation.guestSnapshot?.firstName ?? null,
+        customerLastName: reservation.guestSnapshot?.lastName ?? null,
         adultCount: Number.isFinite(reservation.adultCount)
           ? reservation.adultCount
           : reservation.numberOfGuests ?? 0,
         childCount: Number.isFinite(reservation.childCount)
           ? reservation.childCount
           : 0,
-        roomNumber: room?.roomNumber,
-        roomTypeName: roomType?.name,
+        roomNumber: reservation.roomNumber,
+        roomTypeName: reservation.roomTypeName,
       });
 
       seenReservationIds.add(reservation.id);
@@ -262,11 +268,11 @@ export function ReservationHoverCard({
     };
 
     reservationIds.forEach((id) => {
-      includeReservationDetail(reservationMap.get(id));
+      includeReservationDetail(reservationDetailsById.get(id));
     });
 
     if (targetBookingIds.size > 0) {
-      reservationMap.forEach((reservation) => {
+      reservationDetailsById.forEach((reservation) => {
         const bookingKey = reservation.bookingId || reservation.id;
         if (targetBookingIds.has(bookingKey)) {
           includeReservationDetail(reservation);
@@ -275,7 +281,7 @@ export function ReservationHoverCard({
     }
 
     return details;
-  }, [reservationIds, reservations, guests, rooms, roomTypes, hoverDate]);
+  }, [reservationIds, reservationDetailsById, hoverDate]);
 
   const displayedReservationDetails = React.useMemo(() => {
     const active = reservationDetails.filter((detail) =>

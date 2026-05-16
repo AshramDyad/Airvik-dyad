@@ -74,7 +74,7 @@ export function AmenityFormDialog({
   async function onSubmit(values: z.infer<typeof amenitySchema>) {
     try {
       if (isEditing && amenity) {
-        await updateAmenity(amenity.id, values);
+        await updateAmenity(amenity.id, values, amenity);
       } else {
         await addAmenity(values);
       }

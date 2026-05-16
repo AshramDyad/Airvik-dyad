@@ -21,7 +21,7 @@ import { getAllCountries, type Country } from "@/lib/countries";
 
 interface CountryComboboxProps {
   value: string;
-  onChange: (value: string) => void;
+  onChange: (value: string, country?: Country) => void;
   placeholder?: string;
   disabled?: boolean;
   className?: string;
@@ -94,7 +94,7 @@ export function CountryCombobox({
                   keywords={[country.name, country.code, country.dialCode]}
                   className="text-foreground data-[selected=true]:text-primary"
                   onSelect={() => {
-                    onChange(country.code);
+                    onChange(country.code, country);
                     setOpen(false);
                   }}
                 >

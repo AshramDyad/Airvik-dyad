@@ -1,19 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDonationByOrderId, updateDonationRecord } from "@/lib/api/donations";
+import {
+  getDonationIdByOrderId,
+  updateDonationRecordWithoutReturning,
+} from "@/lib/api/donations";
 import { verifyWebhookSignature } from "@/lib/razorpay";
+
+const cacheHeaders = {
+  "Cache-Control": "private, no-store",
+};
+const noStoreJson = (body: unknown, init?: ResponseInit) =>
+  NextResponse.json(body, { ...init, headers: cacheHeaders });
 
 export async function POST(request: NextRequest) {
   const signature = request.headers.get("x-razorpay-signature");
   const payload = await request.text();
 
   if (!signature) {
-    return NextResponse.json({ message: "Missing webhook signature" }, { status: 400 });
+    return noStoreJson({ message: "Missing webhook signature" }, { status: 400 });
   }
 
   try {
     const isValid = verifyWebhookSignature(payload, signature);
     if (!isValid) {
-      return NextResponse.json({ message: "Invalid webhook signature" }, { status: 400 });
+      return noStoreJson({ message: "Invalid webhook signature" }, { status: 400 });
     }
 
     const event = JSON.parse(payload);
@@ -23,15 +32,15 @@ export async function POST(request: NextRequest) {
     const status = payment?.status;
 
     if (!orderId) {
-      return NextResponse.json({ received: true });
+      return noStoreJson({ received: true });
     }
 
-    const donation = await getDonationByOrderId(orderId);
-    if (!donation) {
-      return NextResponse.json({ received: true });
+    const donationId = await getDonationIdByOrderId(orderId);
+    if (!donationId) {
+      return noStoreJson({ received: true });
     }
 
-    const updates: Parameters<typeof updateDonationRecord>[1] = {
+    const updates: Parameters<typeof updateDonationRecordWithoutReturning>[1] = {
       razorpayPaymentId: paymentId ?? undefined,
     };
 
@@ -43,11 +52,11 @@ export async function POST(request: NextRequest) {
       updates.paymentStatus = "refunded";
     }
 
-    await updateDonationRecord(donation.id, updates);
+    await updateDonationRecordWithoutReturning(donationId, updates);
 
-    return NextResponse.json({ received: true });
+    return noStoreJson({ received: true });
   } catch (error) {
     console.error("Razorpay webhook error", error);
-    return NextResponse.json({ message: "Webhook handler failed" }, { status: 400 });
+    return noStoreJson({ message: "Webhook handler failed" }, { status: 400 });
   }
 }

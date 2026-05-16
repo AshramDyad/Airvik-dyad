@@ -32,6 +32,7 @@ import { Switch } from "@/components/ui/switch";
 import type { RoomType } from "@/data/types";
 import { useDataContext } from "@/context/data-context";
 import { MultiImageUpload } from "@/components/shared/multi-image-upload";
+import type { AdminRoomTypeAmenityOption } from "./types";
 
 const roomTypeSchema = z.object({
   name: z.string().min(1, "Room type name is required."),
@@ -47,15 +48,19 @@ const roomTypeSchema = z.object({
 
 interface RoomTypeFormDialogProps {
   roomType?: RoomType;
+  amenities: AdminRoomTypeAmenityOption[];
+  onSaved?: () => void | Promise<void>;
   children: React.ReactNode;
 }
 
 export function RoomTypeFormDialog({
   roomType,
+  amenities,
+  onSaved,
   children,
 }: RoomTypeFormDialogProps) {
   const [open, setOpen] = React.useState(false);
-  const { amenities: allAmenities, addRoomType, updateRoomType } = useDataContext();
+  const { addRoomType, updateRoomType } = useDataContext();
   const isEditing = !!roomType;
 
   const form = useForm<z.infer<typeof roomTypeSchema>>({
@@ -87,10 +92,11 @@ export function RoomTypeFormDialog({
 
     try {
       if (isEditing && roomType) {
-        await updateRoomType(roomType.id, processedValues);
+        await updateRoomType(roomType.id, processedValues, roomType);
       } else {
         await addRoomType(processedValues);
       }
+      await onSaved?.();
 
       toast.success(
         `Room type ${isEditing ? "updated" : "created"} successfully!`
@@ -214,7 +220,7 @@ export function RoomTypeFormDialog({
                 <FormItem>
                   <FormLabel>Amenities</FormLabel>
                   <div className="grid grid-cols-2 gap-3 rounded-2xl border border-border/50 bg-card/80 p-5 shadow-sm md:grid-cols-3">
-                    {allAmenities.map((amenity) => (
+                    {amenities.map((amenity) => (
                       <FormField
                         key={amenity.id}
                         control={form.control}

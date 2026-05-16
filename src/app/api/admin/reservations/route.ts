@@ -19,14 +19,21 @@ const parseBoolean = (value: string | null): boolean => {
   return ["1", "true", "yes"].includes(value.toLowerCase());
 };
 
+const cacheHeaders = {
+  "Cache-Control": "private, no-store",
+};
+
+const noStoreJson = (body: unknown, init?: ResponseInit) =>
+  NextResponse.json(body, { ...init, headers: cacheHeaders });
+
 export async function GET(request: NextRequest) {
   try {
     await requireFeature(request, "reservations");
   } catch (error) {
     if (error instanceof HttpError) {
-      return NextResponse.json({ message: error.message }, { status: error.status });
+      return noStoreJson({ message: error.message }, { status: error.status });
     }
-    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    return noStoreJson({ message: "Unauthorized" }, { status: 401 });
   }
 
   const url = new URL(request.url);
@@ -39,7 +46,7 @@ export async function GET(request: NextRequest) {
   const offset = offsetParam ? Number(offsetParam) : undefined;
 
   if ((limitParam && Number.isNaN(Number(limitParam))) || (offsetParam && Number.isNaN(Number(offsetParam)))) {
-    return NextResponse.json(
+    return noStoreJson(
       { message: "limit and offset must be numbers" },
       { status: 400 }
     );
@@ -60,14 +67,10 @@ export async function GET(request: NextRequest) {
       count,
     };
 
-    return NextResponse.json(body, {
-      headers: {
-        "Cache-Control": "private, no-store",
-      },
-    });
+    return noStoreJson(body);
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Failed to load reservations";
-    return NextResponse.json({ message }, { status: 500 });
+    return noStoreJson({ message }, { status: 500 });
   }
 }

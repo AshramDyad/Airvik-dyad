@@ -48,6 +48,8 @@
 //   updateUser: (userId: string, updatedData: Partial<Omit<User, "id">>) => void;
 //   deleteUser: (userId: string) => Promise<boolean>;
 //   refetchUsers: () => Promise<void>;
+//   refetchRoles: () => Promise<void>;
+//   refetchAmenities: () => Promise<void>;
 //   addAmenity: (amenity: Omit<Amenity, "id">) => void;
 //   updateAmenity: (amenityId: string, updatedData: Partial<Omit<Amenity, "id">>) => void;
 //   deleteAmenity: (amenityId: string) => Promise<boolean>;
@@ -150,6 +152,9 @@ interface DataContextType {
   reservations: Reservation[];
   todayReservations: Reservation[];
   activeBookingReservations: Reservation[];
+  activeBookingRooms: Room[];
+  activeBookingRoomTypes: RoomType[];
+  activeBookingRatePlans: RatePlan[];
   reservationsTotalCount: number;
   guests: Guest[];
   rooms: Room[];
@@ -185,7 +190,8 @@ interface DataContextType {
   addGuest: (guest: Omit<Guest, "id">) => Promise<Guest>;
   updateGuest: (
     guestId: string,
-    updatedData: Partial<Omit<Guest, "id">>
+    updatedData: Partial<Omit<Guest, "id">>,
+    existingGuest?: Guest
   ) => void;
   deleteGuest: (guestId: string) => Promise<boolean>;
   addFolioItem: (
@@ -198,43 +204,87 @@ interface DataContextType {
     status: "Pending" | "Completed"
   ) => void;
   addRoom: (room: Omit<Room, "id">) => void;
-  updateRoom: (roomId: string, updatedData: Partial<Omit<Room, "id">>) => void;
-  deleteRoom: (roomId: string) => Promise<boolean>;
+  updateRoom: (
+    roomId: string,
+    updatedData: Partial<Omit<Room, "id">>,
+    existingRoom?: Room
+  ) => void;
+  deleteRoom: (roomId: string, existingRoom?: Room) => Promise<boolean>;
   addRoomType: (roomType: Omit<RoomType, "id">) => void;
   updateRoomType: (
     roomTypeId: string,
-    updatedData: Partial<Omit<RoomType, "id">>
+    updatedData: Partial<Omit<RoomType, "id">>,
+    existingRoomType?: RoomType
   ) => void;
-  deleteRoomType: (roomTypeId: string) => Promise<boolean>;
+  deleteRoomType: (
+    roomTypeId: string,
+    existingRoomType?: RoomType
+  ) => Promise<boolean>;
   addRoomCategory: (roomCategory: Omit<RoomCategory, "id">) => Promise<void>;
-  updateRoomCategory: (roomCategoryId: string, updatedData: Partial<Omit<RoomCategory, "id">>) => Promise<void>;
-  deleteRoomCategory: (roomCategoryId: string) => Promise<boolean>;
+  updateRoomCategory: (
+    roomCategoryId: string,
+    updatedData: Partial<Omit<RoomCategory, "id">>,
+    existingCategory?: RoomCategory
+  ) => Promise<void>;
+  deleteRoomCategory: (
+    roomCategoryId: string,
+    existingCategory?: RoomCategory
+  ) => Promise<boolean>;
   addRatePlan: (ratePlan: Omit<RatePlan, "id">) => void;
   updateRatePlan: (
     ratePlanId: string,
-    updatedData: Partial<Omit<RatePlan, "id">>
+    updatedData: Partial<Omit<RatePlan, "id">>,
+    existingRatePlan?: RatePlan
   ) => void;
-  deleteRatePlan: (ratePlanId: string) => Promise<boolean>;
-  addSeasonalPrice: (data: Omit<SeasonalPrice, "id">) => Promise<SeasonalPrice>;
+  deleteRatePlan: (
+    ratePlanId: string,
+    existingRatePlan?: RatePlan
+  ) => Promise<boolean>;
+  addSeasonalPrice: (
+    data: Omit<SeasonalPrice, "id">,
+    roomTypeName?: string
+  ) => Promise<SeasonalPrice>;
   updateSeasonalPrice: (
     id: string,
-    updatedData: Partial<Omit<SeasonalPrice, "id">>
+    updatedData: Partial<Omit<SeasonalPrice, "id">>,
+    existingSeasonalPrice?: SeasonalPrice
   ) => Promise<void>;
-  deleteSeasonalPrice: (id: string) => Promise<boolean>;
+  deleteSeasonalPrice: (
+    id: string,
+    existingSeasonalPrice?: SeasonalPrice
+  ) => Promise<boolean>;
   propertyClosures: PropertyClosure[];
   addPropertyClosure: (data: Omit<PropertyClosure, "id">) => Promise<PropertyClosure>;
-  updatePropertyClosure: (id: string, updatedData: Partial<Omit<PropertyClosure, "id">>) => Promise<void>;
-  deletePropertyClosure: (id: string) => Promise<boolean>;
+  updatePropertyClosure: (
+    id: string,
+    updatedData: Partial<Omit<PropertyClosure, "id">>,
+    existingClosure?: PropertyClosure
+  ) => Promise<void>;
+  deletePropertyClosure: (
+    id: string,
+    existingClosure?: PropertyClosure
+  ) => Promise<boolean>;
   addRole: (role: Omit<Role, "id">) => void;
-  updateRole: (roleId: string, updatedData: Partial<Omit<Role, "id">>) => void;
+  updateRole: (
+    roleId: string,
+    updatedData: Partial<Omit<Role, "id">>,
+    existingRole?: Role
+  ) => void;
   deleteRole: (roleId: string) => Promise<boolean>;
-  updateUser: (userId: string, updatedData: Partial<Omit<User, "id">>) => void;
+  updateUser: (
+    userId: string,
+    updatedData: Partial<Omit<User, "id">>,
+    existingUser?: User
+  ) => void;
   deleteUser: (userId: string) => Promise<boolean>;
   refetchUsers: () => Promise<void>;
+  refetchRoles: () => Promise<void>;
+  refetchAmenities: () => Promise<void>;
   addAmenity: (amenity: Omit<Amenity, "id">) => void;
   updateAmenity: (
     amenityId: string,
-    updatedData: Partial<Omit<Amenity, "id">>
+    updatedData: Partial<Omit<Amenity, "id">>,
+    existingAmenity?: Amenity
   ) => void;
   deleteAmenity: (amenityId: string) => Promise<boolean>;
   addStickyNote: (
@@ -242,7 +292,8 @@ interface DataContextType {
   ) => void;
   updateStickyNote: (
     noteId: string,
-    updatedData: Partial<Omit<StickyNote, "id" | "createdAt" | "userId">>
+    updatedData: Partial<Omit<StickyNote, "id" | "createdAt" | "userId">>,
+    existingNote?: StickyNote
   ) => void;
   deleteStickyNote: (noteId: string) => void;
   updateDashboardLayout: (layout: DashboardComponentId[]) => void;

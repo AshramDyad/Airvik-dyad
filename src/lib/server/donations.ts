@@ -4,7 +4,11 @@ import type {
   DonationStats,
   DonationStatus,
 } from "@/data/types";
-import type { DonationListFilters } from "@/lib/api/donations";
+import {
+  DONATION_SELECT_COLUMNS,
+  DONATION_STATS_SELECT_COLUMNS,
+  type DonationListFilters,
+} from "@/lib/api/donations";
 import { getServerSupabaseClient } from "@/lib/server/supabase";
 
 type DbDonation = {
@@ -69,7 +73,7 @@ export async function getAdminDonations(
   const supabase = await getServerSupabaseClient();
   let query = supabase
     .from("donations")
-    .select("*")
+    .select(DONATION_SELECT_COLUMNS)
     .order("created_at", { ascending: false });
 
   if (filters.status) {
@@ -116,7 +120,10 @@ export async function getAdminDonations(
 
 export async function getAdminDonationStats(): Promise<DonationStats> {
   const supabase = await getServerSupabaseClient();
-  const { data, error } = await supabase.from("donation_stats").select("*").maybeSingle();
+  const { data, error } = await supabase
+    .from("donation_stats")
+    .select(DONATION_STATS_SELECT_COLUMNS)
+    .maybeSingle();
 
   if (error) {
     throw new Error(error.message ?? "Unable to load donation stats");

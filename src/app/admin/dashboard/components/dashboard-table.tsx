@@ -7,15 +7,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import type { DashboardSummaryRow } from "@/lib/dashboard/summary";
 import { cn } from "@/lib/utils";
 
-export interface DashboardTableRow {
-  id: string;
-  guestName: string;
-  guestEmail?: string;
-  roomNumber: string;
-  status: string;
-}
+export type DashboardTableRow = DashboardSummaryRow;
 
 interface DashboardTableProps {
   headers: string[];

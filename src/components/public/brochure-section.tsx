@@ -1,17 +1,19 @@
 "use client";
 
 import * as React from "react";
+import dynamic from "next/dynamic";
 import { Eye, Download, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
 
 const BROCHURE_PDF_PATH = "/sahajanand-wellness-brochure.pdf";
+
+const BrochureViewerDialog = dynamic(
+  () =>
+    import("./brochure-viewer-dialog").then(
+      (module) => module.BrochureViewerDialog,
+    ),
+  { ssr: false },
+);
 
 export function BrochureSection() {
   const [viewerOpen, setViewerOpen] = React.useState(false);
@@ -68,25 +70,13 @@ export function BrochureSection() {
         </div>
       </div>
 
-      {/* PDF Viewer Modal */}
-      <Dialog open={viewerOpen} onOpenChange={setViewerOpen}>
-        <DialogContent className="max-w-4xl h-[85vh] flex flex-col gap-0 p-0 overflow-hidden">
-          <DialogHeader className="px-6 pt-6 pb-3 shrink-0">
-            <DialogTitle>Sahajanand Wellness Brochure</DialogTitle>
-            <DialogDescription>
-              Browse the full brochure below. Close this window when you are
-              done.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex-1 px-6 pb-6 min-h-0">
-            <iframe
-              src={BROCHURE_PDF_PATH}
-              className="w-full h-full rounded-xl border border-border/40"
-              title="Sahajanand Wellness Brochure"
-            />
-          </div>
-        </DialogContent>
-      </Dialog>
+      {viewerOpen && (
+        <BrochureViewerDialog
+          open={viewerOpen}
+          onOpenChange={setViewerOpen}
+          pdfPath={BROCHURE_PDF_PATH}
+        />
+      )}
     </section>
   );
 }

@@ -13,7 +13,12 @@ import { UsersDataTable } from "./users-data-table";
 import { columns } from "./users-columns";
 
 export function UsersManagement() {
-  const { users } = useDataContext();
+  const { users, refetchRoles, refetchUsers } = useDataContext();
+
+  React.useEffect(() => {
+    void refetchRoles();
+    void refetchUsers();
+  }, [refetchRoles, refetchUsers]);
 
   return (
     <Card>

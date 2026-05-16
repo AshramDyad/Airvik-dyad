@@ -48,7 +48,7 @@ export function useAuth() {
       if (error) throw error;
       if (!profile) throw new Error("Profile not found");
 
-      const typedProfile = profile as ProfileWithRole;
+      const typedProfile = profile as unknown as ProfileWithRole;
 
       setAuthUser(user);
       setCurrentUser({

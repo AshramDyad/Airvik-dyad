@@ -8,7 +8,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { SessionProvider } from "@/context/session-context";
 import { AuthProvider } from "@/context/auth-context";
 import { DataProvider } from "@/context/data-context";
-import { StickyBookingButton } from "@/components/sticky-booking-button";
+import { StickyBookingButtonLoader } from "@/components/sticky-booking-button-loader";
 
 const fontSans = Inter({
   subsets: ["latin"],
@@ -54,7 +54,7 @@ export default function RootLayout({
             <AuthProvider>
               <DataProvider>
                 {children}
-                <StickyBookingButton />
+                <StickyBookingButtonLoader />
                 <Toaster position="top-right" />
               </DataProvider>
             </AuthProvider>

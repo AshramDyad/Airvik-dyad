@@ -5,6 +5,12 @@ import { MAX_FEEDBACK_LENGTH, ROOM_OR_FACILITY_OPTIONS } from "@/constants/feedb
 import { createServerSupabaseClient } from "@/integrations/supabase/server";
 
 const feedbackTypeValues = ["suggestion", "praise", "complaint", "question"] as const;
+const cacheHeaders = {
+  "Cache-Control": "private, no-store",
+};
+const noStoreJson = (body: unknown, init?: ResponseInit) =>
+  NextResponse.json(body, { ...init, headers: cacheHeaders });
+
 const FeedbackPayloadSchema = z.object({
   feedbackType: z.enum(feedbackTypeValues),
   message: z
@@ -50,25 +56,25 @@ export async function POST(request: Request) {
 
     if (error) {
       console.error("Failed to store feedback", error);
-      return NextResponse.json(
+      return noStoreJson(
         { message: "Unable to submit feedback right now." },
         { status: 500 }
       );
     }
 
-    return NextResponse.json(
+    return noStoreJson(
       { message: "Thank you for your feedback! We appreciate your time." },
       { status: 201 }
     );
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json(
+      return noStoreJson(
         { message: "Invalid input", issues: error.flatten().fieldErrors },
         { status: 400 }
       );
     }
     console.error("Unexpected feedback submission error", error);
-    return NextResponse.json(
+    return noStoreJson(
       { message: "Unexpected error while submitting feedback." },
       { status: 500 }
     );

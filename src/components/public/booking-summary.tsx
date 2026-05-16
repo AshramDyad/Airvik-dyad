@@ -7,7 +7,7 @@ import { differenceInDays, format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import type { RoomType } from "@/data/types";
+import type { RatePlan, RoomType, SeasonalPrice } from "@/data/types";
 import type { EnhancedBookingSearchFormValues } from "./booking-widget";
 import { useDataContext } from "@/context/data-context";
 import { calculateMultipleRoomPricing } from "@/lib/pricing-calculator";
@@ -16,6 +16,8 @@ import { useCurrencyFormatter } from "@/hooks/use-currency";
 interface BookingSummaryProps {
   selection: RoomType[];
   searchValues: EnhancedBookingSearchFormValues;
+  ratePlan: RatePlan | null;
+  seasonalPrices: SeasonalPrice[];
   onRemove: (index: number) => void;
   onClear: () => void;
 }
@@ -23,11 +25,13 @@ interface BookingSummaryProps {
 export function BookingSummary({
   selection,
   searchValues,
+  ratePlan,
+  seasonalPrices,
   onRemove,
   onClear,
 }: BookingSummaryProps) {
   const router = useRouter();
-  const { ratePlans, seasonalPrices, property } = useDataContext();
+  const { property } = useDataContext();
   const formatCurrency = useCurrencyFormatter();
   const { dateRange } = searchValues;
   const requestedRooms = searchValues.roomOccupancies.length;
@@ -37,8 +41,6 @@ export function BookingSummary({
   }
 
   const nights = differenceInDays(dateRange.to, dateRange.from);
-  const ratePlan =
-    ratePlans.find((rp) => rp.name === "Standard Rate") || ratePlans[0];
   const taxConfig = {
     enabled: Boolean(property.tax_enabled),
     percentage: property.tax_percentage ?? 0,

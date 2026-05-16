@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useDataContext } from "@/context/data-context";
 import type { ReservationWithDetails } from "@/app/admin/reservations/components/columns";
-import type { ReservationStatus } from "@/data/types";
+import type { Guest, ReservationStatus, Room, RoomType } from "@/data/types";
 import { CancelReservationDialog } from "@/app/admin/reservations/components/cancel-reservation-dialog";
 import { InvoiceDownloadButton } from "@/components/shared/invoice-download-button";
 import { SendInvoiceWhatsAppButton } from "@/components/shared/send-invoice-whatsapp-button";
@@ -17,24 +17,29 @@ import * as React from "react";
 
 interface ReservationHeaderProps {
   reservation: ReservationWithDetails;
+  bookingReservations: ReservationWithDetails[];
+  guest: Guest | null | undefined;
+  bookingRooms: Room[];
+  bookingRoomTypes: RoomType[];
   bookingStatus?: ReservationStatus;
 }
 
-export function ReservationHeader({ reservation, bookingStatus }: ReservationHeaderProps) {
-  const { updateReservationStatus, updateBookingReservationStatus, guests, rooms, roomTypes, property, reservations } = useDataContext();
+export function ReservationHeader({
+  reservation,
+  bookingReservations,
+  guest,
+  bookingRooms,
+  bookingRoomTypes,
+  bookingStatus,
+}: ReservationHeaderProps) {
+  const {
+    updateReservationStatus,
+    updateBookingReservationStatus,
+    property,
+  } = useDataContext();
   const [isCancelDialogOpen, setIsCancelDialogOpen] = React.useState(false);
   const searchParams = useSearchParams();
   const isNewlyCreated = searchParams?.get("createdBooking") === "1";
-
-  // Get all reservations for this booking
-  const bookingReservations = React.useMemo(() => {
-    return reservations.filter((r) => r.bookingId === reservation.bookingId);
-  }, [reservations, reservation.bookingId]);
-
-  // Get guest for this reservation
-  const guest = React.useMemo(() => {
-    return guests.find((g) => g.id === reservation.guestId);
-  }, [guests, reservation.guestId]);
 
   const handleStatusUpdate = async (
     status: "Checked-in" | "Checked-out" | "Cancelled"
@@ -104,8 +109,8 @@ export function ReservationHeader({ reservation, bookingStatus }: ReservationHea
             reservations={bookingReservations}
             guest={guest}
             property={property}
-            rooms={rooms}
-            roomTypes={roomTypes}
+            rooms={bookingRooms}
+            roomTypes={bookingRoomTypes}
             invoiceType="invoice"
             variant="outline"
             size="sm"
@@ -114,8 +119,8 @@ export function ReservationHeader({ reservation, bookingStatus }: ReservationHea
             reservations={bookingReservations}
             guest={guest}
             property={property}
-            rooms={rooms}
-            roomTypes={roomTypes}
+            rooms={bookingRooms}
+            roomTypes={bookingRoomTypes}
             variant="outline"
             size="sm"
           />

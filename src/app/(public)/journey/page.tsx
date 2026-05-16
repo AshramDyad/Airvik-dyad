@@ -1,15 +1,12 @@
-"use client";
-
 import { JourneyHeroSection } from "@/components/marketing/journey/JourneyHeroSection";
-import { JourneyTimeline } from "@/components/marketing/journey/JourneyTimeline";
-import { JourneyCTA } from "@/components/marketing/journey/JourneyCTA";
+
+import { JourneySectionsLoader } from "./journey-sections-loader";
 
 export default function JourneyPage() {
   return (
     <div className="bg-background text-foreground">
       <JourneyHeroSection />
-      <JourneyTimeline />
-      <JourneyCTA />
+      <JourneySectionsLoader />
     </div>
   );
 }

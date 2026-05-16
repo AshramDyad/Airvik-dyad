@@ -25,16 +25,19 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { useDataContext } from "@/context/data-context";
+import { useReportReservations } from "@/hooks/use-report-reservations";
 import { cn } from "@/lib/utils";
 import { useCurrencyFormatter } from "@/hooks/use-currency";
 
 export function RevenueReport() {
-  const { reservations } = useDataContext();
   const currencyFormatter = useCurrencyFormatter();
   const [date, setDate] = React.useState<DateRange | undefined>({
     from: subDays(new Date(), 29),
     to: new Date(),
+  });
+  const { reservations } = useReportReservations({
+    from: date?.from,
+    to: date?.to,
   });
 
   const chartData = React.useMemo(() => {

@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { requirePageFeature } from "@/lib/server/page-auth";
 import { getEventById } from "@/lib/server/events";
-import { EventForm } from "@/components/admin/events/event-form";
+import { EventFormLoader } from "@/components/admin/events/event-form-loader";
 
 interface Props {
   params: Promise<{
@@ -26,7 +26,7 @@ export default async function EditEventPage({ params }: Props) {
           Update event details and schedule.
         </p>
       </div>
-      <EventForm initialData={event} />
+      <EventFormLoader initialData={event} />
     </div>
   );
 }

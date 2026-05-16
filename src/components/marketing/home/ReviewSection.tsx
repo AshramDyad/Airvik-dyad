@@ -67,7 +67,7 @@ export function ReviewSection() {
       setIsLoading(true);
       setLoadError(false);
       try {
-        const response = await fetch("/api/reviews", { cache: "no-store" });
+        const response = await fetch("/api/reviews");
         if (!response.ok) {
           setLoadError(true);
           return;
@@ -177,6 +177,7 @@ export function ReviewSection() {
                                 src={review.image}
                                 alt={review.imageAlt}
                                 fill
+                                sizes="(min-width: 1024px) 128px, 96px"
                                 className="object-cover rounded-full"
                               />
                             </div>

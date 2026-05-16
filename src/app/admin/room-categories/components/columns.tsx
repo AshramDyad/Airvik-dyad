@@ -50,7 +50,10 @@ export const columns: ColumnDef<RoomCategory>[] = [
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>Actions</DropdownMenuLabel>
             {hasPermission?.("update:room_category") && (
-                <RoomCategoryFormDialog roomCategory={roomCategory}>
+                <RoomCategoryFormDialog
+                  roomCategory={roomCategory}
+                  onSaved={() => table.options.meta?.refreshData?.()}
+                >
                     <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
                         Edit
                     </DropdownMenuItem>

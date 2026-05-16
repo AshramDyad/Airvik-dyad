@@ -42,21 +42,25 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import type {
+  Guest,
+  Property,
   Reservation,
   ReservationSource,
   ReservationStatus,
-  Guest,
-  Property,
   Room,
   RoomType,
 } from "@/data/types";
 import { useDataContext } from "@/context/data-context";
-import type { InvoiceData } from "@/lib/invoice/generate-invoice";
 import { useCurrencyFormatter } from "@/hooks/use-currency";
+import { authorizedFetch } from "@/lib/auth/client-session";
 import { formatBookingCode } from "@/lib/reservations/formatting";
 import { cn } from "@/lib/utils";
+import {
+  buildReservationInvoiceData,
+  type ReservationInvoiceRow,
+} from "./invoice-data";
 
-export type ReservationWithDetails = Reservation & {
+export type ReservationWithDetails = ReservationInvoiceRow & {
   displayAmount?: number;
   paidAmount?: number;
   remainingBalance?: number;
@@ -67,30 +71,61 @@ export type ReservationWithDetails = Reservation & {
   subRows?: ReservationWithDetails[];
 };
 
-function buildInvoiceData(
+type BookingInvoiceApiPayload = {
+  data?: {
+    reservations?: Reservation[];
+    guest?: Guest | null;
+    rooms?: Room[];
+    roomTypes?: RoomType[];
+  };
+};
+
+async function fetchBookingInvoiceData(
   row: ReservationWithDetails,
-  guests: Guest[],
   property: Property,
-  rooms: Room[],
-  roomTypes: RoomType[],
-): InvoiceData {
-  const reservations: Reservation[] = row.subRows?.length
-    ? (row.subRows as unknown as Reservation[])
-    : [row as unknown as Reservation];
-  const guest = guests.find((g) => g.id === row.guestId) ?? null;
-  return { reservations, guest, property, rooms, roomTypes };
+) {
+  const detailsId = row.subRows?.[0]?.id ?? row.id;
+  const response = await authorizedFetch(
+    `/api/admin/reservations/${encodeURIComponent(detailsId)}/booking`,
+    { cache: "no-store" },
+  );
+
+  if (!response.ok) {
+    const message = await response.text().catch(() => "");
+    throw new Error(message || "Failed to load invoice data.");
+  }
+
+  const payload = (await response.json()) as BookingInvoiceApiPayload;
+  const details = payload.data;
+  const fallbackInvoiceData = buildReservationInvoiceData(
+    row,
+    [],
+    property,
+    details?.rooms ?? [],
+    details?.roomTypes ?? [],
+  );
+
+  return {
+    reservations: details?.reservations?.length
+      ? details.reservations
+      : fallbackInvoiceData.reservations,
+    guest: details?.guest ?? fallbackInvoiceData.guest,
+    property,
+    rooms: details?.rooms ?? fallbackInvoiceData.rooms,
+    roomTypes: details?.roomTypes ?? fallbackInvoiceData.roomTypes,
+  };
 }
 
 function InvoiceDownloadCell({ row }: CellContext<ReservationWithDetails, unknown>) {
   const [isGenerating, setIsGenerating] = React.useState(false);
-  const { guests, property, rooms, roomTypes } = useDataContext();
+  const { property } = useDataContext();
 
   if (row.depth > 0) return null;
 
   const handleDownload = async () => {
     setIsGenerating(true);
     try {
-      const invoiceData = buildInvoiceData(row.original, guests, property, rooms, roomTypes);
+      const invoiceData = await fetchBookingInvoiceData(row.original, property);
       if (invoiceData.reservations.length === 0) {
         toast.error("No reservation data available.");
         return;
@@ -134,14 +169,14 @@ function InvoiceDownloadCell({ row }: CellContext<ReservationWithDetails, unknow
 
 function InvoiceViewCell({ row }: CellContext<ReservationWithDetails, unknown>) {
   const [isGenerating, setIsGenerating] = React.useState(false);
-  const { guests, property, rooms, roomTypes } = useDataContext();
+  const { property } = useDataContext();
 
   if (row.depth > 0) return null;
 
   const handleView = async () => {
     setIsGenerating(true);
     try {
-      const invoiceData = buildInvoiceData(row.original, guests, property, rooms, roomTypes);
+      const invoiceData = await fetchBookingInvoiceData(row.original, property);
       if (invoiceData.reservations.length === 0) {
         toast.error("No reservation data available.");
         return;

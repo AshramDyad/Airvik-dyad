@@ -1,11 +1,20 @@
 import { notFound } from "next/navigation";
 import Image from "next/image";
 import { format } from "date-fns";
-import { getPostBySlug } from "@/lib/server/posts";
+import {
+  getPublishedPostBySlug,
+  getPublishedPosts,
+} from "@/lib/server/posts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+
+export const revalidate = 3600;
+
+export async function generateStaticParams() {
+  const posts = await getPublishedPosts();
+  return posts.map((post) => ({ slug: post.slug }));
+}
 
 export default async function BlogPostPage({
   params,
@@ -13,7 +22,7 @@ export default async function BlogPostPage({
   params: Promise<{ slug: string }>;
 }) {
   const resolvedParams = await params;
-  const post = await getPostBySlug(resolvedParams.slug);
+  const post = await getPublishedPostBySlug(resolvedParams.slug);
 
   if (!post) {
     notFound();
@@ -22,10 +31,10 @@ export default async function BlogPostPage({
   return (
     <article className="container mx-auto py-12 px-4 max-w-4xl">
       <Button variant="ghost" asChild className="mb-8 pl-0 hover:bg-transparent hover:text-primary">
-        <Link href="/blog">
+        <a href="/blog">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Blog
-        </Link>
+        </a>
       </Button>
 
       <div className="space-y-6 text-center mb-12">
@@ -51,6 +60,7 @@ export default async function BlogPostPage({
             fill
             className="object-cover"
             priority
+            sizes="(max-width: 896px) 100vw, 896px"
           />
         </div>
       )}

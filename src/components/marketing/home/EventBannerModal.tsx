@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import { X } from "lucide-react";
 
-import type { EventBanner } from "@/data/types";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 
 import {
@@ -17,10 +16,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-type BannerResponse = { data: EventBanner | null };
+type HomepageModalBanner = {
+  title: string;
+  description?: string;
+  imageUrl: string;
+};
+
+type BannerResponse = { data: HomepageModalBanner | null };
 
 export function EventBannerModal() {
-  const [banner, setBanner] = useState<EventBanner | null>(null);
+  const [banner, setBanner] = useState<HomepageModalBanner | null>(null);
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -45,9 +50,7 @@ export function EventBannerModal() {
       if (window.sessionStorage.getItem(STORAGE_KEY)) return;
 
       try {
-        const response = await fetch("/api/event-banner/active", {
-          cache: "no-store",
-        });
+        const response = await fetch("/api/event-banner/active");
         if (!response.ok) return;
         const json: BannerResponse = await response.json();
         if (!cancelled && json?.data) {
@@ -103,7 +106,6 @@ export function EventBannerModal() {
               width={1200}
               height={700}
               className="lg:h-72 h-48 w-full object-cover"
-              priority
             />
           </div>
           <div className="space-y-3 px-4 pb-4 pt-4">

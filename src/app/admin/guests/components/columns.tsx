@@ -46,6 +46,7 @@ export const columns: ColumnDef<Guest>[] = [
     cell: ({ row, table }) => {
       const guest = row.original
       const hasPermission = table.options.meta?.hasPermission;
+      const onItemSaved = table.options.meta?.onItemSaved;
 
       return (
         <DropdownMenu>
@@ -58,7 +59,7 @@ export const columns: ColumnDef<Guest>[] = [
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>Actions</DropdownMenuLabel>
             {hasPermission?.("update:guest") && (
-                <GuestFormDialog guest={guest}>
+                <GuestFormDialog guest={guest} onGuestSaved={onItemSaved}>
                     <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
                         Edit
                     </DropdownMenuItem>

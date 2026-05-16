@@ -103,6 +103,7 @@ interface GuestFormDialogProps {
   children?: React.ReactNode;
   defaultOpen?: boolean;
   onGuestCreated?: (guest: Guest) => void;
+  onGuestSaved?: (guest: Guest) => void;
 }
 
 export function GuestFormDialog({
@@ -110,6 +111,7 @@ export function GuestFormDialog({
   children,
   defaultOpen = false,
   onGuestCreated,
+  onGuestSaved,
 }: GuestFormDialogProps) {
   const [open, setOpen] = React.useState(defaultOpen);
   const { addGuest, updateGuest } = useDataContext();
@@ -148,7 +150,11 @@ export function GuestFormDialog({
   async function onSubmit(values: z.infer<typeof guestSchema>) {
     try {
       if (isEditing && guest) {
-        await updateGuest(guest.id, values);
+        await updateGuest(guest.id, values, guest);
+        const updatedGuest = {
+          ...guest,
+          ...values,
+        };
         form.reset({
           firstName: values.firstName,
           lastName: values.lastName,
@@ -160,6 +166,7 @@ export function GuestFormDialog({
           state: values.state,
           country: values.country,
         });
+        onGuestSaved?.(updatedGuest);
       } else {
         const created = await addGuest(values);
         form.reset({
@@ -174,6 +181,7 @@ export function GuestFormDialog({
           country: "",
         });
         onGuestCreated?.(created);
+        onGuestSaved?.(created);
       }
 
       toast.success(

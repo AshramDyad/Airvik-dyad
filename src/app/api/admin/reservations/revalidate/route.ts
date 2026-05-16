@@ -8,6 +8,13 @@ import {
   RESERVATIONS_COUNT_CACHE_TAG,
 } from "@/server/reservations/cache";
 
+const cacheHeaders = {
+  "Cache-Control": "private, no-store",
+};
+
+const noStoreJson = (body: unknown, init?: ResponseInit) =>
+  NextResponse.json(body, { ...init, headers: cacheHeaders });
+
 export async function POST(request: Request) {
   try {
     await requireFeature(request, "reservations");
@@ -15,16 +22,16 @@ export async function POST(request: Request) {
     revalidateTag(RESERVATIONS_CACHE_TAG);
     revalidateTag(RESERVATIONS_COUNT_CACHE_TAG);
 
-    return NextResponse.json({ revalidated: true });
+    return noStoreJson({ revalidated: true });
   } catch (error) {
     if (error instanceof HttpError) {
-      return NextResponse.json(
+      return noStoreJson(
         { revalidated: false, message: error.message },
         { status: error.status }
       );
     }
     const message =
       error instanceof Error ? error.message : "Failed to revalidate cache";
-    return NextResponse.json({ revalidated: false, message }, { status: 500 });
+    return noStoreJson({ revalidated: false, message }, { status: 500 });
   }
 }

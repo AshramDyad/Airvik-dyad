@@ -15,7 +15,7 @@ import type { RatePlan } from "@/data/types"
 import { RatePlanFormDialog } from "./rate-plan-form-dialog"
 import { useCurrencyFormatter } from "@/hooks/use-currency";
 
-function PriceCell({ row }: CellContext<RatePlan, number>) {
+function PriceCell({ row }: CellContext<RatePlan, unknown>) {
   const formatCurrency = useCurrencyFormatter();
   const amount = Number(row.getValue("price")) || 0;
   return <div className="text-right font-medium">{formatCurrency(amount)}</div>;
@@ -48,7 +48,10 @@ export const columns: ColumnDef<RatePlan>[] = [
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>Actions</DropdownMenuLabel>
             {hasPermission?.("update:rate_plan") && (
-                <RatePlanFormDialog ratePlan={ratePlan}>
+                <RatePlanFormDialog
+                  ratePlan={ratePlan}
+                  onSaved={() => table.options.meta?.refreshData?.()}
+                >
                     <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
                         Edit
                     </DropdownMenuItem>

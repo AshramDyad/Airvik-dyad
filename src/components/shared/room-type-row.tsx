@@ -10,12 +10,12 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { ReservationHoverCard } from "@/components/shared/reservation-hover-card";
 import type {
   AvailabilityCellStatus,
+  RoomDayReservation,
   RoomTypeAvailability,
   UnitsViewMode,
-  Guest,
 } from "@/data/types";
+import type { CalendarReservationDetail } from "@/lib/calendar/reservation-details";
 import { cn } from "@/lib/utils";
-import { useDataContext } from "@/context/data-context";
 
 const availabilityStatusClasses: Record<AvailabilityCellStatus, string> = {
   free: "bg-emerald-400 border border-emerald-200",
@@ -30,6 +30,12 @@ const bookedPillClasses =
 const cellBaseClasses =
   "relative flex min-h-[60px] w-full items-center justify-center rounded-none px-6 text-lg font-semibold transition focus-visible:outline-none";
 
+const formatName = (...parts: Array<string | null | undefined>) =>
+  parts
+    .filter((part): part is string => Boolean(part && part.trim()))
+    .join(" ")
+    .trim();
+
 interface RoomTypeRowProps {
   data: RoomTypeAvailability;
   unitsView: UnitsViewMode;
@@ -37,6 +43,7 @@ interface RoomTypeRowProps {
   todayIso: string;
   onCellClick?: (roomTypeId: string, date: string, status: AvailabilityCellStatus, isClosed: boolean) => void;
   selectedCell?: { roomTypeId: string; date: string } | null;
+  reservationDetailsById: ReadonlyMap<string, CalendarReservationDetail>;
 }
 
 export function RoomTypeRow({
@@ -46,24 +53,22 @@ export function RoomTypeRow({
   todayIso,
   onCellClick,
   selectedCell,
+  reservationDetailsById,
 }: RoomTypeRowProps) {
   const [isExpanded, setIsExpanded] = React.useState(false);
   const { roomType, availability } = data;
-  const { guests } = useDataContext();
-
-  const guestMap = React.useMemo(() => {
-    return new Map<string, Guest>(guests.map((guest) => [guest.id, guest]));
-  }, [guests]);
 
   const getGuestName = React.useCallback(
-    (guestId: string) => {
-      const guest = guestMap.get(guestId);
-      if (!guest) {
-        return "Guest";
-      }
-      return `${guest.firstName} ${guest.lastName}`.trim();
+    (entry: RoomDayReservation) => {
+      const detail = reservationDetailsById.get(entry.reservationId);
+      return (
+        formatName(
+          detail?.guestSnapshot.firstName,
+          detail?.guestSnapshot.lastName,
+        ) || "Guest"
+      );
     },
-    [guestMap]
+    [reservationDetailsById],
   );
 
   if (roomType.units <= 0) {
@@ -216,6 +221,7 @@ export function RoomTypeRow({
                 <ReservationHoverCard
                   reservationIds={day.reservationIds}
                   date={day.date}
+                  reservationDetailsById={reservationDetailsById}
                 >
                   {cellContent}
                 </ReservationHoverCard>
@@ -275,7 +281,7 @@ export function RoomTypeRow({
                     span += 1;
                   }
 
-                  const guestName = getGuestName(entry.guestId);
+                  const guestName = getGuestName(entry);
                   dayCells.push(
                     <TableCell
                       key={`${room.id}-${entry.reservationId}-${day.date}`}
@@ -285,6 +291,7 @@ export function RoomTypeRow({
                       <ReservationHoverCard
                         reservationIds={[entry.reservationId]}
                         date={day.date}
+                        reservationDetailsById={reservationDetailsById}
                       >
                         <div
                           className={cn(

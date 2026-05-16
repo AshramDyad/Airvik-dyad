@@ -1,5 +1,14 @@
 import { Category, Post } from "@/data/types";
 
+export const DB_CATEGORY_SELECT_COLUMNS =
+  "id, name, slug, description, parent_id, created_at" as const;
+
+export const DB_POST_SELECT_COLUMNS =
+  "id, title, slug, content, excerpt, featured_image, status, published_at, author_id, created_at, updated_at" as const;
+
+export const DB_POST_WITH_CATEGORIES_SELECT_COLUMNS =
+  `${DB_POST_SELECT_COLUMNS}, categories:post_categories(categories(${DB_CATEGORY_SELECT_COLUMNS}))` as const;
+
 export type DbCategory = {
   id: string;
   name: string;

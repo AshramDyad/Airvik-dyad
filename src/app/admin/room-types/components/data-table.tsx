@@ -27,13 +27,18 @@ import { DeleteConfirmationDialog } from "@/components/shared/delete-confirmatio
 import { useDataContext } from "@/context/data-context"
 import { useAuthContext } from "@/context/auth-context"
 import type { RoomType } from "@/data/types"
+import type { AdminRoomTypeAmenityOption } from "./types"
 
 export function RoomTypesDataTable<TData extends RoomType, TValue>({
   columns,
   data,
+  amenities,
+  onRefresh,
 }: {
   columns: ColumnDef<TData, TValue>[]
   data: TData[]
+  amenities: AdminRoomTypeAmenityOption[]
+  onRefresh: () => void | Promise<void>
 }) {
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [itemToDelete, setItemToDelete] = React.useState<TData | null>(null)
@@ -42,9 +47,10 @@ export function RoomTypesDataTable<TData extends RoomType, TValue>({
 
   const handleDeleteConfirm = async () => {
     if (itemToDelete) {
-      const success = await deleteRoomType(itemToDelete.id);
+      const success = await deleteRoomType(itemToDelete.id, itemToDelete);
       if (success) {
         toast.success(`Room type "${itemToDelete.name}" has been deleted.`);
+        await onRefresh();
       } else {
         toast.error("Failed to delete room type.", {
           description: "This room type is still in use by one or more rooms.",
@@ -68,6 +74,8 @@ export function RoomTypesDataTable<TData extends RoomType, TValue>({
       openDeleteDialog: (item: TData) => {
         setItemToDelete(item)
       },
+      amenities,
+      refreshData: onRefresh,
       hasPermission,
     },
   })
@@ -77,7 +85,7 @@ export function RoomTypesDataTable<TData extends RoomType, TValue>({
       <div className="space-y-6">
         <div className="flex items-center justify-end gap-3">
           {hasPermission("create:room_type") && (
-            <RoomTypeFormDialog>
+            <RoomTypeFormDialog amenities={amenities} onSaved={onRefresh}>
               <Button>Add Room Type</Button>
             </RoomTypeFormDialog>
           )}

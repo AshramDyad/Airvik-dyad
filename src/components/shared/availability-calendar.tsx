@@ -48,6 +48,7 @@ import {
   formatMonthStart,
   useMultiMonthAvailability,
 } from "@/hooks/use-monthly-availability";
+import { useCalendarReservationDetails } from "@/hooks/use-calendar-reservation-details";
 import { RoomTypeRow } from "@/components/shared/room-type-row";
 import { cn } from "@/lib/utils";
 import { useFullscreen } from "@/hooks/use-fullscreen";
@@ -138,6 +139,12 @@ export function AvailabilityCalendar() {
     currentMonth,
     visibleMonths
   );
+  const visibleReservationIds = React.useMemo(
+    () => collectAvailabilityReservationIds(dataByMonth),
+    [dataByMonth],
+  );
+  const { detailsById: reservationDetailsById } =
+    useCalendarReservationDetails(visibleReservationIds);
   const hasAvailability = React.useMemo(() => {
     return monthSequence.some((monthDate) => {
       const monthKey = formatMonthStart(monthDate);
@@ -425,6 +432,7 @@ export function AvailabilityCalendar() {
                                 todayIso={todayIso}
                                 onCellClick={handleCellSelection}
                                 selectedCell={selectedCell}
+                                reservationDetailsById={reservationDetailsById}
                               />
                             ))}
                           </TableBody>
@@ -589,6 +597,25 @@ function buildHeaderDays(
   }));
 }
 
+function collectAvailabilityReservationIds(
+  dataByMonth: Record<string, RoomTypeAvailability[]>
+) {
+  const ids = new Set<string>();
+
+  Object.values(dataByMonth).forEach((availabilityByRoomType) => {
+    availabilityByRoomType.forEach((roomTypeAvailability) => {
+      roomTypeAvailability.availability.forEach((day) => {
+        day.reservationIds.forEach((id) => ids.add(id));
+        Object.values(day.roomReservations ?? {}).forEach((entry) => {
+          ids.add(entry.reservationId);
+        });
+      });
+    });
+  });
+
+  return Array.from(ids).sort();
+}
+
 function buildMonthOptions(currentMonth: Date) {
   const todayStart = startOfMonth(new Date());
   const anchor =
@@ -737,6 +764,16 @@ function LegacyAvailabilityCalendar() {
                           const guest = guests.find(
                             (g) => g.id === reservation.guestId
                           );
+                          const guestName =
+                            guest
+                              ? `${guest.firstName} ${guest.lastName}`.trim()
+                              : [
+                                  reservation.guestSnapshot?.firstName,
+                                  reservation.guestSnapshot?.lastName,
+                                ]
+                                  .filter(Boolean)
+                                  .join(" ")
+                                  .trim() || "Guest";
                           const statusStyle = getStatusStyle(
                             reservation.status
                           );
@@ -758,13 +795,13 @@ function LegacyAvailabilityCalendar() {
                                     )}
                                   >
                                     <span className="truncate">
-                                      {guest?.firstName} {guest?.lastName}
+                                      {guestName}
                                     </span>
                                   </div>
                                 </TooltipTrigger>
                                 <TooltipContent className="max-w-xs">
                                   <p className="font-bold">
-                                    {guest?.firstName} {guest?.lastName}
+                                    {guestName}
                                   </p>
                                   <p className="text-sm">
                                     Status: {reservation.status}

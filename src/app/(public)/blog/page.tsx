@@ -1,14 +1,15 @@
-import Link from "next/link";
 import Image from "next/image";
 import { format } from "date-fns";
-import { getPosts } from "@/lib/server/posts";
+import {
+  getPublishedPosts,
+} from "@/lib/server/posts";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 3600;
 
 export default async function BlogPage() {
-  const posts = await getPosts({ status: "published" });
+  const posts = await getPublishedPosts();
 
   return (
     <div className="container mx-auto py-12 px-4">
@@ -20,7 +21,7 @@ export default async function BlogPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
         {posts.length > 0 ? (
           posts.map((post) => (
-            <Link href={`/blog/${post.slug}`} key={post.id} className="group">
+            <a href={`/blog/${post.slug}`} key={post.id} className="group">
               <Card className="h-full overflow-hidden transition-shadow hover:shadow-lg border-none shadow-md">
                 <div className="relative aspect-video w-full overflow-hidden rounded-t-lg">
                   {post.featured_image ? (
@@ -29,6 +30,7 @@ export default async function BlogPage() {
                       alt={post.title}
                       fill
                       className="object-cover transition-transform duration-300 group-hover:scale-105"
+                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                     />
                   ) : (
                     <div className="w-full h-full bg-muted flex items-center justify-center text-muted-foreground">
@@ -57,7 +59,7 @@ export default async function BlogPage() {
                   {post.published_at && format(new Date(post.published_at), "MMMM d, yyyy")}
                 </CardFooter>
               </Card>
-            </Link>
+            </a>
           ))
         ) : (
             <div className="col-span-full text-center py-12">

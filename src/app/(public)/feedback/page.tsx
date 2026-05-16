@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { FeedbackForm } from "@/components/feedback/feedback-form";
+import { FeedbackFormLoader } from "@/components/feedback/feedback-form-loader";
 
 export const metadata: Metadata = {
   title: "Share Feedback | Sahajanand Wellness",
@@ -22,7 +22,7 @@ export default function FeedbackPage() {
           </p>
         </div>
         <div className="mt-12">
-          <FeedbackForm />
+          <FeedbackFormLoader />
         </div>
       </div>
     </section>

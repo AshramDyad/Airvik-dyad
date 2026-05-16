@@ -44,6 +44,7 @@ import { buildRoomOccupancyAssignments } from "@/lib/reservations/guest-allocati
 import { isActiveReservationStatus } from "@/lib/reservations/status";
 import { markReservationAsRemoved } from "@/lib/reservations/filters";
 import { useCurrencyFormatter } from "@/hooks/use-currency";
+import { useAdminReservationFormData } from "@/hooks/use-admin-reservation-form-data";
 import type { Reservation, RoomType } from "@/data/types";
 import type { ReservationWithDetails } from "@/app/admin/reservations/components/columns";
 import { useDataContext } from "@/context/data-context";
@@ -138,16 +139,20 @@ export function ReservationEditForm({
     updateReservation,
     addRoomsToBooking,
     reservations,
-    rooms,
-    roomTypes,
     guests,
-    ratePlans,
-    seasonalPrices,
     property,
     validateBookingRequest,
     refreshReservations,
     activeBookingReservations,
   } = useDataContext();
+  const {
+    rooms,
+    roomTypes,
+    ratePlans,
+    seasonalPrices,
+    isLoading: isLoadingFormData,
+    error: formDataError,
+  } = useAdminReservationFormData();
 
   const guest = React.useMemo(() => guests.find((g) => g.id === reservation.guestId), [guests, reservation.guestId]);
 
@@ -429,7 +434,13 @@ export function ReservationEditForm({
     [resolveCapacity, selectedRoomIds]
   );
   const hasCapacity = totalGuests > 0 && selectedRoomsCapacity >= totalGuests;
-  const canSubmit = form.formState.isValid && hasCapacity && selectedRoomIds.length > 0 && !ratePlanUnavailable;
+  const canSubmit =
+    form.formState.isValid &&
+    hasCapacity &&
+    selectedRoomIds.length > 0 &&
+    !ratePlanUnavailable &&
+    !isLoadingFormData &&
+    !formDataError;
 
   React.useEffect(() => {
     if (!watchedDateRange?.from || !watchedDateRange?.to) return;
@@ -949,6 +960,11 @@ export function ReservationEditForm({
 
   return (
     <div className="space-y-6">
+      {formDataError && (
+        <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
+          {formDataError}
+        </div>
+      )}
       <Form {...form}>
         <form
           onSubmit={form.handleSubmit(handleSubmit)}
@@ -1098,7 +1114,11 @@ export function ReservationEditForm({
                       </p>
                     )}
                     <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
-                      {watchedDateRange?.from && watchedDateRange?.to ? (
+                      {isLoadingFormData ? (
+                        <p className="rounded-xl border border-dashed border-border/60 p-4 text-center text-sm text-muted-foreground">
+                          Loading room and rate data...
+                        </p>
+                      ) : watchedDateRange?.from && watchedDateRange?.to ? (
                         filteredAvailableRooms.length ? (
                           filteredAvailableRooms.map((room) => {
                             const roomType = roomTypeMap.get(room.roomTypeId);

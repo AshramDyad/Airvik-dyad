@@ -1,36 +1,24 @@
 "use client";
 
-import React, {
-  useCallback,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import type { MouseEvent } from "react";
+import { useCallback, useRef, useState } from "react";
 import Image from "next/image";
+import dynamic from "next/dynamic";
 import { motion } from "framer-motion";
-import Lightbox, { type Slide } from "yet-another-react-lightbox";
-import DownloadPlugin from "yet-another-react-lightbox/plugins/download";
-import Counter from "yet-another-react-lightbox/plugins/counter";
-import {
-  ChevronLeft,
-  ChevronRight,
-  Download as DownloadIcon,
-  X,
-} from "lucide-react";
+import type {
+  GalleryLightboxImage,
+  GalleryLightboxProps,
+} from "./gallery-lightbox";
 
-type GalleryImage = {
-  src: string;
-  alt: string;
-};
+const DynamicGalleryLightbox = dynamic<GalleryLightboxProps>(
+  () => import("./gallery-lightbox").then((module) => module.GalleryLightbox),
+  {
+    loading: () => null,
+    ssr: false,
+  },
+);
 
-type DownloadableSlide = Slide & {
-  download?: {
-    url: string;
-    filename: string;
-  };
-};
-
-const galleryImages: GalleryImage[] = [
+const galleryImages: GalleryLightboxImage[] = [
   {
     src: "/havan.png",
     alt: "Saints performing a havan ceremony at the ashram.",
@@ -81,34 +69,10 @@ const galleryImages: GalleryImage[] = [
   },
 ];
 
-const buildDownloadName = (alt: string, index: number, src: string) => {
-  const sanitized = alt
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)+/g, "")
-    .trim();
-  const fallback = `ashram-image-${index + 1}`;
-  const extension = src.split("?")[0]?.split(".").pop() ?? "jpg";
-  return `${sanitized || fallback}.${extension}`;
-};
-
 export function GalleryPageSection() {
   const [viewerIndex, setViewerIndex] = useState(0);
   const [isViewerOpen, setIsViewerOpen] = useState(false);
   const lastTriggerRef = useRef<HTMLButtonElement | null>(null);
-
-  const slides = useMemo<DownloadableSlide[]>(
-    () =>
-      galleryImages.map((image, index) => ({
-        src: image.src,
-        alt: image.alt,
-        download: {
-          url: image.src,
-          filename: buildDownloadName(image.alt, index, image.src),
-        },
-      })),
-    []
-  );
 
   const handleClose = useCallback(() => {
     setIsViewerOpen(false);
@@ -118,7 +82,7 @@ export function GalleryPageSection() {
   }, []);
 
   const openViewer = useCallback(
-    (index: number) => (event: React.MouseEvent<HTMLButtonElement>) => {
+    (index: number) => (event: MouseEvent<HTMLButtonElement>) => {
       lastTriggerRef.current = event.currentTarget;
       setViewerIndex(index);
       setIsViewerOpen(true);
@@ -202,34 +166,14 @@ export function GalleryPageSection() {
         </motion.div>
       </div>
 
-      <Lightbox
-        className="ashram-lightbox"
-        open={isViewerOpen}
-        close={handleClose}
-        index={viewerIndex}
-        slides={slides}
-        controller={{ closeOnBackdropClick: true }}
-        carousel={{ finite: false, imageFit: "contain" }}
-        plugins={[DownloadPlugin, Counter]}
-        counter={{
-          container: {
-            className: "ashram-lightbox-counter",
-            "aria-live": "polite",
-          },
-        }}
-        toolbar={{
-          buttons: ["close", "download"],
-        }}
-        render={{
-          iconClose: () =>  <X className="h-5 w-5" aria-hidden />,
-          iconPrev: () => <ChevronLeft className="h-6 w-6" aria-hidden />,
-          iconNext: () => <ChevronRight className="h-6 w-6" aria-hidden />,
-          iconDownload: () => <DownloadIcon className="h-5 w-5" aria-hidden />,
-        }}
-        on={{
-          view: ({ index }) => setViewerIndex(index),
-        }}
-      />
+      {isViewerOpen ? (
+        <DynamicGalleryLightbox
+          images={galleryImages}
+          index={viewerIndex}
+          onClose={handleClose}
+          onView={(index) => setViewerIndex(index)}
+        />
+      ) : null}
     </section>
   );
 }

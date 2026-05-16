@@ -10,21 +10,17 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import type { Room, RoomStatus, HousekeepingAssignment } from "@/data/types";
+import type { RoomStatus, User } from "@/data/types";
 import { cn } from "@/lib/utils";
 import { ROOM_STATUS_LABELS } from "@/lib/rooms";
-import { User } from "lucide-react";
+import { User as UserIcon } from "lucide-react";
 import { UpdateStatusDialog } from "./update-status-dialog";
 import { AssignHousekeeperDialog } from "./assign-housekeeper-dialog";
-
-interface RoomWithDetails extends Room {
-  roomTypeName: string;
-  assignment?: HousekeepingAssignment;
-  housekeeperName?: string;
-}
+import type { HousekeepingRoomWithDetails } from "../types";
 
 interface RoomStatusCardProps {
-  room: RoomWithDetails;
+  room: HousekeepingRoomWithDetails;
+  housekeepers: User[];
   onStatusUpdate: (roomId: string, newStatus: RoomStatus) => void;
 }
 
@@ -44,7 +40,11 @@ const statusStyles: Record<RoomStatus, { className: string }> = {
   },
 };
 
-export function RoomStatusCard({ room, onStatusUpdate }: RoomStatusCardProps) {
+export function RoomStatusCard({
+  room,
+  housekeepers,
+  onStatusUpdate,
+}: RoomStatusCardProps) {
   const { className } = statusStyles[room.status];
   const label = ROOM_STATUS_LABELS[room.status];
 
@@ -69,7 +69,7 @@ export function RoomStatusCard({ room, onStatusUpdate }: RoomStatusCardProps) {
       <CardContent className="flex-1">
         {room.assignment && room.status === "Dirty" ? (
           <div className="flex items-center gap-3 rounded-2xl border border-border/40 bg-card/80 px-4 py-3 text-sm text-muted-foreground shadow-sm">
-            <User className="h-4 w-4" />
+            <UserIcon className="h-4 w-4" />
             <span className="font-medium text-foreground">
               Assigned to: <span className="font-semibold">{room.housekeeperName}</span> ({room.assignment.status})
             </span>
@@ -85,6 +85,7 @@ export function RoomStatusCard({ room, onStatusUpdate }: RoomStatusCardProps) {
           <AssignHousekeeperDialog
             roomId={room.id}
             currentAssigneeId={room.assignment?.assignedTo}
+            housekeepers={housekeepers}
           >
             <Button variant="secondary" size="sm">
               {room.assignment ? "Re-assign" : "Assign"}

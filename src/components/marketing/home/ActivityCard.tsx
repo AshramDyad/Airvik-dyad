@@ -67,6 +67,7 @@ export function ActivityCard({
           "object-cover transition-transform duration-500 ease-in-out",
           isExpanded && "scale-110"
         )}
+        sizes="(max-width: 768px) 100vw, 33vw"
       />
 
       {/* Content Overlay */}

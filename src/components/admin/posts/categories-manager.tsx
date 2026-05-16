@@ -32,7 +32,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { createCategory, updateCategory, deleteCategory } from "@/lib/api";
+import { createCategoryIdOnly, updateCategoryWithoutReturning, deleteCategory } from "@/lib/api";
 import { Category } from "@/data/types";
 
 const categorySchema = z.object({
@@ -41,6 +41,11 @@ const categorySchema = z.object({
   parent_id: z.string().optional().nullable(),
   description: z.string().optional(),
 });
+
+const definedCategoryUpdate = (categoryData: Partial<Category>): Partial<Category> =>
+  Object.fromEntries(
+    Object.entries(categoryData).filter(([, value]) => typeof value !== "undefined")
+  ) as Partial<Category>;
 
 export function CategoriesManager({ initialCategories }: { initialCategories: Category[] }) {
   const router = useRouter();
@@ -95,11 +100,21 @@ export function CategoriesManager({ initialCategories }: { initialCategories: Ca
       };
 
       if (editingId) {
-        const updated = await updateCategory(editingId, payload);
-        setCategories(categories.map(c => c.id === editingId ? updated : c));
+        await updateCategoryWithoutReturning(editingId, payload);
+        const updateForState = definedCategoryUpdate(payload);
+        setCategories(categories.map(c => c.id === editingId ? { ...c, ...updateForState } : c));
         setEditingId(null);
       } else {
-        const created = await createCategory(payload);
+        const categoryId = await createCategoryIdOnly(payload);
+        const created: Category = {
+          id: categoryId,
+          name: payload.name,
+          slug: payload.slug,
+          description: payload.description,
+          parent_id: payload.parent_id,
+          created_at: new Date().toISOString(),
+          _count: { posts: 0 },
+        };
         setCategories([...categories, created]);
       }
       form.reset({

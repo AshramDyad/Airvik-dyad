@@ -38,11 +38,13 @@ const ratePlanSchema = z.object({
 
 interface RatePlanFormDialogProps {
   ratePlan?: RatePlan;
+  onSaved?: () => void | Promise<void>;
   children: React.ReactNode;
 }
 
 export function RatePlanFormDialog({
   ratePlan,
+  onSaved,
   children,
 }: RatePlanFormDialogProps) {
   const [open, setOpen] = React.useState(false);
@@ -71,10 +73,11 @@ export function RatePlanFormDialog({
 
     try {
       if (isEditing && ratePlan) {
-        await updateRatePlan(ratePlan.id, ratePlanData);
+        await updateRatePlan(ratePlan.id, ratePlanData, ratePlan);
       } else {
         await addRatePlan(ratePlanData);
       }
+      await onSaved?.();
 
       toast.success(
         `Rate plan ${isEditing ? "updated" : "created"} successfully!`

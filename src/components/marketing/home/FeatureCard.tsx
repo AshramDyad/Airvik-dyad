@@ -1,9 +1,5 @@
-"use client";
-
-import React from "react";
 import Image from "next/image";
-import Link from "next/link";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -49,6 +45,7 @@ export function FeatureCard({
           fill
           style={{ objectFit: "cover" }}
           className="rounded-xl"
+          sizes="(max-width: 1024px) 100vw, 33vw"
         />
       </div>
       <div className="pt-4 space-y-2">
@@ -69,7 +66,7 @@ export function FeatureCard({
                 asChild
                 className="w-full bg-primary hover:bg-primary-hover"
               >
-                <Link href="/book">Book Ashram Stay</Link>
+                <a href="/book">Book Ashram Stay</a>
               </Button>
             </div>
           )}

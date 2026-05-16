@@ -1,11 +1,10 @@
 import type { DonationListFilters } from "@/lib/api/donations";
 import { getPropertyCurrency } from "@/lib/server/property";
 import { DonationStatsGrid } from "@/components/admin/donations/donation-stats";
-import { DonationFilters } from "@/components/admin/donations/donation-filters";
-import { DonationsTable } from "@/components/admin/donations/donations-table";
 import type { DonationFrequency, DonationStatus } from "@/data/types";
 import { requirePageFeature } from "@/lib/server/page-auth";
 import { getAdminDonationStats, getAdminDonations } from "@/lib/server/donations";
+import { DonationsIndexLoader } from "./donations-index-loader";
 
 export const metadata = {
   title: "Donations | Admin",
@@ -76,9 +75,7 @@ export default async function AdminDonationsPage({
 
       <DonationStatsGrid stats={stats} currency={currency} />
 
-      <DonationFilters initialValues={initialFilters} />
-
-      <DonationsTable donations={donations} />
+      <DonationsIndexLoader initialFilters={initialFilters} donations={donations} />
     </div>
   );
 }

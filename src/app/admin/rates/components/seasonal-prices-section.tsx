@@ -20,15 +20,26 @@ import { useDataContext } from "@/context/data-context";
 import { useAuthContext } from "@/context/auth-context";
 import { useCurrencyFormatter } from "@/hooks/use-currency";
 import { SeasonalPriceFormDialog } from "./seasonal-price-form-dialog";
+import type { SeasonalPrice } from "@/data/types";
+import type { AdminRateRoomTypeOption } from "./types";
 
-export function SeasonalPricesSection() {
-  const { seasonalPrices, roomTypes, deleteSeasonalPrice } = useDataContext();
+type SeasonalPricesSectionProps = {
+  roomTypes: AdminRateRoomTypeOption[];
+  seasonalPrices: SeasonalPrice[];
+  onRefresh: () => void | Promise<void>;
+};
+
+export function SeasonalPricesSection({
+  roomTypes,
+  seasonalPrices,
+  onRefresh,
+}: SeasonalPricesSectionProps) {
+  const { deleteSeasonalPrice } = useDataContext();
   const { hasPermission } = useAuthContext();
   const formatCurrency = useCurrencyFormatter();
-  const [deleteTarget, setDeleteTarget] = React.useState<{
-    id: string;
-    name: string;
-  } | null>(null);
+  const [deleteTarget, setDeleteTarget] = React.useState<SeasonalPrice | null>(
+    null,
+  );
 
   const roomTypeNameMap = React.useMemo(() => {
     const map = new Map<string, string>();
@@ -36,10 +47,11 @@ export function SeasonalPricesSection() {
     return map;
   }, [roomTypes]);
 
-  const handleDelete = async (id: string, name: string) => {
+  const handleDelete = async (seasonalPrice: SeasonalPrice) => {
     try {
-      await deleteSeasonalPrice(id);
-      toast.success(`Deleted seasonal price "${name}"`);
+      await deleteSeasonalPrice(seasonalPrice.id, seasonalPrice);
+      toast.success(`Deleted seasonal price "${seasonalPrice.name}"`);
+      await onRefresh();
     } catch {
       toast.error("Failed to delete seasonal price");
     }
@@ -50,7 +62,10 @@ export function SeasonalPricesSection() {
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Seasonal Prices</h2>
         {hasPermission("create:rate_plan") && (
-          <SeasonalPriceFormDialog>
+          <SeasonalPriceFormDialog
+            roomTypes={roomTypes}
+            onSaved={onRefresh}
+          >
             <Button size="sm">
               <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
               Add Seasonal Price
@@ -93,7 +108,11 @@ export function SeasonalPricesSection() {
                   <TableCell>
                     <div className="flex items-center gap-1">
                       {hasPermission("update:rate_plan") && (
-                        <SeasonalPriceFormDialog seasonalPrice={sp}>
+                        <SeasonalPriceFormDialog
+                          seasonalPrice={sp}
+                          roomTypes={roomTypes}
+                          onSaved={onRefresh}
+                        >
                           <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Edit seasonal price">
                             <Pencil className="h-4 w-4" aria-hidden="true" />
                           </Button>
@@ -105,7 +124,7 @@ export function SeasonalPricesSection() {
                           size="icon"
                           className="h-8 w-8 text-destructive"
                           aria-label={`Delete seasonal price ${sp.name}`}
-                          onClick={() => setDeleteTarget({ id: sp.id, name: sp.name })}
+                          onClick={() => setDeleteTarget(sp)}
                         >
                           <Trash2 className="h-4 w-4" aria-hidden="true" />
                         </Button>
@@ -125,7 +144,7 @@ export function SeasonalPricesSection() {
         }}
         onConfirm={() => {
           if (deleteTarget) {
-            handleDelete(deleteTarget.id, deleteTarget.name);
+            void handleDelete(deleteTarget);
             setDeleteTarget(null);
           }
         }}

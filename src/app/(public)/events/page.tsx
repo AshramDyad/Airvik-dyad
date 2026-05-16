@@ -12,8 +12,10 @@ export const metadata = {
 };
 
 export default async function EventsPublicPage() {
-  const activeEvent = await getHomepageBanner();
-  const upcomingEvents = await getUpcomingEvents();
+  const [activeEvent, upcomingEvents] = await Promise.all([
+    getHomepageBanner(),
+    getUpcomingEvents(),
+  ]);
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -54,6 +56,7 @@ export default async function EventsPublicPage() {
                   fill
                   className="object-cover"
                   priority
+                  sizes="(max-width: 1024px) 100vw, 50vw"
                 />
               </div>
             </div>

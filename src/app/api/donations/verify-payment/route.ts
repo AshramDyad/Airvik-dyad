@@ -2,17 +2,23 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDonationById, updateDonationRecord } from "@/lib/api/donations";
 import { verifyCheckoutSignature } from "@/lib/razorpay";
 
+const cacheHeaders = {
+  "Cache-Control": "private, no-store",
+};
+const noStoreJson = (body: unknown, init?: ResponseInit) =>
+  NextResponse.json(body, { ...init, headers: cacheHeaders });
+
 export async function POST(request: NextRequest) {
   try {
     const { donationId, razorpay_order_id, razorpay_payment_id, razorpay_signature } = await request.json();
 
     if (!donationId || !razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
-      return NextResponse.json({ message: "Missing payment verification payload" }, { status: 400 });
+      return noStoreJson({ message: "Missing payment verification payload" }, { status: 400 });
     }
 
     const donation = await getDonationById(donationId);
     if (!donation) {
-      return NextResponse.json({ message: "Donation not found" }, { status: 404 });
+      return noStoreJson({ message: "Donation not found" }, { status: 404 });
     }
 
     const isValid = verifyCheckoutSignature({
@@ -22,7 +28,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (!isValid) {
-      return NextResponse.json({ message: "Signature verification failed" }, { status: 400 });
+      return noStoreJson({ message: "Signature verification failed" }, { status: 400 });
     }
 
     const updated = await updateDonationRecord(donation.id, {
@@ -32,7 +38,7 @@ export async function POST(request: NextRequest) {
       razorpaySignature: razorpay_signature,
     });
 
-    return NextResponse.json({
+    return noStoreJson({
       receipt: {
         donationId: updated.id,
         amountInMinor: updated.amountInMinor,
@@ -46,7 +52,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Failed to verify Razorpay payment", error);
-    return NextResponse.json(
+    return noStoreJson(
       { message: error instanceof Error ? error.message : "Unable to verify payment" },
       { status: 400 },
     );

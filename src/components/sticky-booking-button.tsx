@@ -11,8 +11,8 @@ import {
 } from "@/components/ui/popover";
 import { CalendarCheck, Bed, ChevronRight } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
-import { useDataContext } from "@/context/data-context";
 import { cn } from "@/lib/utils";
+import { useRoomTypePreview } from "@/hooks/use-room-type-preview";
 
 const featuredRoomMatchers = [
   {
@@ -39,19 +39,15 @@ const featuredRoomMatchers = [
 
 export function StickyBookingButton() {
   const pathname = usePathname();
-  const { roomTypes } = useDataContext();
   const [isOpen, setIsOpen] = React.useState(false);
-  const visibleRoomTypes = React.useMemo(
-    () => (roomTypes ?? []).filter((roomType) => roomType.isVisible !== false),
-    [roomTypes]
-  );
 
   const isAdminRoute = React.useMemo(() => {
     return pathname?.startsWith("/admin");
   }, [pathname]);
+  const { roomTypes } = useRoomTypePreview(isOpen && !isAdminRoute);
 
   const rooms = React.useMemo(() => {
-    if (visibleRoomTypes.length === 0) {
+    if (roomTypes.length === 0) {
       return featuredRoomMatchers.map((room) => ({
         name: room.label,
         subtitle: room.subtitle,
@@ -60,7 +56,7 @@ export function StickyBookingButton() {
     }
 
     return featuredRoomMatchers.map((room) => {
-      const matchedRoomType = visibleRoomTypes.find((roomType) =>
+      const matchedRoomType = roomTypes.find((roomType) =>
         roomType.name.toLowerCase().startsWith(room.match.toLowerCase())
       );
 
@@ -70,7 +66,7 @@ export function StickyBookingButton() {
         href: matchedRoomType ? `/book/rooms/${matchedRoomType.id}` : "/book",
       };
     });
-  }, [visibleRoomTypes]);
+  }, [roomTypes]);
 
   if (isAdminRoute) {
     return null;

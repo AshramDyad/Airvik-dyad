@@ -1,10 +1,9 @@
-import Link from "next/link";
 import { Plus } from "lucide-react";
 
 import { requirePageFeature } from "@/lib/server/page-auth";
 import { getAllReviews } from "@/lib/server/reviews";
 import { Button } from "@/components/ui/button";
-import { ReviewsTable } from "@/components/admin/reviews/reviews-table";
+import { ReviewsTableLoader } from "@/components/admin/reviews/reviews-table-loader";
 
 export default async function ReviewsPage() {
   const profile = await requirePageFeature("reviews");
@@ -20,15 +19,15 @@ export default async function ReviewsPage() {
         </div>
         {canCreate && (
           <Button asChild>
-            <Link href="/admin/reviews/create">
+            <a href="/admin/reviews/create">
               <Plus className="mr-2 h-4 w-4" />
               Add Review
-            </Link>
+            </a>
           </Button>
         )}
       </div>
 
-      <ReviewsTable reviews={reviews} />
+      <ReviewsTableLoader reviews={reviews} />
     </div>
   );
 }

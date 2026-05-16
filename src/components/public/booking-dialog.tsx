@@ -36,7 +36,8 @@ import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import type { EnhancedBookingSearchFormValues } from "./booking-widget";
 import { useAvailabilitySearch } from "@/hooks/use-availability-search";
-import type { RoomOccupancy } from "@/data/types";
+import { useBookingSearchData } from "@/hooks/use-booking-search-data";
+import type { PropertyClosure, RoomOccupancy, RoomType } from "@/data/types";
 
 // Legacy type for backward compatibility in this dialog
 type BookingSearchFormValues = {
@@ -59,6 +60,9 @@ const searchSchema = z.object({
   rooms: z.coerce.number().min(1, "At least one room is required."),
 });
 
+const EMPTY_ROOM_TYPES: RoomType[] = [];
+const EMPTY_PROPERTY_CLOSURES: PropertyClosure[] = [];
+
 interface BookingDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
@@ -71,8 +75,13 @@ export function BookingDialog({
   initialSearchValues,
 }: BookingDialogProps) {
   const router = useRouter();
+  const { bookingSearchData } = useBookingSearchData(isOpen);
   const { search, availableRoomTypes, isLoading, setAvailableRoomTypes } =
-    useAvailabilitySearch();
+    useAvailabilitySearch({
+      roomTypes: bookingSearchData?.roomTypes ?? EMPTY_ROOM_TYPES,
+      propertyClosures:
+        bookingSearchData?.propertyClosures ?? EMPTY_PROPERTY_CLOSURES,
+    });
 
   const form = useForm<z.infer<typeof searchSchema>>({
     resolver: zodResolver(searchSchema),

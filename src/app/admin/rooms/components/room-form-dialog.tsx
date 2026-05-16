@@ -35,6 +35,7 @@ import { Input } from "@/components/ui/input";
 import { type Room, type RoomStatus } from "@/data/types";
 import { useDataContext } from "@/context/data-context";
 import { MultiImageUpload } from "@/components/shared/multi-image-upload";
+import type { AdminRoomTypeSummary } from "./types";
 
 const roomSchema = z.object({
   roomNumber: z.string().min(1, "Room number is required."),
@@ -45,6 +46,9 @@ const roomSchema = z.object({
 
 interface RoomFormDialogProps {
   room?: Room;
+  rooms: Room[];
+  roomTypes: AdminRoomTypeSummary[];
+  onSaved?: () => void | Promise<void>;
   children: React.ReactNode;
 }
 
@@ -54,10 +58,13 @@ const normalizeRoomNumber = (value: string) => value.trim().toLowerCase();
 
 export function RoomFormDialog({
   room,
+  rooms,
+  roomTypes,
+  onSaved,
   children,
 }: RoomFormDialogProps) {
   const [open, setOpen] = React.useState(false);
-  const { rooms, addRoom, updateRoom, roomTypes } = useDataContext();
+  const { addRoom, updateRoom } = useDataContext();
   const isEditing = !!room;
 
   const form = useForm<z.infer<typeof roomSchema>>({
@@ -98,10 +105,11 @@ export function RoomFormDialog({
 
     try {
       if (isEditing && room) {
-        await updateRoom(room.id, roomData);
+        await updateRoom(room.id, roomData, room);
       } else {
         await addRoom(roomData);
       }
+      await onSaved?.();
       
       toast.success(
         `Room ${isEditing ? "updated" : "created"} successfully!`

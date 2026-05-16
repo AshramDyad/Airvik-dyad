@@ -22,7 +22,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { label } from "yet-another-react-lightbox";
 
 const quickLinks = [
   { href: "/book", label: "Rooms" },
@@ -94,7 +93,6 @@ export function Footer({ propertyLocation }: FooterProps) {
                   width={360}
                   height={160}
                   quality={100}
-                  priority
                   sizes="(max-width: 640px) 128px, (max-width: 1024px) 176px, (max-width: 1280px) 208px, 240px"
                   className="h-auto w-52 xl:w-56 max-w-full"
                 />

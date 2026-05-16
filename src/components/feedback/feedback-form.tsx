@@ -110,6 +110,7 @@ export function FeedbackForm() {
       const response = await fetch("/api/feedback", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        cache: "no-store",
         body: JSON.stringify(payload),
       });
 

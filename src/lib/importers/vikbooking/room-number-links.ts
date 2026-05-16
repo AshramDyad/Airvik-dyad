@@ -71,7 +71,7 @@ export interface UpsertRoomNumberLinkInput {
 export async function upsertRoomNumberLink(
   client: SupabaseClient,
   input: UpsertRoomNumberLinkInput
-): Promise<RoomNumberLink> {
+): Promise<void> {
   const normalized = normalizeRoomNumber(input.externalNumber);
   if (!normalized) {
     throw new Error("Room number is required");
@@ -84,17 +84,11 @@ export async function upsertRoomNumberLink(
     room_id: input.roomId,
   };
 
-  const { data, error } = await client
+  const { error } = await client
     .from("vikbooking_room_number_links")
-    .upsert(payload, { onConflict: "source,external_number_normalized" })
-    .select(
-      "id, source, external_number, external_number_normalized, room_id, created_at, updated_at"
-    )
-    .single();
+    .upsert(payload, { onConflict: "source,external_number_normalized" });
 
   if (error) {
     throw error;
   }
-
-  return mapRoomNumberLink(data as DbRoomNumberLink);
 }

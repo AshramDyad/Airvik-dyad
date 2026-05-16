@@ -25,20 +25,23 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { useDataContext } from "@/context/data-context";
+import { useReportReservations } from "@/hooks/use-report-reservations";
 import { cn } from "@/lib/utils";
 
 export function OccupancyReport() {
-  const { reservations, rooms } = useDataContext();
   const [date, setDate] = React.useState<DateRange | undefined>({
     from: subDays(new Date(), 29),
     to: new Date(),
+  });
+  const { reservations, roomsForSaleCount } = useReportReservations({
+    from: date?.from,
+    to: date?.to,
   });
 
   const chartData = React.useMemo(() => {
     if (!date?.from || !date?.to) return [];
 
-    const totalRooms = rooms.length;
+    const totalRooms = roomsForSaleCount;
     if (totalRooms === 0) return [];
     
     const days = eachDayOfInterval({ start: date.from, end: date.to });
@@ -59,7 +62,7 @@ export function OccupancyReport() {
         occupancy: Math.round((occupiedCount / totalRooms) * 100),
       };
     });
-  }, [date, reservations, rooms]);
+  }, [date, reservations, roomsForSaleCount]);
 
   return (
     <Card>

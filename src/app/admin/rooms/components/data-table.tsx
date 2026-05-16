@@ -27,13 +27,18 @@ import { DeleteConfirmationDialog } from "@/components/shared/delete-confirmatio
 import { useDataContext } from "@/context/data-context"
 import { useAuthContext } from "@/context/auth-context"
 import type { Room } from "@/data/types"
+import type { AdminRoomTypeSummary } from "./types"
 
 export function RoomsDataTable<TData extends Room, TValue>({
   columns,
   data,
+  roomTypes,
+  onRefresh,
 }: {
   columns: ColumnDef<TData, TValue>[]
   data: TData[]
+  roomTypes: AdminRoomTypeSummary[]
+  onRefresh: () => void | Promise<void>
 }) {
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [itemToDelete, setItemToDelete] = React.useState<TData | null>(null)
@@ -42,9 +47,10 @@ export function RoomsDataTable<TData extends Room, TValue>({
 
   const handleDeleteConfirm = async () => {
     if (itemToDelete) {
-      const success = await deleteRoom(itemToDelete.id);
+      const success = await deleteRoom(itemToDelete.id, itemToDelete);
       if (success) {
         toast.success(`Room "${itemToDelete.roomNumber}" has been deleted.`);
+        await onRefresh();
       } else {
         toast.error("Failed to delete room.", {
           description: "This room has active reservations and cannot be deleted.",
@@ -68,6 +74,8 @@ export function RoomsDataTable<TData extends Room, TValue>({
       openDeleteDialog: (item: TData) => {
         setItemToDelete(item)
       },
+      refreshData: onRefresh,
+      roomTypes,
       hasPermission,
     },
   })
@@ -77,7 +85,11 @@ export function RoomsDataTable<TData extends Room, TValue>({
       <div className="space-y-6">
         <div className="flex items-center justify-end gap-3">
           {hasPermission("create:room") && (
-            <RoomFormDialog>
+            <RoomFormDialog
+              rooms={data}
+              roomTypes={roomTypes}
+              onSaved={onRefresh}
+            >
               <Button>Add Room</Button>
             </RoomFormDialog>
           )}

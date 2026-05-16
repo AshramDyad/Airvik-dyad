@@ -27,7 +27,13 @@ export function AccommodationCard({
   return (
     <Card className="group overflow-hidden border-none shadow-lg bg-card h-full transition-transform duration-300 hover:shadow-xl flex flex-col">
       <div className="relative h-56 w-full">
-        <Image src={imageUrl} alt={title} fill className="object-cover" />
+        <Image
+          src={imageUrl}
+          alt={title}
+          fill
+          sizes="(max-width: 768px) 100vw, 33vw"
+          className="object-cover"
+        />
       </div>
       <CardContent className="p-6 flex flex-col flex-grow">
         <div className="space-y-4">

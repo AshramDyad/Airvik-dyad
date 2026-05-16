@@ -31,9 +31,11 @@ import type { RatePlan } from "@/data/types"
 export function RatePlansDataTable<TData extends RatePlan, TValue>({
   columns,
   data,
+  onRefresh,
 }: {
   columns: ColumnDef<TData, TValue>[]
   data: TData[]
+  onRefresh: () => void | Promise<void>
 }) {
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [itemToDelete, setItemToDelete] = React.useState<TData | null>(null)
@@ -42,9 +44,10 @@ export function RatePlansDataTable<TData extends RatePlan, TValue>({
 
   const handleDeleteConfirm = async () => {
     if (itemToDelete) {
-      const success = await deleteRatePlan(itemToDelete.id);
+      const success = await deleteRatePlan(itemToDelete.id, itemToDelete);
       if (success) {
         toast.success(`Rate plan "${itemToDelete.name}" has been deleted.`);
+        await onRefresh();
       } else {
         toast.error("Failed to delete rate plan.", {
           description: "This rate plan is in use by one or more reservations.",
@@ -68,6 +71,7 @@ export function RatePlansDataTable<TData extends RatePlan, TValue>({
       openDeleteDialog: (item: TData) => {
         setItemToDelete(item)
       },
+      refreshData: onRefresh,
       hasPermission,
     },
   })
@@ -77,7 +81,7 @@ export function RatePlansDataTable<TData extends RatePlan, TValue>({
       <div className="space-y-6">
         <div className="flex items-center justify-end gap-3">
           {hasPermission("create:rate_plan") && (
-            <RatePlanFormDialog>
+            <RatePlanFormDialog onSaved={onRefresh}>
               <Button>Add Rate Plan</Button>
             </RatePlanFormDialog>
           )}

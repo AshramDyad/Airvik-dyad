@@ -8,7 +8,6 @@ import * as z from "zod";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import dynamic from "next/dynamic";
-import { RichTextEditor } from "@/components/admin/posts/rich-text-editor";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import {
@@ -27,7 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Category, Post } from "@/data/types";
-import { createPost, updatePost, uploadFile } from "@/lib/api";
+import { createPostWithoutReturning, updatePostWithoutReturning, uploadFile } from "@/lib/api";
 import { useAuthContext } from "@/context/auth-context";
 import { Image as ImageIcon, Loader2, X } from "lucide-react";
 import Image from "next/image";
@@ -42,6 +41,17 @@ const postSchema = z.object({
   categoryIds: z.array(z.string()).optional(),
   status: z.enum(["draft", "published"]),
 });
+
+const RichTextEditor = dynamic(
+  () =>
+    import("@/components/admin/posts/rich-text-editor").then(
+      (module) => module.RichTextEditor,
+    ),
+  {
+    ssr: false,
+    loading: () => <div className="min-h-[360px] rounded-lg border bg-muted/20" />,
+  },
+);
 
 export function PostForm({
   post,
@@ -107,7 +117,7 @@ export function PostForm({
       };
       
       if (post) {
-        await updatePost(post.id, updatedValues);
+        await updatePostWithoutReturning(post.id, updatedValues);
         router.push("/admin/posts");
         router.refresh();
       } else {
@@ -116,7 +126,7 @@ export function PostForm({
             setIsSaving(false);
             return;
         }
-        await createPost({
+        await createPostWithoutReturning({
             ...updatedValues,
             author_id: currentUser.id
         });

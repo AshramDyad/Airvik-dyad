@@ -184,6 +184,7 @@ function TimelineItem({
               src={event.image}
               alt={event.title}
               fill
+              sizes="(max-width: 768px) 100vw, 45vw"
               className="object-cover"
             />
           </div>

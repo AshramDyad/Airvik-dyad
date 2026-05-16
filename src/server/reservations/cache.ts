@@ -10,6 +10,8 @@ const MAX_PAGE_LIMIT = 500;
 
 export const RESERVATIONS_CACHE_TAG = "reservations";
 export const RESERVATIONS_COUNT_CACHE_TAG = "reservations:count";
+export const BOOKINGS_SUMMARY_SELECT_COLUMNS =
+  "booking_id, booking_date, guest_id, guest_first_name, guest_last_name, guest_name, guest_email, guest_phone, total_amount, room_count, check_in_date, check_out_date, number_of_guests, adult_count, child_count, status, reservation_rows" as const;
 
 export type DbBookingSummaryRow = {
   booking_id: string;
@@ -49,10 +51,17 @@ const normalizePageParams = (params: ReservationPageParams = {}): Required<Reser
 
 export const mapBookingSummaryRow = (row: DbBookingSummaryRow) => {
   const reservationRows = row.reservation_rows || [];
+  const guestSnapshot = {
+    firstName: row.guest_first_name,
+    lastName: row.guest_last_name,
+    email: row.guest_email,
+    phone: row.guest_phone,
+  };
 
   const validSubRows = reservationRows.map((r) => ({
     ...r,
     guestName: row.guest_name || "N/A",
+    guestSnapshot,
     nights: 0,
     folio: r.folio || [],
   }));
@@ -69,12 +78,7 @@ export const mapBookingSummaryRow = (row: DbBookingSummaryRow) => {
     bookingDate: row.booking_date,
     guestId: row.guest_id,
     guestName: row.guest_name || "N/A",
-    guestSnapshot: {
-      firstName: row.guest_first_name,
-      lastName: row.guest_last_name,
-      email: row.guest_email,
-      phone: row.guest_phone,
-    },
+    guestSnapshot,
     totalAmount: row.total_amount,
     roomCount: row.room_count,
     checkInDate: row.check_in_date,
@@ -98,7 +102,7 @@ const fetchReservationPage = async (params: Required<ReservationPageParams>) => 
 
   let queryBuilder = supabase
     .from("bookings_summary_view")
-    .select("*", { count: "exact" });
+    .select(BOOKINGS_SUMMARY_SELECT_COLUMNS, { count: "exact" });
 
   if (params.query) {
     const searchTerm = `%${params.query}%`;

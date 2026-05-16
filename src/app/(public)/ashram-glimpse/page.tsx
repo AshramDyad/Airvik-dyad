@@ -1,12 +1,9 @@
-"use client";
-
-import { GalleryPageSection } from "@/components/marketing/gallery/gallery-page-section";
+import { GalleryPageSectionLoader } from "./gallery-page-section-loader";
 
 export default function GalleryPage() {
   return (
     <div className="min-h-screen bg-background text-foreground">
-        <GalleryPageSection />
+      <GalleryPageSectionLoader />
     </div>
   );
 }
-

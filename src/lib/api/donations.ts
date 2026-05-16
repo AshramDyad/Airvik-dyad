@@ -7,7 +7,10 @@ import type {
 import { createServerSupabaseClient } from "@/integrations/supabase/server";
 
 // Column selection to reduce egress
-const DONATION_SELECT_COLUMNS = 'id, donor_name, email, phone, amount_in_minor, currency, frequency, message, consent, payment_provider, payment_status, razorpay_order_id, razorpay_payment_id, razorpay_signature, upi_reference, metadata, created_at, updated_at' as const;
+export const DONATION_SELECT_COLUMNS = 'id, donor_name, email, phone, amount_in_minor, currency, frequency, message, consent, payment_provider, payment_status, razorpay_order_id, razorpay_payment_id, razorpay_signature, upi_reference, metadata, created_at, updated_at' as const;
+export const DONATION_ID_SELECT_COLUMNS = "id" as const;
+export const DONATION_STATS_SELECT_COLUMNS =
+  "total_amount_in_minor, total_donations, monthly_donations, last_donation_at" as const;
 
 type DbDonation = {
   id: string;
@@ -112,6 +115,28 @@ const fromDbStats = (row: DbDonationStats | null): DonationStats => ({
   lastDonationAt: row?.last_donation_at ?? undefined,
 });
 
+const toDonationUpdatePayload = (input: UpdateDonationInput): Record<string, unknown> => {
+  const payload: Record<string, unknown> = {};
+
+  if (typeof input.donorName !== "undefined") payload.donor_name = input.donorName;
+  if (typeof input.email !== "undefined") payload.email = input.email;
+  if (typeof input.phone !== "undefined") payload.phone = input.phone;
+  if (typeof input.amountInMinor !== "undefined") payload.amount_in_minor = input.amountInMinor;
+  if (typeof input.currency !== "undefined") payload.currency = input.currency;
+  if (typeof input.frequency !== "undefined") payload.frequency = input.frequency;
+  if (typeof input.message !== "undefined") payload.message = input.message ?? null;
+  if (typeof input.consent !== "undefined") payload.consent = input.consent;
+  if (typeof input.paymentProvider !== "undefined") payload.payment_provider = input.paymentProvider;
+  if (typeof input.paymentStatus !== "undefined") payload.payment_status = input.paymentStatus;
+  if (typeof input.razorpayOrderId !== "undefined") payload.razorpay_order_id = input.razorpayOrderId;
+  if (typeof input.razorpayPaymentId !== "undefined") payload.razorpay_payment_id = input.razorpayPaymentId;
+  if (typeof input.razorpaySignature !== "undefined") payload.razorpay_signature = input.razorpaySignature;
+  if (typeof input.upiReference !== "undefined") payload.upi_reference = input.upiReference;
+  if (typeof input.metadata !== "undefined") payload.metadata = input.metadata;
+
+  return payload;
+};
+
 export async function createDonationRecord(input: CreateDonationInput): Promise<Donation> {
   const supabase = createServerSupabaseClient();
   const { data, error } = await supabase
@@ -133,7 +158,7 @@ export async function createDonationRecord(input: CreateDonationInput): Promise<
       upi_reference: input.upiReference ?? null,
       metadata: input.metadata ?? {},
     })
-    .select()
+    .select(DONATION_SELECT_COLUMNS)
     .single();
 
   if (error) {
@@ -194,29 +219,13 @@ export async function updateDonationRecord(
   input: UpdateDonationInput,
 ): Promise<Donation> {
   const supabase = createServerSupabaseClient();
-  const payload: Record<string, unknown> = {};
-
-  if (typeof input.donorName !== "undefined") payload.donor_name = input.donorName;
-  if (typeof input.email !== "undefined") payload.email = input.email;
-  if (typeof input.phone !== "undefined") payload.phone = input.phone;
-  if (typeof input.amountInMinor !== "undefined") payload.amount_in_minor = input.amountInMinor;
-  if (typeof input.currency !== "undefined") payload.currency = input.currency;
-  if (typeof input.frequency !== "undefined") payload.frequency = input.frequency;
-  if (typeof input.message !== "undefined") payload.message = input.message ?? null;
-  if (typeof input.consent !== "undefined") payload.consent = input.consent;
-  if (typeof input.paymentProvider !== "undefined") payload.payment_provider = input.paymentProvider;
-  if (typeof input.paymentStatus !== "undefined") payload.payment_status = input.paymentStatus;
-  if (typeof input.razorpayOrderId !== "undefined") payload.razorpay_order_id = input.razorpayOrderId;
-  if (typeof input.razorpayPaymentId !== "undefined") payload.razorpay_payment_id = input.razorpayPaymentId;
-  if (typeof input.razorpaySignature !== "undefined") payload.razorpay_signature = input.razorpaySignature;
-  if (typeof input.upiReference !== "undefined") payload.upi_reference = input.upiReference;
-  if (typeof input.metadata !== "undefined") payload.metadata = input.metadata;
+  const payload = toDonationUpdatePayload(input);
 
   const { data, error } = await supabase
     .from("donations")
     .update(payload)
     .eq("id", donationId)
-    .select()
+    .select(DONATION_SELECT_COLUMNS)
     .single();
 
   if (error) {
@@ -224,6 +233,23 @@ export async function updateDonationRecord(
   }
 
   return fromDbDonation(data as DbDonation);
+}
+
+export async function updateDonationRecordWithoutReturning(
+  donationId: string,
+  input: UpdateDonationInput,
+): Promise<void> {
+  const supabase = createServerSupabaseClient();
+  const payload = toDonationUpdatePayload(input);
+
+  const { error } = await supabase
+    .from("donations")
+    .update(payload)
+    .eq("id", donationId);
+
+  if (error) {
+    throw new Error(`Failed to update donation: ${error.message}`);
+  }
 }
 
 export async function getDonationById(id: string): Promise<Donation | null> {
@@ -239,6 +265,21 @@ export async function getDonationById(id: string): Promise<Donation | null> {
   }
 
   return data ? fromDbDonation(data as DbDonation) : null;
+}
+
+export async function getDonationIdByOrderId(orderId: string): Promise<string | null> {
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("donations")
+    .select(DONATION_ID_SELECT_COLUMNS)
+    .eq("razorpay_order_id", orderId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Failed to load donation id by order id: ${error.message}`);
+  }
+
+  return typeof data?.id === "string" ? data.id : null;
 }
 
 export async function getDonationByOrderId(orderId: string): Promise<Donation | null> {
@@ -259,7 +300,10 @@ export async function getDonationByOrderId(orderId: string): Promise<Donation | 
 export async function getDonationStats(): Promise<DonationStats> {
   try {
     const supabase = createServerSupabaseClient();
-    const { data, error } = await supabase.from("donation_stats").select("*").maybeSingle();
+    const { data, error } = await supabase
+      .from("donation_stats")
+      .select(DONATION_STATS_SELECT_COLUMNS)
+      .maybeSingle();
 
     if (error) {
       console.warn("Unable to read donation stats, returning defaults", error.message);
