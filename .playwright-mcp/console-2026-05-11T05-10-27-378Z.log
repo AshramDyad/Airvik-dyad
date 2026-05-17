@@ -1,0 +1,5 @@
+[     667ms] [LOG] [AppData] Postponing fetchData: session still loading @ https://www.swaminarayan.yoga/_next/static/chunks/796-bcf2446393c3a0cd.js:0
+[     703ms] [LOG] [AppData] Fetching global data (userId: null) @ https://www.swaminarayan.yoga/_next/static/chunks/796-bcf2446393c3a0cd.js:0
+[    1086ms] [LOG] [AppData] No user session found, clearing state @ https://www.swaminarayan.yoga/_next/static/chunks/796-bcf2446393c3a0cd.js:0
+[   37628ms] [LOG] [AppData] Fetching global data (userId: d95a07e8-91fa-4911-b938-20ae08a1af65) @ https://www.swaminarayan.yoga/_next/static/chunks/796-bcf2446393c3a0cd.js:0
+[   42533ms] [LOG] [AppData] Global data fetch complete @ https://www.swaminarayan.yoga/_next/static/chunks/796-bcf2446393c3a0cd.js:0

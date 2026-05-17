@@ -1,0 +1,40 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - generic [ref=e5]:
+      - img "Apexture logo" [ref=e7]
+      - heading "Hotel Management System" [level=2] [ref=e8]
+      - paragraph [ref=e9]: Securely orchestrate reservations, rates, and on-site teams from one console built for fast-moving hospitality leaders.
+      - list [ref=e10]:
+        - listitem [ref=e11]:
+          - img [ref=e12]
+          - generic [ref=e15]:
+            - paragraph [ref=e16]: Granular staff roles
+            - paragraph [ref=e17]: Approve only the actions each desk or department needs.
+        - listitem [ref=e18]:
+          - img [ref=e19]
+          - generic [ref=e22]:
+            - paragraph [ref=e23]: Live stay grid
+            - paragraph [ref=e24]: Automate scheduling, room turns, and housekeeping handoffs.
+        - listitem [ref=e25]:
+          - img [ref=e26]
+          - generic [ref=e29]:
+            - paragraph [ref=e30]: Revenue-grade analytics
+            - paragraph [ref=e31]: Track pacing, ADR, and channel mix in real time.
+    - generic [ref=e33]:
+      - generic [ref=e34]:
+        - heading "Admin Sign in" [level=3] [ref=e35]
+        - generic [ref=e36]: Sign in with your Apexture credentials to open the control room.
+      - generic [ref=e38]:
+        - generic [ref=e39]:
+          - text: Email
+          - textbox "Email" [ref=e40]:
+            - /placeholder: admin@hotel.com
+        - generic [ref=e41]:
+          - text: Password
+          - textbox "Password" [ref=e42]:
+            - /placeholder: ••••••••
+          - link "Forgot password?" [ref=e44] [cursor=pointer]:
+            - /url: /admin/forget-password
+        - button "Sign in" [ref=e45] [cursor=pointer]
+  - region "Notifications alt+T"
+  - alert [ref=e46]

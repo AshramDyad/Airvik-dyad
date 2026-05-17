@@ -1,0 +1,383 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - complementary [ref=e47]:
+      - generic [ref=e48]:
+        - link "admin-logo" [ref=e49] [cursor=pointer]:
+          - /url: /
+          - img "admin-logo" [ref=e50]
+        - button "Toggle sidebar" [ref=e51] [cursor=pointer]:
+          - img
+          - generic [ref=e52]: Toggle sidebar
+      - navigation [ref=e53]:
+        - link "Dashboard" [ref=e54] [cursor=pointer]:
+          - /url: /admin
+          - img [ref=e55]
+          - text: Dashboard
+        - link "Reservations" [ref=e58] [cursor=pointer]:
+          - /url: /admin/reservations
+          - img [ref=e59]
+          - text: Reservations
+        - link "Calendar" [ref=e61] [cursor=pointer]:
+          - /url: /admin/calendar
+          - img [ref=e62]
+          - text: Calendar
+        - button "Engagement" [ref=e65] [cursor=pointer]:
+          - generic [ref=e66]:
+            - img
+            - text: Engagement
+          - img
+        - link "Housekeeping" [ref=e67] [cursor=pointer]:
+          - /url: /admin/housekeeping
+          - img [ref=e68]
+          - text: Housekeeping
+        - link "Guests" [ref=e71] [cursor=pointer]:
+          - /url: /admin/guests
+          - img [ref=e72]
+          - text: Guests
+        - link "Room Categories" [ref=e77] [cursor=pointer]:
+          - /url: /admin/room-categories
+          - img [ref=e78]
+          - text: Room Categories
+        - link "Room Types" [ref=e80] [cursor=pointer]:
+          - /url: /admin/room-types
+          - img [ref=e81]
+          - text: Room Types
+        - link "Rooms" [ref=e85] [cursor=pointer]:
+          - /url: /admin/rooms
+          - img [ref=e86]
+          - text: Rooms
+        - link "Rate Plans" [ref=e89] [cursor=pointer]:
+          - /url: /admin/rates
+          - img [ref=e90]
+          - text: Rate Plans
+        - link "Feedback" [ref=e92] [cursor=pointer]:
+          - /url: /admin/feedback
+          - img [ref=e93]
+          - text: Feedback
+        - link "Reports" [ref=e95] [cursor=pointer]:
+          - /url: /admin/reports
+          - img [ref=e96]
+          - text: Reports
+        - link "Activity" [ref=e98] [cursor=pointer]:
+          - /url: /admin/activity
+          - img [ref=e99]
+          - text: Activity
+      - link "Settings" [ref=e104] [cursor=pointer]:
+        - /url: /admin/settings
+        - img [ref=e105]
+        - text: Settings
+    - generic [ref=e108]:
+      - banner [ref=e109]:
+        - generic [ref=e111]:
+          - heading "Dashboard" [level=1] [ref=e112]
+          - paragraph [ref=e113]: Sahajanand Wellness
+        - generic [ref=e114]:
+          - button "Toggle theme" [ref=e115] [cursor=pointer]:
+            - img
+            - generic [ref=e116]: Toggle theme
+          - button "Toggle user menu" [ref=e117] [cursor=pointer]:
+            - img
+            - generic [ref=e118]: Toggle user menu
+      - main [ref=e119]:
+        - generic [ref=e122]:
+          - generic [ref=e123]:
+            - generic [ref=e125]:
+              - generic [ref=e126]:
+                - generic [ref=e127]:
+                  - generic [ref=e128]:
+                    - heading "Occupancy" [level=3] [ref=e129]
+                    - paragraph [ref=e130]: Overall occupancy rate
+                  - img [ref=e133]
+                - generic [ref=e137]:
+                  - generic [ref=e139]: 187%
+                  - paragraph [ref=e140]: 155 of 83 rooms occupied
+              - generic [ref=e141]:
+                - generic [ref=e142]:
+                  - generic [ref=e143]:
+                    - heading "Arrivals Today" [level=3] [ref=e144]
+                    - paragraph [ref=e145]: Check-ins scheduled
+                  - img [ref=e148]
+                - generic [ref=e151]:
+                  - generic [ref=e153]: "12"
+                  - paragraph [ref=e154]: 12 guests arriving
+              - generic [ref=e155]:
+                - generic [ref=e156]:
+                  - generic [ref=e157]:
+                    - heading "Departures Today" [level=3] [ref=e158]
+                    - paragraph [ref=e159]: Check-outs scheduled
+                  - img [ref=e162]
+                - generic [ref=e165]:
+                  - generic [ref=e167]: "20"
+                  - paragraph [ref=e168]: 20 guests departing
+              - generic [ref=e169]:
+                - generic [ref=e170]:
+                  - generic [ref=e171]:
+                    - heading "Available Rooms" [level=3] [ref=e172]
+                    - paragraph [ref=e173]: Ready for check-in
+                  - img [ref=e176]
+                - generic [ref=e179]:
+                  - generic [ref=e181]: "0"
+                  - paragraph [ref=e182]: 0 rooms available
+            - generic [ref=e184]:
+              - generic [ref=e185]:
+                - generic [ref=e186]:
+                  - heading "Today's Arrivals" [level=3] [ref=e187]
+                  - paragraph [ref=e188]: Guests scheduled to check-in today.
+                - table [ref=e193]:
+                  - rowgroup [ref=e194]:
+                    - row "Guest Room Status" [ref=e195]:
+                      - columnheader "Guest" [ref=e196]
+                      - columnheader "Room" [ref=e197]
+                      - columnheader "Status" [ref=e198]
+                  - rowgroup [ref=e199]:
+                    - row "Nileshkuma Ingrodiya 218 AC Confirmed" [ref=e200]:
+                      - cell "Nileshkuma Ingrodiya" [ref=e201]:
+                        - generic [ref=e203]: Nileshkuma Ingrodiya
+                      - cell "218 AC" [ref=e204]
+                      - cell "Confirmed" [ref=e205]:
+                        - generic [ref=e206]: Confirmed
+                    - row "Hiren vaghani vaghanihiren123@gmail.com KK 2 Confirmed" [ref=e207]:
+                      - cell "Hiren vaghani vaghanihiren123@gmail.com" [ref=e208]:
+                        - generic [ref=e209]:
+                          - generic [ref=e210]: Hiren vaghani
+                          - generic [ref=e211]: vaghanihiren123@gmail.com
+                      - cell "KK 2" [ref=e212]
+                      - cell "Confirmed" [ref=e213]:
+                        - generic [ref=e214]: Confirmed
+                    - row "Hiren vaghani vaghanihiren123@gmail.com KK 3 Confirmed" [ref=e215]:
+                      - cell "Hiren vaghani vaghanihiren123@gmail.com" [ref=e216]:
+                        - generic [ref=e217]:
+                          - generic [ref=e218]: Hiren vaghani
+                          - generic [ref=e219]: vaghanihiren123@gmail.com
+                      - cell "KK 3" [ref=e220]
+                      - cell "Confirmed" [ref=e221]:
+                        - generic [ref=e222]: Confirmed
+                    - row "Hiteshbhai Nadoda KK 1 Confirmed" [ref=e223]:
+                      - cell "Hiteshbhai Nadoda" [ref=e224]:
+                        - generic [ref=e226]: Hiteshbhai Nadoda
+                      - cell "KK 1" [ref=e227]
+                      - cell "Confirmed" [ref=e228]:
+                        - generic [ref=e229]: Confirmed
+                    - row "Dharmik Gajera 309 Confirmed" [ref=e230]:
+                      - cell "Dharmik Gajera" [ref=e231]:
+                        - generic [ref=e233]: Dharmik Gajera
+                      - cell "309" [ref=e234]
+                      - cell "Confirmed" [ref=e235]:
+                        - generic [ref=e236]: Confirmed
+                    - row "Dharmik Gajera 110 Confirmed" [ref=e237]:
+                      - cell "Dharmik Gajera" [ref=e238]:
+                        - generic [ref=e240]: Dharmik Gajera
+                      - cell "110" [ref=e241]
+                      - cell "Confirmed" [ref=e242]:
+                        - generic [ref=e243]: Confirmed
+                    - row "Dharmik Gajera 205 Confirmed" [ref=e244]:
+                      - cell "Dharmik Gajera" [ref=e245]:
+                        - generic [ref=e247]: Dharmik Gajera
+                      - cell "205" [ref=e248]
+                      - cell "Confirmed" [ref=e249]:
+                        - generic [ref=e250]: Confirmed
+                    - row "Dharmik Gajera 306 Confirmed" [ref=e251]:
+                      - cell "Dharmik Gajera" [ref=e252]:
+                        - generic [ref=e254]: Dharmik Gajera
+                      - cell "306" [ref=e255]
+                      - cell "Confirmed" [ref=e256]:
+                        - generic [ref=e257]: Confirmed
+                    - row "Vinod Lavjibhai Mangukiya vinodmangukiya@gmal.com 304-2 only Confirmed" [ref=e258]:
+                      - cell "Vinod Lavjibhai Mangukiya vinodmangukiya@gmal.com" [ref=e259]:
+                        - generic [ref=e260]:
+                          - generic [ref=e261]: Vinod Lavjibhai Mangukiya
+                          - generic [ref=e262]: vinodmangukiya@gmal.com
+                      - cell "304-2 only" [ref=e263]
+                      - cell "Confirmed" [ref=e264]:
+                        - generic [ref=e265]: Confirmed
+                    - row "Tarunkumar Jerambhai Patel tarunj@gmail.com 104-2 only Confirmed" [ref=e266]:
+                      - cell "Tarunkumar Jerambhai Patel tarunj@gmail.com" [ref=e267]:
+                        - generic [ref=e268]:
+                          - generic [ref=e269]: Tarunkumar Jerambhai Patel
+                          - generic [ref=e270]: tarunj@gmail.com
+                      - cell "104-2 only" [ref=e271]
+                      - cell "Confirmed" [ref=e272]:
+                        - generic [ref=e273]: Confirmed
+                    - row "Tarunkumar Jerambhai Patel tarunj@gmail.com 113 * 2700 Confirmed" [ref=e274]:
+                      - cell "Tarunkumar Jerambhai Patel tarunj@gmail.com" [ref=e275]:
+                        - generic [ref=e276]:
+                          - generic [ref=e277]: Tarunkumar Jerambhai Patel
+                          - generic [ref=e278]: tarunj@gmail.com
+                      - cell "113 * 2700" [ref=e279]
+                      - cell "Confirmed" [ref=e280]:
+                        - generic [ref=e281]: Confirmed
+                    - row "Tarunkumar Jerambhai Patel tarunj@gmail.com 404 Confirmed" [ref=e282]:
+                      - cell "Tarunkumar Jerambhai Patel tarunj@gmail.com" [ref=e283]:
+                        - generic [ref=e284]:
+                          - generic [ref=e285]: Tarunkumar Jerambhai Patel
+                          - generic [ref=e286]: tarunj@gmail.com
+                      - cell "404" [ref=e287]
+                      - cell "Confirmed" [ref=e288]:
+                        - generic [ref=e289]: Confirmed
+              - generic [ref=e290]:
+                - generic [ref=e291]:
+                  - heading "Today's Departures" [level=3] [ref=e292]
+                  - paragraph [ref=e293]: Guests scheduled to check-out today.
+                - table [ref=e298]:
+                  - rowgroup [ref=e299]:
+                    - row "Guest Room Status" [ref=e300]:
+                      - columnheader "Guest" [ref=e301]
+                      - columnheader "Room" [ref=e302]
+                      - columnheader "Status" [ref=e303]
+                  - rowgroup [ref=e304]:
+                    - row "Bhavinkumar Gevariya 404 Checked-in" [ref=e305]:
+                      - cell "Bhavinkumar Gevariya" [ref=e306]:
+                        - generic [ref=e308]: Bhavinkumar Gevariya
+                      - cell "404" [ref=e309]
+                      - cell "Checked-in" [ref=e310]:
+                        - generic [ref=e311]: Checked-in
+                    - row "Devendra Sharma 211 Checked-in" [ref=e312]:
+                      - cell "Devendra Sharma" [ref=e313]:
+                        - generic [ref=e315]: Devendra Sharma
+                      - cell "211" [ref=e316]
+                      - cell "Checked-in" [ref=e317]:
+                        - generic [ref=e318]: Checked-in
+                    - row "Mayur Mulani 3B Confirmed" [ref=e319]:
+                      - cell "Mayur Mulani" [ref=e320]:
+                        - generic [ref=e322]: Mayur Mulani
+                      - cell "3B" [ref=e323]
+                      - cell "Confirmed" [ref=e324]:
+                        - generic [ref=e325]: Confirmed
+                    - row "Mayur Mulani 3A Confirmed" [ref=e326]:
+                      - cell "Mayur Mulani" [ref=e327]:
+                        - generic [ref=e329]: Mayur Mulani
+                      - cell "3A" [ref=e330]
+                      - cell "Confirmed" [ref=e331]:
+                        - generic [ref=e332]: Confirmed
+                    - row "Dashrath Devaiya 1B Checked-in" [ref=e333]:
+                      - cell "Dashrath Devaiya" [ref=e334]:
+                        - generic [ref=e336]: Dashrath Devaiya
+                      - cell "1B" [ref=e337]
+                      - cell "Checked-in" [ref=e338]:
+                        - generic [ref=e339]: Checked-in
+                    - row "Hiteshbhai Nadoda 2B Checked-in" [ref=e340]:
+                      - cell "Hiteshbhai Nadoda" [ref=e341]:
+                        - generic [ref=e343]: Hiteshbhai Nadoda
+                      - cell "2B" [ref=e344]
+                      - cell "Checked-in" [ref=e345]:
+                        - generic [ref=e346]: Checked-in
+                    - row "Alubhai Rathod 320 Checked-in" [ref=e347]:
+                      - cell "Alubhai Rathod" [ref=e348]:
+                        - generic [ref=e350]: Alubhai Rathod
+                      - cell "320" [ref=e351]
+                      - cell "Checked-in" [ref=e352]:
+                        - generic [ref=e353]: Checked-in
+                    - row "Nileshkuma Ingrodiya 304-2 only Confirmed" [ref=e354]:
+                      - cell "Nileshkuma Ingrodiya" [ref=e355]:
+                        - generic [ref=e357]: Nileshkuma Ingrodiya
+                      - cell "304-2 only" [ref=e358]
+                      - cell "Confirmed" [ref=e359]:
+                        - generic [ref=e360]: Confirmed
+                    - row "Nileshkuma Ingrodiya 104-2 only Checked-in" [ref=e361]:
+                      - cell "Nileshkuma Ingrodiya" [ref=e362]:
+                        - generic [ref=e364]: Nileshkuma Ingrodiya
+                      - cell "104-2 only" [ref=e365]
+                      - cell "Checked-in" [ref=e366]:
+                        - generic [ref=e367]: Checked-in
+                    - row "Nileshkuma Ingrodiya 113 * 2700 Confirmed" [ref=e368]:
+                      - cell "Nileshkuma Ingrodiya" [ref=e369]:
+                        - generic [ref=e371]: Nileshkuma Ingrodiya
+                      - cell "113 * 2700" [ref=e372]
+                      - cell "Confirmed" [ref=e373]:
+                        - generic [ref=e374]: Confirmed
+                    - row "Dheeraj M. Agarwal 208 Checked-in" [ref=e375]:
+                      - cell "Dheeraj M. Agarwal" [ref=e376]:
+                        - generic [ref=e378]: Dheeraj M. Agarwal
+                      - cell "208" [ref=e379]
+                      - cell "Checked-in" [ref=e380]:
+                        - generic [ref=e381]: Checked-in
+                    - row "Vijaykumar solanki 406 Checked-in" [ref=e382]:
+                      - cell "Vijaykumar solanki" [ref=e383]:
+                        - generic [ref=e385]: Vijaykumar solanki
+                      - cell "406" [ref=e386]
+                      - cell "Checked-in" [ref=e387]:
+                        - generic [ref=e388]: Checked-in
+                    - row "Goral Thakar 218 AC Confirmed" [ref=e389]:
+                      - cell "Goral Thakar" [ref=e390]:
+                        - generic [ref=e392]: Goral Thakar
+                      - cell "218 AC" [ref=e393]
+                      - cell "Confirmed" [ref=e394]:
+                        - generic [ref=e395]: Confirmed
+                    - row "Goral Thakar 205 Confirmed" [ref=e396]:
+                      - cell "Goral Thakar" [ref=e397]:
+                        - generic [ref=e399]: Goral Thakar
+                      - cell "205" [ref=e400]
+                      - cell "Confirmed" [ref=e401]:
+                        - generic [ref=e402]: Confirmed
+                    - row "Goral Thakar 110 Checked-in" [ref=e403]:
+                      - cell "Goral Thakar" [ref=e404]:
+                        - generic [ref=e406]: Goral Thakar
+                      - cell "110" [ref=e407]
+                      - cell "Checked-in" [ref=e408]:
+                        - generic [ref=e409]: Checked-in
+                    - row "Goral Thakar 206 Confirmed" [ref=e410]:
+                      - cell "Goral Thakar" [ref=e411]:
+                        - generic [ref=e413]: Goral Thakar
+                      - cell "206" [ref=e414]
+                      - cell "Confirmed" [ref=e415]:
+                        - generic [ref=e416]: Confirmed
+                    - row "Goral Thakar 309 Confirmed" [ref=e417]:
+                      - cell "Goral Thakar" [ref=e418]:
+                        - generic [ref=e420]: Goral Thakar
+                      - cell "309" [ref=e421]
+                      - cell "Confirmed" [ref=e422]:
+                        - generic [ref=e423]: Confirmed
+                    - row "Goral Thakar 318 AC Confirmed" [ref=e424]:
+                      - cell "Goral Thakar" [ref=e425]:
+                        - generic [ref=e427]: Goral Thakar
+                      - cell "318 AC" [ref=e428]
+                      - cell "Confirmed" [ref=e429]:
+                        - generic [ref=e430]: Confirmed
+                    - row "Goral Thakar 317 AC Confirmed" [ref=e431]:
+                      - cell "Goral Thakar" [ref=e432]:
+                        - generic [ref=e434]: Goral Thakar
+                      - cell "317 AC" [ref=e435]
+                      - cell "Confirmed" [ref=e436]:
+                        - generic [ref=e437]: Confirmed
+                    - row "Goral Thakar 306 Confirmed" [ref=e438]:
+                      - cell "Goral Thakar" [ref=e439]:
+                        - generic [ref=e441]: Goral Thakar
+                      - cell "306" [ref=e442]
+                      - cell "Confirmed" [ref=e443]:
+                        - generic [ref=e444]: Confirmed
+            - generic [ref=e448]:
+              - generic [ref=e449]:
+                - generic [ref=e450]:
+                  - button [ref=e451] [cursor=pointer]:
+                    - img
+                  - combobox [ref=e452] [cursor=pointer]:
+                    - generic: May 2026
+                    - img [ref=e453]
+                  - button [ref=e455] [cursor=pointer]:
+                    - img
+                - combobox [ref=e457] [cursor=pointer]:
+                  - generic: 1 Month
+                  - img [ref=e458]
+                - combobox [ref=e460] [cursor=pointer]:
+                  - generic: Units left
+                  - img [ref=e461]
+                - button [ref=e463] [cursor=pointer]:
+                  - img
+              - generic [ref=e464]:
+                - generic [ref=e467]: Free
+                - generic [ref=e470]: Partially booked
+                - generic [ref=e473]: Fully booked
+                - generic [ref=e476]: Closed
+            - generic [ref=e480]:
+              - generic [ref=e481]:
+                - heading "Sticky Notes" [level=2] [ref=e482]
+                - button "Add Note" [ref=e483] [cursor=pointer]:
+                  - img
+                  - text: Add Note
+              - paragraph [ref=e486]: No sticky notes yet. Add one to get started!
+          - status [ref=e487]
+          - button "Edit Layout" [ref=e489] [cursor=pointer]:
+            - img
+            - text: Edit Layout
+  - region "Notifications alt+T"
+  - alert [ref=e46]
