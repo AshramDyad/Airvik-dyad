@@ -65,16 +65,6 @@ const propertySchema = z.object({
     .number({ invalid_type_error: "Enter a valid percentage" })
     .min(0, "Tax percentage cannot be negative")
     .max(100, "Tax percentage cannot exceed 100"),
-  upi_id: z
-    .string()
-    .trim()
-    .transform((value) => value || undefined)
-    .optional(),
-  upi_merchant_name: z
-    .string()
-    .trim()
-    .transform((value) => value || undefined)
-    .optional(),
   trust_registration_no: z.string().optional(),
   trust_date: z.string().optional(),
   pan_no: z.string().optional(),
@@ -107,8 +97,6 @@ export function PropertySettingsForm() {
       currency: property.currency || "INR",
       tax_enabled: property.tax_enabled ?? false,
       tax_percentage: (property.tax_percentage ?? 0) * 100,
-      upi_id: property.upi_id || "",
-      upi_merchant_name: property.upi_merchant_name || "",
       trust_registration_no: property.trust_registration_no || "",
       trust_date: property.trust_date || "",
       pan_no: property.pan_no || "",
@@ -131,8 +119,6 @@ export function PropertySettingsForm() {
       currency: property.currency || "INR",
       tax_enabled: property.tax_enabled ?? false,
       tax_percentage: (property.tax_percentage ?? 0) * 100,
-      upi_id: property.upi_id || "",
-      upi_merchant_name: property.upi_merchant_name || "",
       trust_registration_no: property.trust_registration_no || "",
       trust_date: property.trust_date || "",
       pan_no: property.pan_no || "",
@@ -150,8 +136,6 @@ export function PropertySettingsForm() {
       photos: values.photos ? values.photos.split(",").map(p => p.trim()).filter(Boolean) : [],
       google_maps_url: values.google_maps_url?.trim() || undefined,
       tax_percentage: normalizedTaxPercentage,
-      upi_id: values.upi_id?.trim() || undefined,
-      upi_merchant_name: values.upi_merchant_name?.trim() || undefined,
       trust_registration_no: values.trust_registration_no || undefined,
       trust_date: values.trust_date || undefined,
       pan_no: values.pan_no || undefined,
@@ -334,57 +318,6 @@ export function PropertySettingsForm() {
             />
           </div>
         </div>
-
-            <div className="border rounded-lg p-4 space-y-4">
-              <div>
-                <h3 className="text-lg font-semibold">UPI Payment Settings</h3>
-                <p className="text-sm text-muted-foreground">
-                  Configure the destination for reservation payment links.
-                </p>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <FormField<PropertyFormValues, "upi_id">
-                  control={form.control}
-                  name="upi_id"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>UPI ID</FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          placeholder="example@upi"
-                          autoComplete="off"
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        Enter the UPI ID that should receive guest payments.
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField<PropertyFormValues, "upi_merchant_name">
-                  control={form.control}
-                  name="upi_merchant_name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>UPI Merchant Name</FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          placeholder="Hotel Name"
-                          autoComplete="off"
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        This name appears on the UPI app while paying.
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-            </div>
             <FormField<PropertyFormValues, "google_maps_url">
               control={form.control}
               name="google_maps_url"

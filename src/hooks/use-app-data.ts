@@ -32,7 +32,6 @@ import type {
   StickyNote,
   DashboardComponentId,
   AdminActivityLogInput,
-  ReservationPaymentRequest,
 } from "@/data/types";
 
 const mapDbRole = (role: Role & { hierarchy_level?: number }): Role => ({
@@ -89,32 +88,6 @@ type AddRoomsToBookingPayload = {
   customRoomTotals?: Array<number | null>;
 };
 
-type ReservationPaymentRequestCreatePayload = {
-  reservationIds: string[];
-  amount: number;
-  notes?: string;
-  requestedAt?: string;
-  expiresAt?: string;
-  paymentMethod?: string;
-};
-
-type ReservationPaymentRequestUpdatePayload = {
-  paidAmount?: number;
-  status?: ReservationPaymentRequest["status"];
-  paidAt?: string | null;
-  paymentReference?: string;
-  notes?: string;
-  expiresAt?: string;
-};
-
-type AddFolioItemOptions = {
-  autoApplyToReservationPaymentRequests?: boolean;
-  requestIds?: string[];
-};
-
-type ReservationPaymentAllocationOptions = {
-  requestIds?: string[];
-};
 
 type UserProfileUpdate = Partial<Pick<User, "name" | "roleId">>;
 
@@ -303,9 +276,6 @@ export function useAppData() {
   const [activeBookingReservations, setActiveBookingReservations] = React.useState<Reservation[]>([]);
   const [reservationsTotalCount, setReservationsTotalCount] = React.useState<number>(0);
   const [property, setProperty] = React.useState<Property>(defaultProperty);
-  const [reservationPaymentRequests, setReservationPaymentRequests] = React.useState<
-    ReservationPaymentRequest[]
-  >([]);
   const [bookings, setBookings] = React.useState<BookingSummary[]>([]);
   const [reservations, setReservations] = React.useState<Reservation[]>([]);
   const [todayReservations, setTodayReservations] = React.useState<Reservation[]>([]);
@@ -389,176 +359,6 @@ export function useAppData() {
       }
     },
     [userId, isSessionLoading]
-  );
-
-  const toNumber = React.useCallback(
-    (value: number) => Number(value.toFixed(2)),
-    []
-  );
-
-  const normalizePaymentRequestResponse = React.useCallback(
-    (request: ReservationPaymentRequest) => ({
-      ...request,
-      amount: toNumber(Number(request.amount)),
-      paidAmount: toNumber(Number(request.paidAmount)),
-    }),
-    [toNumber]
-  );
-
-  const loadReservationPaymentRequests = React.useCallback(
-    async (reservationId: string): Promise<ReservationPaymentRequest[]> => {
-      if (!reservationId) {
-        setReservationPaymentRequests([]);
-        return [];
-      }
-
-      const response = await authorizedFetch(
-        `/api/admin/reservation-payment-requests?reservationId=${encodeURIComponent(
-          reservationId
-        )}`
-      );
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          setReservationPaymentRequests([]);
-          return [];
-        }
-        const message = await response.text();
-        throw new Error(
-          message || "Unable to load reservation payment requests."
-        );
-      }
-
-      const payload = (await response.json()) as { data?: ReservationPaymentRequest[] };
-      const requests = Array.isArray(payload.data)
-        ? payload.data.map((request) => normalizePaymentRequestResponse(request))
-        : [];
-      setReservationPaymentRequests(requests);
-      return requests;
-    },
-    [normalizePaymentRequestResponse, toNumber]
-  );
-
-  const createReservationPaymentRequest = React.useCallback(
-    async (payload: ReservationPaymentRequestCreatePayload) => {
-      const requestPayload = {
-        reservationIds: payload.reservationIds,
-        amount: toNumber(payload.amount),
-        notes: payload.notes?.trim() || undefined,
-        requestedAt: payload.requestedAt,
-        expiresAt: payload.expiresAt,
-        paymentMethod: payload.paymentMethod || "UPI",
-      };
-
-      const response = await authorizedFetch(
-        "/api/admin/reservation-payment-requests",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(requestPayload),
-        }
-      );
-
-      if (!response.ok) {
-        const message = await response.text();
-        throw new Error(message || "Unable to create reservation payment request.");
-      }
-
-      const payloadJson = (await response.json()) as { data: ReservationPaymentRequest };
-      const request = normalizePaymentRequestResponse(payloadJson.data);
-      setReservationPaymentRequests((previous) => [request, ...previous.filter((item) => item.id !== request.id)]);
-      return request;
-    },
-    [normalizePaymentRequestResponse, toNumber]
-  );
-
-  const updateReservationPaymentRequest = React.useCallback(
-    async (
-      requestId: string,
-      updatePayload: ReservationPaymentRequestUpdatePayload
-    ): Promise<ReservationPaymentRequest | null> => {
-      const response = await authorizedFetch(
-        `/api/admin/reservation-payment-requests/${requestId}`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            paidAmount: typeof updatePayload.paidAmount === "number"
-              ? toNumber(updatePayload.paidAmount)
-              : undefined,
-            status: updatePayload.status,
-            paidAt: updatePayload.paidAt,
-            paymentReference: updatePayload.paymentReference,
-            notes: updatePayload.notes,
-            expiresAt: updatePayload.expiresAt,
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        const message = await response.text();
-        throw new Error(message || "Unable to update reservation payment request.");
-      }
-
-      const payload = (await response.json()) as { data: ReservationPaymentRequest };
-      const request = normalizePaymentRequestResponse(payload.data);
-      setReservationPaymentRequests((previous) =>
-        previous.map((item) => (item.id === request.id ? request : item))
-      );
-      return request;
-    },
-    [normalizePaymentRequestResponse, toNumber]
-  );
-
-  const applyManualPaymentToReservationPaymentRequests = React.useCallback(
-    async (
-      reservationId: string,
-      paymentAmount: number,
-      options?: ReservationPaymentAllocationOptions
-    ) => {
-      const normalizedAmount = toNumber(paymentAmount);
-      if (normalizedAmount <= 0 || reservationPaymentRequests.length === 0) {
-        return 0;
-      }
-
-      const targetRequestIds = options?.requestIds && options.requestIds.length > 0
-        ? new Set(options.requestIds)
-        : null;
-
-      const activeRequests = reservationPaymentRequests
-        .filter((request) =>
-          request.reservationIds.includes(reservationId) &&
-          (!targetRequestIds || targetRequestIds.has(request.id)) &&
-          (request.status === "requested" || request.status === "partially_paid")
-        )
-        .filter((request) => {
-          if (!request.expiresAt) return true;
-          return new Date(request.expiresAt).getTime() > Date.now();
-        })
-        .sort((a, b) =>
-          new Date(a.requestedAt).getTime() - new Date(b.requestedAt).getTime()
-        );
-
-      if (activeRequests.length === 0) {
-        return 0;
-      }
-
-      let remaining = normalizedAmount;
-      for (const request of activeRequests) {
-        if (remaining <= 0) break;
-        const outstanding = toNumber(request.amount - request.paidAmount);
-        if (outstanding <= 0) continue;
-        const paidNow = Math.min(outstanding, remaining);
-        const nextPaidAmount = toNumber(request.paidAmount + paidNow);
-        await updateReservationPaymentRequest(request.id, {
-          paidAmount: nextPaidAmount,
-        });
-        remaining = toNumber(remaining - paidNow);
-      }
-
-      return toNumber(normalizedAmount - remaining);
-    },
-    [updateReservationPaymentRequest, reservationPaymentRequests, toNumber]
   );
 
   const loadReservationsPage = React.useCallback(
@@ -1033,8 +833,7 @@ export function useAppData() {
 
   const addFolioItem = async (
     reservationId: string,
-    item: Omit<FolioItem, "id" | "timestamp">,
-    options?: AddFolioItemOptions
+    item: Omit<FolioItem, "id" | "timestamp">
   ) => {
     const { data, error } = await api.addFolioItem({
       reservation_id: reservationId,
@@ -1102,23 +901,6 @@ export function useAppData() {
           : r
       )
     );
-
-    const shouldAutoApplyRequests = options?.autoApplyToReservationPaymentRequests ?? item.amount < 0;
-    const requestIds = options?.requestIds;
-
-    if (item.amount < 0 && shouldAutoApplyRequests) {
-      try {
-        await applyManualPaymentToReservationPaymentRequests(
-          reservationId,
-          Math.abs(item.amount),
-          {
-            requestIds,
-          }
-        );
-      } catch (error) {
-        console.error("Failed to auto-allocate payment to requests", error);
-      }
-    }
 
     triggerReservationsCacheRevalidation();
     recordActivity({
@@ -1753,11 +1535,6 @@ export function useAppData() {
     updateReservationStatus,
     updateBookingReservationStatus,
     addFolioItem,
-    reservationPaymentRequests,
-    loadReservationPaymentRequests,
-    createReservationPaymentRequest,
-    updateReservationPaymentRequest,
-    applyManualPaymentToReservationPaymentRequests,
     assignHousekeeper,
     updateAssignmentStatus,
     addRoom,
