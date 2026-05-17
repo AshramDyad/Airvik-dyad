@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/carousel";
 import { Icon } from "@/components/shared/icon";
 import type { IconName } from "@/lib/icons";
+import { getRoomTypeImageUrl } from "@/lib/room-type-images";
 import {
   Tooltip,
   TooltipContent,
@@ -101,22 +102,7 @@ export function RoomsShowcaseSection() {
     "VidhyaDan",
   ];
 
-  const placeholderImage = "/room-placeholder.svg";
-  const fallbackImages: Record<string, string> = {
-    annadaan: "/annakshetra.png",
-    "sant bhojan donation": "/Dining Hall.png",
-    brahmbhoj: "/Spiritual Spaces.png",
-    vidhyadan: "/gallery-room-05-2-1.png",
-  };
-
   const toDisplayRoom = (roomType: RoomType) => {
-    const normalizedKey = normalizeName(roomType.name);
-    const imageUrl =
-      roomType.mainPhotoUrl ??
-      roomType.photos?.[0] ??
-      fallbackImages[normalizedKey] ??
-      placeholderImage;
-
     const amenityRecords: AmenityDisplay[] = (roomType.amenities ?? [])
       .map((amenityId) => amenities?.find((amenity) => amenity.id === amenityId))
       .filter((amenity): amenity is NonNullable<typeof amenity> => Boolean(amenity))
@@ -136,7 +122,7 @@ export function RoomsShowcaseSection() {
       id: roomType.id,
       name: roomType.name,
       description: roomType.description ?? "",
-      imageUrl,
+      imageUrl: getRoomTypeImageUrl(roomType),
       amenities: amenityRecords,
     };
   };

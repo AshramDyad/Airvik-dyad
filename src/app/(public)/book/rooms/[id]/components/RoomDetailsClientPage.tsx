@@ -47,6 +47,7 @@ import {
 } from "@/components/ui/carousel";
 import { cn } from "@/lib/utils";
 import { Icon } from "@/components/shared/icon";
+import { getRoomTypeImageUrl } from "@/lib/room-type-images";
 import type { Amenity, RatePlan, Reservation, Room, RoomType } from "@/data/types";
 
 const bookingSchema = z.object({
@@ -114,7 +115,7 @@ export function RoomDetailsClientPage({
 
   const photosToShow = React.useMemo(() => {
     if (!roomType || !roomType.photos || roomType.photos.length === 0) {
-      return ["/room-placeholder.svg"];
+      return [getRoomTypeImageUrl(roomType)];
     }
     const sortedPhotos = [...roomType.photos];
     if (roomType.mainPhotoUrl) {

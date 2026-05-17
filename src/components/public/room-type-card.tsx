@@ -23,6 +23,7 @@ import { Icon } from "@/components/shared/icon";
 import { useDataContext } from "@/context/data-context";
 import type { EnhancedBookingSearchFormValues } from "./booking-widget";
 import { useCurrencyFormatter } from "@/hooks/use-currency";
+import { getRoomTypeImageUrl } from "@/lib/room-type-images";
 
 // Legacy type for backward compatibility
 type BookingSearchFormValues = {
@@ -54,6 +55,7 @@ export function RoomTypeCard({
 }: RoomTypeCardProps) {
   const { amenities: allAmenities } = useDataContext();
   const formatCurrency = useCurrencyFormatter();
+  const imageUrl = React.useMemo(() => getRoomTypeImageUrl(roomType), [roomType]);
 
   const detailsLink = React.useMemo(() => {
     const baseUrl = `/book/rooms/${roomType.id}`;
@@ -145,11 +147,7 @@ export function RoomTypeCard({
         >
           <div className="relative h-32 md:h-40 overflow-hidden">
             <Image
-              src={
-                roomType.mainPhotoUrl ||
-                roomType.photos[0] ||
-                "/room-placeholder.svg"
-              }
+              src={imageUrl}
               alt={roomType.name}
               fill
               className="object-cover"

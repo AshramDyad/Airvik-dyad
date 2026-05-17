@@ -34,6 +34,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
+import { getRoomTypeImageUrl } from "@/lib/room-type-images";
 import type { EnhancedBookingSearchFormValues } from "./booking-widget";
 import { useAvailabilitySearch } from "@/hooks/use-availability-search";
 import type { RoomOccupancy } from "@/data/types";
@@ -265,11 +266,7 @@ export function BookingDialog({
                       <div className="flex gap-4">
                         <div className="w-24 h-16 relative rounded-md overflow-hidden flex-shrink-0">
                           <img
-                            src={
-                              rt.mainPhotoUrl ||
-                              rt.photos[0] ||
-                              "/room-placeholder.svg"
-                            }
+                            src={getRoomTypeImageUrl(rt)}
                             alt={rt.name}
                             className="absolute inset-0 h-full w-full object-cover"
                           />
