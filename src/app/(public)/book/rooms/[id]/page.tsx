@@ -72,6 +72,7 @@ import { calculateRoomPricing } from "@/lib/pricing-calculator";
 import { PricingBreakdown } from "@/components/ui/pricing-breakdown";
 import { useCurrencyFormatter } from "@/hooks/use-currency";
 import { isBookableRoom } from "@/lib/rooms";
+import { getRoomTypeImageUrl } from "@/lib/room-type-images";
 
 const bookingSchema = z.object({
   dateRange: z
@@ -278,7 +279,7 @@ export default function RoomDetailsPage() {
   const photosToShow = React.useMemo(() => {
     if (!roomType || !roomType.photos || roomType.photos.length === 0) {
       return [
-        "/room-placeholder.svg",
+        getRoomTypeImageUrl(roomType),
         "/room-placeholder.svg",
         "/room-placeholder.svg",
       ];

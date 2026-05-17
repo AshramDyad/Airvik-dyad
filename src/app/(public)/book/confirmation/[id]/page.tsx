@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { useCurrencyFormatter } from "@/hooks/use-currency";
+import { getRoomTypeImageUrl } from "@/lib/room-type-images";
 import { InlineAlert } from "@/components/public/inline-alert";
 import { InvoiceDownloadButton } from "@/components/shared/invoice-download-button";
 
@@ -595,11 +596,7 @@ export default function BookingConfirmationPage() {
                             >
                               <div className="relative h-16 w-24 overflow-hidden rounded flex-shrink-0">
                                 <img
-                                  src={
-                                    item.roomType.mainPhotoUrl ||
-                                    item.roomType.photos?.[0] ||
-                                    "/room-placeholder.svg"
-                                  }
+                                  src={getRoomTypeImageUrl(item.roomType)}
                                   alt={item.roomType.name}
                                   className="absolute inset-0 h-full w-full object-cover"
                                 />

@@ -22,6 +22,7 @@ import { InlineAlert } from "@/components/public/inline-alert";
 import { BookingPolicies } from "@/components/public/booking-policies";
 import { calculateRoomPricing, calculateMultipleRoomPricing } from "@/lib/pricing-calculator";
 import { useCurrencyFormatter } from "@/hooks/use-currency";
+import { getRoomTypeImageUrl } from "@/lib/room-type-images";
 import { distributeGuestsAcrossRooms } from "@/lib/reservations/guest-allocation";
 
 import { Button } from "@/components/ui/button";
@@ -635,11 +636,7 @@ function BookingReviewContent() {
             <CardContent className="p-0">
               <div className="relative h-52 w-full">
                 <Image
-                  src={
-                    activeHeroRoomType?.mainPhotoUrl ||
-                    activeHeroRoomType?.photos?.[0] ||
-                    "/room-placeholder.svg"
-                  }
+                  src={getRoomTypeImageUrl(activeHeroRoomType)}
                   alt={activeHeroRoomType?.name || property.name}
                   fill
                   className="object-cover rounded-t-lg"
@@ -706,11 +703,7 @@ function BookingReviewContent() {
                         >
                           <div className="relative mb-2 h-16 w-full overflow-hidden rounded">
                             <Image
-                              src={
-                                roomType.mainPhotoUrl ||
-                                roomType.photos?.[0] ||
-                                "/room-placeholder.svg"
-                              }
+                              src={getRoomTypeImageUrl(roomType)}
                               alt={roomType.name}
                               fill
                               className="object-cover"
@@ -1146,5 +1139,4 @@ export default function BookingReviewPage() {
     </React.Suspense>
   );
 }
-
 

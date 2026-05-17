@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import type { RoomType } from "@/data/types";
+import { getRoomTypeImageUrl } from "@/lib/room-type-images";
 import Image from "next/image";
 
 interface ShareDialogProps {
@@ -45,13 +46,10 @@ export function ShareDialog({
 
   const shareText = `Check out this room: ${roomType.name} at Airvik Dyad Ashram`;
 
-  // Get the room photo URL - use mainPhotoUrl if available, otherwise first photo
-  const roomPhotoUrl = React.useMemo(() => {
-    if (roomType.mainPhotoUrl) return roomType.mainPhotoUrl;
-    if (roomType.photos && roomType.photos.length > 0)
-      return roomType.photos[0];
-    return "/room-placeholder.svg";
-  }, [roomType]);
+  const roomPhotoUrl = React.useMemo(
+    () => getRoomTypeImageUrl(roomType),
+    [roomType]
+  );
 
   const handleCopyLink = async () => {
     try {
