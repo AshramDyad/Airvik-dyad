@@ -72,6 +72,8 @@ export interface Property {
   trust_date?: string;
   pan_no?: string;
   certificate_no?: string;
+  upi_id?: string | null;
+  upi_merchant_name?: string | null;
 }
 
 export type UnitsViewMode = 'remaining' | 'booked';
@@ -407,6 +409,31 @@ export interface Reservation {
   externalId?: string | null;
   externalMetadata?: Record<string, unknown> | null;
   guestSnapshot?: ReservationGuestSnapshot;
+}
+
+export type ReservationPaymentRequestStatus =
+  | "requested"
+  | "partially_paid"
+  | "paid"
+  | "expired"
+  | "cancelled";
+
+export interface ReservationPaymentRequest {
+  id: string;
+  token: string;
+  reservationIds: string[];
+  amount: number;
+  paidAmount: number;
+  status: ReservationPaymentRequestStatus;
+  notes?: string;
+  requestedAt: string;
+  paidAt?: string;
+  expiresAt?: string;
+  paymentReference?: string;
+  paymentMethod: string;
+  externalMetadata?: Record<string, unknown> | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export type BookingSummary = {

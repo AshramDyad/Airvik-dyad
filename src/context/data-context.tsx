@@ -97,6 +97,7 @@ import type {
   StickyNote,
   DashboardComponentId,
   AdminActivityLogInput,
+  ReservationPaymentRequest,
 } from "@/data/types";
 import type { RoomOccupancyAssignment } from "@/lib/reservations/guest-allocation";
 
@@ -190,8 +191,44 @@ interface DataContextType {
   deleteGuest: (guestId: string) => Promise<boolean>;
   addFolioItem: (
     reservationId: string,
-    item: Omit<FolioItem, "id" | "timestamp">
+    item: Omit<FolioItem, "id" | "timestamp">,
+    options?: {
+      autoApplyToReservationPaymentRequests?: boolean;
+      requestIds?: string[];
+    }
   ) => Promise<void>;
+  reservationPaymentRequests: ReservationPaymentRequest[];
+  loadReservationPaymentRequests: (
+    reservationId: string
+  ) => Promise<ReservationPaymentRequest[]>;
+  createReservationPaymentRequest: (
+    payload: {
+      reservationIds: string[];
+      amount: number;
+      notes?: string;
+      requestedAt?: string;
+      expiresAt?: string;
+      paymentMethod?: string;
+    }
+  ) => Promise<ReservationPaymentRequest>;
+  updateReservationPaymentRequest: (
+    requestId: string,
+    payload: {
+      paidAmount?: number;
+      status?: ReservationPaymentRequest["status"];
+      paidAt?: string | null;
+      paymentReference?: string;
+      notes?: string;
+      expiresAt?: string;
+    }
+  ) => Promise<ReservationPaymentRequest | null>;
+  applyManualPaymentToReservationPaymentRequests: (
+    reservationId: string,
+    paymentAmount: number,
+    options?: {
+      requestIds?: string[];
+    }
+  ) => Promise<number>;
   assignHousekeeper: (assignment: { roomId: string; userId: string }) => void;
   updateAssignmentStatus: (
     roomId: string,

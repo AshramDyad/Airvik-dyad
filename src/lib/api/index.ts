@@ -17,6 +17,8 @@ import type {
   Category,
   Post,
   RoomTypeAvailability,
+  ReservationPaymentRequest,
+  ReservationPaymentRequestStatus,
   BookingRestriction,
   PropertyClosure,
   AdminActivityLog,
@@ -111,6 +113,24 @@ type DbFolioItem = {
   external_source: string | null;
   external_reference: string | null;
   external_metadata: Record<string, unknown> | null;
+};
+
+type DbReservationPaymentRequest = {
+  id: string;
+  token: string;
+  reservation_ids: string[];
+  amount: number;
+  paid_amount: number;
+  status: ReservationPaymentRequestStatus;
+  notes: string | null;
+  requested_at: string;
+  paid_at: string | null;
+  expires_at: string | null;
+  payment_method: string;
+  payment_reference: string | null;
+  external_metadata: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
 };
 
 type DbReservation = {
@@ -437,6 +457,71 @@ const fromDbFolioItem = (dbFolio: DbFolioItem): FolioItem => ({
   externalReference: dbFolio.external_reference ?? undefined,
   externalMetadata: dbFolio.external_metadata ?? undefined,
 });
+
+export const generateReservationPaymentRequestToken = () => {
+  const randomValue =
+    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`;
+  return randomValue.replace(/-/g, "").slice(0, 20);
+};
+
+export const fromDbReservationPaymentRequest = (
+  request: DbReservationPaymentRequest
+): ReservationPaymentRequest => ({
+  id: request.id,
+  token: request.token,
+  reservationIds: request.reservation_ids,
+  amount: Number(request.amount),
+  paidAmount: Number(request.paid_amount),
+  status: request.status,
+  notes: request.notes ?? undefined,
+  requestedAt: request.requested_at,
+  paidAt: request.paid_at ?? undefined,
+  expiresAt: request.expires_at ?? undefined,
+  paymentMethod: request.payment_method,
+  paymentReference: request.payment_reference ?? undefined,
+  externalMetadata: request.external_metadata ?? undefined,
+  createdAt: request.created_at,
+  updatedAt: request.updated_at,
+});
+
+export const normalizeReservationPaymentRequestAmount = (amount: number) => {
+  if (!Number.isFinite(amount)) {
+    throw new Error("Payment request amount must be valid.");
+  }
+
+  if (amount <= 0) {
+    throw new Error("Payment request amount must be greater than 0.");
+  }
+
+  return Math.round(amount * 100) / 100;
+};
+
+export type ReservationPaymentRequestInsertPayload = {
+  reservationIds: string[];
+  amount: number;
+  notes?: string | null;
+  paidAmount?: number;
+  status?: ReservationPaymentRequestStatus;
+  requestedAt?: string | null;
+  paidAt?: string | null;
+  expiresAt?: string | null;
+  paymentMethod?: string;
+  paymentReference?: string | null;
+  externalMetadata?: Record<string, unknown> | null;
+};
+
+export type ReservationPaymentRequestUpdatePayload = {
+  paidAmount?: number;
+  status?: ReservationPaymentRequestStatus;
+  paidAt?: string | null;
+  paymentReference?: string | null;
+  notes?: string | null;
+  expiresAt?: string | null;
+  paymentMethod?: string;
+  externalMetadata?: Record<string, unknown> | null;
+};
 
 const fromDbReservation = (dbReservation: DbReservation): Reservation => ({
   id: dbReservation.id,

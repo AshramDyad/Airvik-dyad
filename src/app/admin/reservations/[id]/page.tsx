@@ -36,6 +36,7 @@ export default function ReservationDetailsPage() {
     lookupStatus,
     activeBookingReservations: isolatedBookingReservations,
     bookings,
+    loadReservationPaymentRequests,
   } = useDataContext();
 
   const reservationIdFromParams = React.useMemo(() => {
@@ -50,6 +51,16 @@ export default function ReservationDetailsPage() {
       loadBookingDetails(reservationIdFromParams);
     }
   }, [reservationIdFromParams, loadBookingDetails]);
+
+  React.useEffect(() => {
+    if (!reservationIdFromParams || isSessionLoading) {
+      return;
+    }
+
+    void loadReservationPaymentRequests(reservationIdFromParams).catch(() => {
+      // Non-blocking: keep reservation page readable even if request fetch fails.
+    });
+  }, [reservationIdFromParams, isSessionLoading, loadReservationPaymentRequests]);
 
   const reservation = React.useMemo(() => {
     const found = isolatedBookingReservations.find((r) => r.id === reservationIdFromParams) ||
