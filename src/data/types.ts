@@ -18,6 +18,37 @@ export type PermissionResource =
   | "donation";
 export type Permission = `${PermissionAction}:${PermissionResource}`;
 
+export type GoogleSheetTransactionRawRow = Record<string, string>;
+
+export interface GoogleSheetTransaction {
+  rowNumber: number;
+  fetchedAt: string | null;
+  date: string | null;
+  amount: number | null;
+  amountText: string | null;
+  description: string | null;
+  payer: string | null;
+  method: string | null;
+  reference: string | null;
+  status: string | null;
+  raw: GoogleSheetTransactionRawRow;
+  cells: string[];
+}
+
+export interface GoogleSheetTransactionsPayload {
+  spreadsheetId: string;
+  range: string;
+  fetchedAt: string;
+  headers: string[];
+  rows: GoogleSheetTransaction[];
+}
+
+export interface GoogleSheetTransactionsApiResponse
+  extends GoogleSheetTransactionsPayload {
+  stale: boolean;
+  message?: string;
+}
+
 export const allPermissions: readonly Permission[] = [
   "create:guest", "read:guest", "update:guest", "delete:guest",
   "create:reservation", "read:reservation", "update:reservation", "delete:reservation",

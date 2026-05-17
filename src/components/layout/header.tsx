@@ -4,7 +4,6 @@ import Link from "next/link";
 import {
   CircleUser,
   Menu,
-  Package2,
 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 
@@ -41,6 +40,7 @@ const navItems: HeaderNavItem[] = [
   { href: "/admin/guests", label: "Guests", feature: "guests" },
   { href: "/admin/feedback", label: "Feedback", feature: "feedback" },
   { href: "/admin/reports", label: "Reports", feature: "reports" },
+  { href: "/admin/payments", label: "Payments", feature: "payments" },
 ] satisfies HeaderNavItem[];
 
 export function Header() {

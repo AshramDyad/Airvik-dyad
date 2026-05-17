@@ -68,6 +68,7 @@
     "embla-carousel-react": "^8.6.0",
     "fast-csv": "^5.0.5",
     "framer-motion": "^12.23.22",
+    "google-auth-library": "^10.6.2",
     "input-otp": "^1.4.2",
     "jspdf": "^2.5.2",
     "jspdf-autotable": "3.8.4",
