@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   Banknote,
   Clock3,
+  Download,
   Loader2,
   ReceiptText,
   RefreshCw,
@@ -155,19 +156,30 @@ export function PaymentsClient() {
     <div className="space-y-6">
       <div className="flex justify-end">
         <div className="flex flex-col items-stretch gap-2 sm:items-end">
-          <Button
-            variant="outline"
-            className="w-full sm:w-auto"
-            onClick={() => void loadTransactions({ force: true })}
-            disabled={isInitialLoading || isRefreshing}
-          >
-            {isRefreshing ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <RefreshCw className="h-4 w-4" />
-            )}
-            Refresh
-          </Button>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button asChild variant="outline" className="w-full sm:w-auto">
+              <a
+                href="/Sahajanand-wellness-qr.png"
+                download="Sahajanand-wellness-qr.png"
+              >
+                <Download className="h-4 w-4" />
+                Download QR
+              </a>
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full sm:w-auto"
+              onClick={() => void loadTransactions({ force: true })}
+              disabled={isInitialLoading || isRefreshing}
+            >
+              {isRefreshing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              Refresh
+            </Button>
+          </div>
           <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <Clock3 className="h-3.5 w-3.5" />
             Last refresh: {lastRefresh}
