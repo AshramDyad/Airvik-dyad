@@ -278,7 +278,16 @@ function parseTransactions(
       return acc;
     }
 
-    acc.push(parseTransactionRow(cells, headers, fieldIndexes, startRow + index + 1));
+    const transaction = parseTransactionRow(
+      cells,
+      headers,
+      fieldIndexes,
+      startRow + index + 1
+    );
+    if (!isSheetHeaderRow(transaction)) {
+      acc.push(transaction);
+    }
+
     return acc;
   }, []);
 
@@ -320,6 +329,24 @@ function parseTransactionRow(
     raw: buildRawRow(cells, headers),
     cells: cells.map((cell) => cell.trim()),
   };
+}
+
+function isSheetHeaderRow(row: GoogleSheetTransaction): boolean {
+  if (row.amount !== null) {
+    return false;
+  }
+
+  const date = normalizeHeader(row.date ?? "");
+  const description = normalizeHeader(row.description ?? "");
+  const amount = normalizeHeader(row.amountText ?? "");
+
+  return (
+    (date === "date" || date === "txn date" || date === "transaction date") &&
+    (description === "particular" ||
+      description === "particulars" ||
+      description === "description") &&
+    (amount === "amount" || amount === "credit")
+  );
 }
 
 function detectFieldIndexes(headers: string[]): FieldIndexes {

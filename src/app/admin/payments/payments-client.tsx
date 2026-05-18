@@ -123,32 +123,33 @@ export function PaymentsClient() {
   }, [loadTransactions]);
 
   const rows = payload?.rows ?? EMPTY_ROWS;
-  const orderedRows = React.useMemo(
-    () => [...rows].sort(compareTransactionsByLatest),
+  const creditedRows = React.useMemo(
+    () => rows.filter(isCreditedTransaction),
     [rows]
   );
   const filteredRows = React.useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     if (!normalizedQuery) {
-      return orderedRows;
+      return creditedRows;
     }
 
-    return orderedRows.filter((row) =>
+    return creditedRows.filter((row) =>
       getSearchText(row).toLowerCase().includes(normalizedQuery)
     );
-  }, [orderedRows, query]);
+  }, [creditedRows, query]);
 
   const todayCollection = React.useMemo(
-    () => getTodayCreditedTotal(rows, timeZone),
-    [rows, timeZone]
+    () => getTodayCreditedTotal(creditedRows, timeZone),
+    [creditedRows, timeZone]
   );
-  const latestTransaction = orderedRows[0] ?? null;
+  const latestTransaction = creditedRows[0] ?? null;
   const lastRefresh = payload ? formatDateTime(payload.fetchedAt) : "Not loaded";
 
-  const showEmptyState = !isInitialLoading && rows.length === 0 && !error;
-  const showErrorEmptyState = !isInitialLoading && rows.length === 0 && Boolean(error);
+  const showEmptyState = !isInitialLoading && creditedRows.length === 0 && !error;
+  const showErrorEmptyState =
+    !isInitialLoading && rows.length === 0 && Boolean(error);
   const showNoSearchResults =
-    !isInitialLoading && rows.length > 0 && filteredRows.length === 0;
+    !isInitialLoading && creditedRows.length > 0 && filteredRows.length === 0;
 
   return (
     <div className="space-y-6">
@@ -211,7 +212,9 @@ export function PaymentsClient() {
                 ? "..."
                 : "None"
           }
-          detail={latestTransaction ? "Latest by fetched_at" : "No transaction rows"}
+          detail={
+            latestTransaction ? "Top credited row in Google Sheet" : "No credited transactions"
+          }
         />
         <SummaryCard
           icon={Banknote}
@@ -263,7 +266,7 @@ export function PaymentsClient() {
           ) : showErrorEmptyState ? (
             <EmptyState title="Resolve the Google Sheets error to load payments" />
           ) : showEmptyState ? (
-            <EmptyState title="No transactions found" />
+            <EmptyState title="No credited transactions found" />
           ) : showNoSearchResults ? (
             <EmptyState title="No matching transactions" />
           ) : (
@@ -273,57 +276,55 @@ export function PaymentsClient() {
                   <TableHead className="min-w-[130px]">Date</TableHead>
                   <TableHead className="min-w-[260px]">Description/Payer</TableHead>
                   <TableHead className="min-w-[130px]">Amount</TableHead>
-                  <TableHead className="min-w-[120px]">Method</TableHead>
                   <TableHead className="min-w-[160px]">Reference</TableHead>
                   <TableHead className="min-w-[120px]">Status</TableHead>
-                  <TableHead className="min-w-[80px] text-right">Row</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredRows.map((row) => (
-                  <TableRow key={row.rowNumber}>
-                    <TableCell className="font-medium">
-                      {getTransactionDateDisplay(row)}
-                    </TableCell>
-                    <TableCell>
-                      <div className="max-w-[320px] space-y-1">
-                        <p className="truncate font-medium text-foreground">
-                          {getPrimaryDescription(row)}
-                        </p>
-                        <p className="truncate text-xs text-muted-foreground">
-                          {getSecondaryDescription(row)}
-                        </p>
-                      </div>
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      {getAmountDisplay(row, currency)}
-                    </TableCell>
-                    <TableCell>{row.method ?? "-"}</TableCell>
-                    <TableCell>
-                      <span className="block max-w-[180px] truncate">
-                        {row.reference ?? "-"}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      {row.status ? (
-                        <Badge
-                          variant="outline"
-                          className={cn(
-                            "max-w-[150px] truncate",
-                            getStatusClassName(row.status)
-                          )}
-                        >
-                          {row.status}
-                        </Badge>
-                      ) : (
-                        "-"
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right text-muted-foreground">
-                      {row.rowNumber}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {filteredRows.map((row) => {
+                  const transactionStatus = getTransactionStatus(row);
+
+                  return (
+                    <TableRow key={row.rowNumber}>
+                      <TableCell className="font-medium">
+                        {getTransactionDateDisplay(row)}
+                      </TableCell>
+                      <TableCell>
+                        <div className="max-w-[320px] space-y-1">
+                          <p className="truncate font-medium text-foreground">
+                            {getPrimaryDescription(row)}
+                          </p>
+                          <p className="truncate text-xs text-muted-foreground">
+                            {getSecondaryDescription(row)}
+                          </p>
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        {getAmountDisplay(row, currency)}
+                      </TableCell>
+                      <TableCell>
+                        <span className="block max-w-[180px] truncate">
+                          {row.reference ?? "-"}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        {transactionStatus ? (
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "max-w-[150px] truncate",
+                              getStatusClassName(transactionStatus)
+                            )}
+                          >
+                            {transactionStatus}
+                          </Badge>
+                        ) : (
+                          "-"
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           )}
@@ -401,29 +402,90 @@ function parseDate(value: string | null): number | null {
     return null;
   }
 
-  const timestamp = Date.parse(value);
+  const trimmed = value.trim();
+  const slashDateTimestamp = parseSeparatedDate(trimmed);
+  if (slashDateTimestamp !== null) {
+    return slashDateTimestamp;
+  }
+
+  const compactDateTimestamp = parseCompactDate(trimmed);
+  if (compactDateTimestamp !== null) {
+    return compactDateTimestamp;
+  }
+
+  const timestamp = Date.parse(trimmed);
   return Number.isFinite(timestamp) ? timestamp : null;
 }
 
-function compareTransactionsByLatest(
-  left: GoogleSheetTransaction,
-  right: GoogleSheetTransaction
-): number {
-  const leftTimestamp = parseDate(left.fetchedAt ?? left.date);
-  const rightTimestamp = parseDate(right.fetchedAt ?? right.date);
-
-  if (leftTimestamp !== null && rightTimestamp !== null) {
-    const timestampOrder = rightTimestamp - leftTimestamp;
-    if (timestampOrder !== 0) {
-      return timestampOrder;
-    }
-  } else if (leftTimestamp !== null) {
-    return -1;
-  } else if (rightTimestamp !== null) {
-    return 1;
+function parseSeparatedDate(value: string): number | null {
+  const match = value.match(
+    /^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2}|\d{4})(?:\s+(\d{1,2})(?::(\d{2}))?(?::(\d{2}))?)?/
+  );
+  if (!match) {
+    return null;
   }
 
-  return right.rowNumber - left.rowNumber;
+  const first = Number.parseInt(match[1], 10);
+  const second = Number.parseInt(match[2], 10);
+  const yearPart = Number.parseInt(match[3], 10);
+  const hours = match[4] ? Number.parseInt(match[4], 10) : 0;
+  const minutes = match[5] ? Number.parseInt(match[5], 10) : 0;
+  const seconds = match[6] ? Number.parseInt(match[6], 10) : 0;
+  const year = yearPart < 100 ? 2000 + yearPart : yearPart;
+  const day = first > 12 ? first : second > 12 ? second : first;
+  const month = first > 12 ? second : second > 12 ? first : second;
+
+  return buildLocalDateTimestamp(year, month, day, hours, minutes, seconds);
+}
+
+function parseCompactDate(value: string): number | null {
+  const match = value.match(/^(\d{2})(\d{2})(\d{2}|\d{4})$/);
+  if (!match) {
+    return null;
+  }
+
+  const day = Number.parseInt(match[1], 10);
+  const month = Number.parseInt(match[2], 10);
+  const yearPart = Number.parseInt(match[3], 10);
+  const year = yearPart < 100 ? 2000 + yearPart : yearPart;
+
+  return buildLocalDateTimestamp(year, month, day, 0, 0, 0);
+}
+
+function buildLocalDateTimestamp(
+  year: number,
+  month: number,
+  day: number,
+  hours: number,
+  minutes: number,
+  seconds: number
+): number | null {
+  if (
+    month < 1 ||
+    month > 12 ||
+    day < 1 ||
+    day > 31 ||
+    hours < 0 ||
+    hours > 23 ||
+    minutes < 0 ||
+    minutes > 59 ||
+    seconds < 0 ||
+    seconds > 59
+  ) {
+    return null;
+  }
+
+  const date = new Date(year, month - 1, day, hours, minutes, seconds);
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    return null;
+  }
+
+  const timestamp = date.getTime();
+  return Number.isFinite(timestamp) ? timestamp : null;
 }
 
 function getTodayCreditedTotal(
@@ -455,11 +517,59 @@ function isCreditedTransaction(row: GoogleSheetTransaction): boolean {
   }
 
   const status = row.status?.trim() ?? "";
-  if (!status || EXCLUDED_STATUS_PATTERN.test(status)) {
+  if (status) {
+    if (EXCLUDED_STATUS_PATTERN.test(status)) {
+      return false;
+    }
+
+    return CREDITED_STATUS_PATTERN.test(status);
+  }
+
+  return isCreditRow(row);
+}
+
+function isCreditRow(row: GoogleSheetTransaction): boolean {
+  const credit = getRawAmountByHeader(row, "credit");
+  if (credit !== null) {
+    return credit > 0;
+  }
+
+  const debit = getRawAmountByHeader(row, "debit");
+  if (debit !== null && debit > 0) {
     return false;
   }
 
-  return CREDITED_STATUS_PATTERN.test(status);
+  return row.amount !== null && row.amount > 0;
+}
+
+function getRawAmountByHeader(
+  row: GoogleSheetTransaction,
+  header: string
+): number | null {
+  const entry = Object.entries(row.raw).find(
+    ([key, value]) =>
+      normalizeLabel(key) === header && value.trim().length > 0
+  );
+  if (!entry) {
+    return null;
+  }
+
+  return parseSheetAmount(entry[1]);
+}
+
+function parseSheetAmount(value: string): number | null {
+  const normalized = value.replace(/,/g, "");
+  const match = normalized.match(/-?\d+(?:\.\d+)?/);
+  if (!match) {
+    return null;
+  }
+
+  const parsed = Number.parseFloat(match[0]);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function normalizeLabel(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
 
 function getTransactionDateKey(
@@ -558,6 +668,28 @@ function getAmountDisplay(
   return row.amountText ?? "-";
 }
 
+function getTransactionStatus(row: GoogleSheetTransaction): string | null {
+  const debit = getRawAmountByHeader(row, "debit");
+  if (debit !== null && debit !== 0) {
+    return "Debit";
+  }
+
+  const credit = getRawAmountByHeader(row, "credit");
+  if (credit !== null && credit !== 0) {
+    return "Credit";
+  }
+
+  if (row.amount !== null && row.amount < 0) {
+    return "Debit";
+  }
+
+  if (row.amount !== null && row.amount > 0) {
+    return "Credit";
+  }
+
+  return row.status;
+}
+
 function formatCurrency(value: number, currency: string): string {
   try {
     return new Intl.NumberFormat("en-IN", {
@@ -586,6 +718,14 @@ function formatDateTime(value: string): string {
 
 function getStatusClassName(status: string): string {
   const normalized = status.toLowerCase();
+  if (normalized.includes("credit")) {
+    return "border-emerald-500/40 bg-emerald-500/10 text-emerald-700";
+  }
+
+  if (normalized.includes("debit")) {
+    return "border-destructive/40 bg-destructive/10 text-destructive";
+  }
+
   if (normalized.includes("success") || normalized.includes("paid")) {
     return "border-emerald-500/40 bg-emerald-500/10 text-emerald-700";
   }
