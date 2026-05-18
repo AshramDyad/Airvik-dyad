@@ -19,7 +19,6 @@ import {
   CardContent,
   CardDescription,
   CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
@@ -144,6 +143,7 @@ export function PaymentsClient() {
   );
   const latestTransaction = creditedRows[0] ?? null;
   const lastRefresh = payload ? formatDateTime(payload.fetchedAt) : "Not loaded";
+  const todayDisplay = formatTodayDate(timeZone);
 
   const showEmptyState = !isInitialLoading && creditedRows.length === 0 && !error;
   const showErrorEmptyState =
@@ -153,14 +153,7 @@ export function PaymentsClient() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="space-y-2">
-          <h1 className="text-2xl font-semibold tracking-tight">Payments</h1>
-          <p className="text-sm text-muted-foreground">
-            View the latest private Google Sheet transactions without syncing them into Supabase.
-          </p>
-        </div>
-
+      <div className="flex justify-end">
         <div className="flex flex-col items-stretch gap-2 sm:items-end">
           <Button
             variant="outline"
@@ -212,13 +205,12 @@ export function PaymentsClient() {
                 ? "..."
                 : "None"
           }
-          detail={
-            latestTransaction ? "Top credited row in Google Sheet" : "No credited transactions"
-          }
+          detail={latestTransaction ? undefined : "No credited transactions"}
         />
         <SummaryCard
           icon={Banknote}
           label="Today collection"
+          labelDetail={todayDisplay}
           value={
             isInitialLoading
               ? "..."
@@ -230,20 +222,6 @@ export function PaymentsClient() {
 
       <Card>
         <CardHeader className="gap-4">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-            <div className="space-y-2">
-              <CardTitle>Sheet Transactions</CardTitle>
-              <CardDescription>
-                Display-only data from the configured private spreadsheet.
-              </CardDescription>
-            </div>
-            {payload && (
-              <Badge variant={payload.stale ? "outline" : "secondary"}>
-                {payload.stale ? "Stale" : "Live cache"}
-              </Badge>
-            )}
-          </div>
-
           <div className="relative max-w-xl">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -337,22 +315,38 @@ export function PaymentsClient() {
 type SummaryCardProps = {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
+  labelDetail?: string;
   value: string;
-  detail: string;
+  detail?: string;
 };
 
-function SummaryCard({ icon: Icon, label, value, detail }: SummaryCardProps) {
+function SummaryCard({
+  icon: Icon,
+  label,
+  labelDetail,
+  value,
+  detail,
+}: SummaryCardProps) {
   return (
     <Card>
       <CardHeader className="flex-row items-center justify-between gap-3 pb-3">
-        <CardDescription>{label}</CardDescription>
+        <CardDescription>
+          {label}
+          {labelDetail ? (
+            <span className="ml-1 text-[11px] text-muted-foreground">
+              ({labelDetail})
+            </span>
+          ) : null}
+        </CardDescription>
         <Icon className="h-4 w-4 text-muted-foreground" />
       </CardHeader>
       <CardContent>
         <div className="truncate text-2xl font-semibold tracking-tight">
           {value}
         </div>
-        <p className="mt-1 truncate text-xs text-muted-foreground">{detail}</p>
+        {detail ? (
+          <p className="mt-1 truncate text-xs text-muted-foreground">{detail}</p>
+        ) : null}
       </CardContent>
     </Card>
   );
@@ -714,6 +708,26 @@ function formatDateTime(value: string): string {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(date);
+}
+
+function formatTodayDate(timeZone: string): string {
+  return formatDateForTimeZone(new Date(), timeZone) ?? formatDateForTimeZone(
+    new Date(),
+    DEFAULT_TIME_ZONE
+  ) ?? "";
+}
+
+function formatDateForTimeZone(date: Date, timeZone: string): string | null {
+  try {
+    return new Intl.DateTimeFormat("en-IN", {
+      timeZone,
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    }).format(date);
+  } catch {
+    return null;
+  }
 }
 
 function getStatusClassName(status: string): string {
