@@ -5,7 +5,6 @@ import {
   AlertTriangle,
   Banknote,
   Clock3,
-  Hash,
   Loader2,
   ReceiptText,
   RefreshCw,
@@ -40,7 +39,12 @@ import { authorizedFetch } from "@/lib/auth/client-session";
 import { cn } from "@/lib/utils";
 
 const AUTO_REFRESH_MS = 60_000;
+const DEFAULT_TIME_ZONE = "Asia/Kolkata";
 const EMPTY_ROWS: GoogleSheetTransaction[] = [];
+const CREDITED_STATUS_PATTERN =
+  /\b(credit|credited|success|successful|paid|received|complete|completed|captured|settled)\b/i;
+const EXCLUDED_STATUS_PATTERN =
+  /\b(cancel|cancelled|canceled|chargeback|debit|debited|declined|fail|failed|failure|pending|refund|refunded|reversal|reversed|unpaid|void|withdrawn)\b/i;
 
 type LoadOptions = {
   force?: boolean;
@@ -59,6 +63,7 @@ export function PaymentsClient() {
     React.useRef<GoogleSheetTransactionsApiResponse | null>(null);
 
   const currency = property?.currency || "INR";
+  const timeZone = property?.timezone || DEFAULT_TIME_ZONE;
 
   React.useEffect(() => {
     payloadRef.current = payload;
@@ -133,13 +138,9 @@ export function PaymentsClient() {
     );
   }, [orderedRows, query]);
 
-  const totalDetectedAmount = React.useMemo(
-    () => rows.reduce((total, row) => total + (row.amount ?? 0), 0),
-    [rows]
-  );
-  const detectedAmountCount = React.useMemo(
-    () => rows.filter((row) => row.amount !== null).length,
-    [rows]
+  const todayCollection = React.useMemo(
+    () => getTodayCreditedTotal(rows, timeZone),
+    [rows, timeZone]
   );
   const latestTransaction = orderedRows[0] ?? null;
   const lastRefresh = payload ? formatDateTime(payload.fetchedAt) : "Not loaded";
@@ -159,19 +160,25 @@ export function PaymentsClient() {
           </p>
         </div>
 
-        <Button
-          variant="outline"
-          className="w-full sm:w-auto"
-          onClick={() => void loadTransactions({ force: true })}
-          disabled={isInitialLoading || isRefreshing}
-        >
-          {isRefreshing ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <RefreshCw className="h-4 w-4" />
-          )}
-          Refresh
-        </Button>
+        <div className="flex flex-col items-stretch gap-2 sm:items-end">
+          <Button
+            variant="outline"
+            className="w-full sm:w-auto"
+            onClick={() => void loadTransactions({ force: true })}
+            disabled={isInitialLoading || isRefreshing}
+          >
+            {isRefreshing ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4" />
+            )}
+            Refresh
+          </Button>
+          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Clock3 className="h-3.5 w-3.5" />
+            Last refresh: {lastRefresh}
+          </p>
+        </div>
       </div>
 
       {error && (
@@ -193,40 +200,28 @@ export function PaymentsClient() {
         </Alert>
       )}
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <SummaryCard
-          icon={Hash}
-          label="Rows loaded"
-          value={isInitialLoading ? "..." : String(rows.length)}
-          detail={payload ? payload.range : "Google Sheet range"}
-        />
-        <SummaryCard
-          icon={Banknote}
-          label="Detected amount"
-          value={
-            isInitialLoading
-              ? "..."
-              : formatCurrency(totalDetectedAmount, currency)
-          }
-          detail={`${detectedAmountCount} row${detectedAmountCount === 1 ? "" : "s"} with amount`}
-        />
+      <div className="grid gap-4 md:grid-cols-2">
         <SummaryCard
           icon={ReceiptText}
-          label="Latest transaction"
+          label="Last transaction amount"
           value={
             latestTransaction
-              ? getPrimaryDescription(latestTransaction)
+              ? getAmountDisplay(latestTransaction, currency)
               : isInitialLoading
                 ? "..."
                 : "None"
           }
-          detail={latestTransaction ? getAmountDisplay(latestTransaction, currency) : "No transaction rows"}
+          detail={latestTransaction ? "Latest by fetched_at" : "No transaction rows"}
         />
         <SummaryCard
-          icon={Clock3}
-          label="Last refresh"
-          value={lastRefresh}
-          detail={payload?.stale ? "Stale cache" : "Auto refreshes every 60 seconds"}
+          icon={Banknote}
+          label="Today collection"
+          value={
+            isInitialLoading
+              ? "..."
+              : formatCurrency(todayCollection, currency)
+          }
+          detail="Credited payments today"
         />
       </div>
 
@@ -429,6 +424,106 @@ function compareTransactionsByLatest(
   }
 
   return right.rowNumber - left.rowNumber;
+}
+
+function getTodayCreditedTotal(
+  rows: GoogleSheetTransaction[],
+  timeZone: string
+): number {
+  const todayDateKey = getDateKeyForDate(new Date(), timeZone);
+  if (!todayDateKey) {
+    return 0;
+  }
+
+  return rows.reduce((total, row) => {
+    if (!isCreditedTransaction(row)) {
+      return total;
+    }
+
+    const rowDateKey = getTransactionDateKey(row, timeZone);
+    if (rowDateKey !== todayDateKey) {
+      return total;
+    }
+
+    return total + (row.amount ?? 0);
+  }, 0);
+}
+
+function isCreditedTransaction(row: GoogleSheetTransaction): boolean {
+  if (row.amount === null || row.amount <= 0) {
+    return false;
+  }
+
+  const status = row.status?.trim() ?? "";
+  if (!status || EXCLUDED_STATUS_PATTERN.test(status)) {
+    return false;
+  }
+
+  return CREDITED_STATUS_PATTERN.test(status);
+}
+
+function getTransactionDateKey(
+  row: GoogleSheetTransaction,
+  timeZone: string
+): string | null {
+  return getDateKeyFromValue(row.fetchedAt ?? row.date, timeZone);
+}
+
+function getDateKeyFromValue(
+  value: string | null,
+  timeZone: string
+): string | null {
+  if (!value) {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    return trimmed;
+  }
+
+  const timestamp = parseDate(trimmed);
+  if (timestamp === null) {
+    return null;
+  }
+
+  return getDateKeyForDate(new Date(timestamp), timeZone);
+}
+
+function getDateKeyForDate(date: Date, timeZone: string): string | null {
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return (
+    getDateKeyForDateInTimeZone(date, timeZone) ??
+    getDateKeyForDateInTimeZone(date, DEFAULT_TIME_ZONE)
+  );
+}
+
+function getDateKeyForDateInTimeZone(
+  date: Date,
+  timeZone: string
+): string | null {
+  try {
+    const parts = new Intl.DateTimeFormat("en-IN", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(date);
+    const year = parts.find((part) => part.type === "year")?.value;
+    const month = parts.find((part) => part.type === "month")?.value;
+    const day = parts.find((part) => part.type === "day")?.value;
+
+    if (!year || !month || !day) {
+      return null;
+    }
+
+    return `${year}-${month}-${day}`;
+  } catch {
+    return null;
+  }
 }
 
 function getTransactionDateDisplay(row: GoogleSheetTransaction): string {
