@@ -264,14 +264,14 @@ export function PaymentsClient() {
           ) : showNoSearchResults ? (
             <EmptyState title="No matching transactions" />
           ) : (
-            <Table>
+            <Table className="table-fixed">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="min-w-[130px]">Date</TableHead>
-                  <TableHead className="min-w-[260px]">Description/Payer</TableHead>
-                  <TableHead className="min-w-[130px]">Amount</TableHead>
-                  <TableHead className="min-w-[160px]">Reference</TableHead>
-                  <TableHead className="min-w-[120px]">Status</TableHead>
+                  <TableHead className="w-[120px]">Date</TableHead>
+                  <TableHead className="w-[42%]">Description/Payer</TableHead>
+                  <TableHead className="w-[130px]">Amount</TableHead>
+                  <TableHead className="w-[180px]">Reference</TableHead>
+                  <TableHead className="w-[120px]">Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -284,11 +284,11 @@ export function PaymentsClient() {
                         {getTransactionDateDisplay(row)}
                       </TableCell>
                       <TableCell>
-                        <div className="max-w-[320px] space-y-1">
-                          <p className="truncate font-medium text-foreground">
+                        <div className="min-w-0 space-y-1">
+                          <p className="whitespace-normal break-words font-medium text-foreground">
                             {getPrimaryDescription(row)}
                           </p>
-                          <p className="truncate text-xs text-muted-foreground">
+                          <p className="whitespace-normal break-words text-xs text-muted-foreground">
                             {getSecondaryDescription(row)}
                           </p>
                         </div>
@@ -297,7 +297,7 @@ export function PaymentsClient() {
                         {getAmountDisplay(row, currency)}
                       </TableCell>
                       <TableCell>
-                        <span className="block max-w-[180px] truncate">
+                        <span className="block whitespace-normal break-words">
                           {row.reference ?? "-"}
                         </span>
                       </TableCell>

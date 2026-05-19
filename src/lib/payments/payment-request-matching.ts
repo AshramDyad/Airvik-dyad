@@ -4,6 +4,7 @@ export const PAYMENT_REQUEST_EXPIRY_HOURS = 3;
 export const PAYMENT_UPI_ID = "biz.sahajana959@fbl";
 export const PAYMENT_MERCHANT_NAME = "Sahajanand Wellness";
 export const PAYMENT_IDENTIFIER_LENGTH = 5;
+export const PAYMENT_IDENTIFIER_PREFIX = "SW";
 
 const CREDITED_STATUS_PATTERN =
   /\b(credit|credited|success|successful|paid|received|complete|completed|captured|settled)\b/i;
@@ -31,17 +32,29 @@ export function buildUpiPaymentUri(args: {
   const upiId = args.upiId ?? PAYMENT_UPI_ID;
   const merchantName = args.merchantName ?? PAYMENT_MERCHANT_NAME;
   const amount = formatUpiAmount(args.amount);
-  const note = `Payment ${args.identifier}`;
+  const paymentCode = getPaymentRequestCode(args.identifier);
+  const note = getPaymentRequestNote(args.identifier, merchantName);
   const params = new URLSearchParams({
     pa: upiId,
     pn: merchantName,
     am: amount,
     cu: "INR",
-    tr: args.identifier,
+    tr: paymentCode,
     tn: note,
   });
 
   return `upi://pay?${params.toString()}`;
+}
+
+export function getPaymentRequestCode(identifier: string): string {
+  return `${PAYMENT_IDENTIFIER_PREFIX}-${identifier.toUpperCase()}`;
+}
+
+export function getPaymentRequestNote(
+  identifier: string,
+  merchantName = PAYMENT_MERCHANT_NAME
+): string {
+  return `${getPaymentRequestCode(identifier)} ${merchantName}`;
 }
 
 export function findPaymentRequestMatches(
@@ -86,7 +99,11 @@ export function doesTransactionMatchRequest(
     return false;
   }
 
-  return getTransactionMatchText(transaction).includes(request.identifier.toUpperCase());
+  const matchText = getTransactionMatchText(transaction);
+  const rawIdentifier = request.identifier.toUpperCase();
+  const paymentCode = getPaymentRequestCode(request.identifier).toUpperCase();
+
+  return matchText.includes(paymentCode) || matchText.includes(rawIdentifier);
 }
 
 export function isCreditedSheetTransaction(row: GoogleSheetTransaction): boolean {

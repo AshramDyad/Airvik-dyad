@@ -19,14 +19,29 @@ describe("payment request matching", () => {
     expect(uri).toContain("pn=Sahajanand+Wellness");
     expect(uri).toContain("am=1500.00");
     expect(uri).toContain("cu=INR");
-    expect(uri).toContain("tr=AB123");
-    expect(uri).toContain("tn=Payment+AB123");
+    expect(uri).toContain("tr=SW-AB123");
+    expect(uri).toContain("tn=SW-AB123+Sahajanand+Wellness");
   });
 
   it("matches only credited transactions with the exact amount and identifier", () => {
     const transaction = createTransaction({
       amount: 1200,
       description: "UPI payment XYZ91",
+      raw: { credit: "1,200.00", debit: "" },
+    });
+
+    expect(
+      doesTransactionMatchRequest(transaction, {
+        identifier: "XYZ91",
+        amount: 1200,
+      })
+    ).toBe(true);
+  });
+
+  it("matches the prefixed payment code from bank statement text", () => {
+    const transaction = createTransaction({
+      amount: 1200,
+      description: "UPI IN/SW-XYZ91/9537566009@ptsbi/Sahajanand Wellness",
       raw: { credit: "1,200.00", debit: "" },
     });
 

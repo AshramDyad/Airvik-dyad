@@ -45,7 +45,11 @@ import {
 import { useDataContext } from "@/context/data-context";
 import type { PaymentRequest, PaymentRequestStatus } from "@/data/types";
 import { authorizedFetch } from "@/lib/auth/client-session";
-import { PAYMENT_MERCHANT_NAME } from "@/lib/payments/payment-request-matching";
+import {
+  buildUpiPaymentUri,
+  getPaymentRequestCode,
+  PAYMENT_MERCHANT_NAME,
+} from "@/lib/payments/payment-request-matching";
 import { cn } from "@/lib/utils";
 
 const AUTO_REFRESH_MS = 60_000;
@@ -295,7 +299,7 @@ export function CreatePaymentClient() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Identifier</TableHead>
+                  <TableHead>Payment ID</TableHead>
                   <TableHead>Amount</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Created</TableHead>
@@ -315,7 +319,7 @@ export function CreatePaymentClient() {
                     }}
                   >
                     <TableCell className="font-mono font-semibold">
-                      {request.identifier}
+                      {getPaymentRequestCode(request.identifier)}
                     </TableCell>
                     <TableCell>{formatCurrency(request.amount, currency)}</TableCell>
                     <TableCell>
@@ -443,7 +447,11 @@ function PaymentQrCard({
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid gap-3 sm:grid-cols-2">
-          <InfoBlock label="Identifier" value={request.identifier} mono />
+          <InfoBlock
+            label="Payment ID"
+            value={getPaymentRequestCode(request.identifier)}
+            mono
+          />
           <InfoBlock label="Status" value={request.status} />
           <InfoBlock
             label="Amount"
@@ -588,7 +596,13 @@ async function createShareableQrImage({
   logoUrl: string;
   siteUrl: string;
 }): Promise<string> {
-  const qrDataUrl = await QRCode.toDataURL(request.upiUri, {
+  const upiUri = buildUpiPaymentUri({
+    identifier: request.identifier,
+    amount: request.amount,
+    upiId: request.upiId,
+    merchantName: request.upiMerchantName,
+  });
+  const qrDataUrl = await QRCode.toDataURL(upiUri, {
     errorCorrectionLevel: "H",
     margin: 2,
     width: 470,
@@ -677,11 +691,17 @@ function drawQrShareCard(
   });
 
   drawRoundedRect(context, 106, 830, 548, 58, 16, "#fff7ed", "#fed7aa");
-  drawText(context, `Payment ID: ${request.identifier}`, 380, 868, {
-    font: "800 25px ui-monospace, SFMono-Regular, Menlo, monospace",
-    color: "#9a3412",
-    align: "center",
-  });
+  drawText(
+    context,
+    `Payment ID: ${getPaymentRequestCode(request.identifier)}`,
+    380,
+    868,
+    {
+      font: "800 25px ui-monospace, SFMono-Regular, Menlo, monospace",
+      color: "#9a3412",
+      align: "center",
+    }
+  );
 
   drawText(context, `Valid for 3 hours, until ${formatDateTime(request.expiresAt)}`, 380, 920, {
     font: "700 20px system-ui, sans-serif",
