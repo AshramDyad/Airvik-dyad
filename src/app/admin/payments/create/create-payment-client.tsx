@@ -671,50 +671,49 @@ function drawQrShareCard(
     color: "#64748b",
   });
 
-  drawText(context, "Scan and pay with any BHIM UPI app", 380, 208, {
+  drawText(context, "Scan and pay with any BHIM UPI app", 380, 196, {
     font: "600 24px system-ui, sans-serif",
     color: "#334155",
     align: "center",
   });
 
-  context.drawImage(qrImage, 145, 238, 470, 470);
+  drawPaymentAppLabels(context, 98, 222);
 
-  drawText(context, "Amount", 380, 752, {
+  context.drawImage(qrImage, 145, 280, 470, 470);
+
+  drawText(context, "Amount", 380, 790, {
     font: "600 20px system-ui, sans-serif",
     color: "#64748b",
     align: "center",
   });
-  drawText(context, formatCurrency(request.amount, currency), 380, 798, {
+  drawText(context, formatCurrency(request.amount, currency), 380, 836, {
     font: "800 44px system-ui, sans-serif",
     color: "#0f172a",
     align: "center",
   });
 
-  drawRoundedRect(context, 106, 830, 548, 58, 16, "#fff7ed", "#fed7aa");
   drawText(
     context,
     `Payment ID: ${getPaymentRequestCode(request.identifier)}`,
     380,
-    868,
+    884,
     {
-      font: "800 25px ui-monospace, SFMono-Regular, Menlo, monospace",
-      color: "#9a3412",
+      font: "600 18px ui-monospace, SFMono-Regular, Menlo, monospace",
+      color: "#94a3b8",
       align: "center",
     }
   );
 
-  drawText(context, `Valid for 3 hours, until ${formatDateTime(request.expiresAt)}`, 380, 920, {
+  drawText(context, `Valid for 3 hours, until ${formatDateTime(request.expiresAt)}`, 380, 928, {
     font: "700 20px system-ui, sans-serif",
     color: "#b45309",
     align: "center",
   });
-  drawText(context, `UPI: ${request.upiId}`, 380, 952, {
+  drawText(context, `UPI: ${request.upiId}`, 380, 960, {
     font: "600 18px system-ui, sans-serif",
     color: "#475569",
     align: "center",
   });
-
-  drawPaymentAppLabels(context, 98, 170);
 }
 
 function drawPaymentAppLabels(
