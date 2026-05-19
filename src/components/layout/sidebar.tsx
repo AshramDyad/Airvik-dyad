@@ -103,6 +103,24 @@ const navItems: SidebarNavItem[] = [
     feature: "calendar",
   },
   {
+    href: "/admin/payments",
+    icon: CreditCard,
+    label: "Payments",
+    feature: "payments",
+    subItems: [
+      {
+        label: "Statement",
+        href: "/admin/payments",
+        feature: "payments",
+      },
+      {
+        label: "Create Payment",
+        href: "/admin/payments/create",
+        feature: "payments",
+      },
+    ],
+  },
+  {
     href: "/admin/posts",
     icon: Megaphone,
     label: "Engagement",
@@ -145,12 +163,6 @@ const navItems: SidebarNavItem[] = [
     icon: BarChart3,
     label: "Reports",
     feature: "reports",
-  },
-  {
-    href: "/admin/payments",
-    icon: CreditCard,
-    label: "Payments",
-    feature: "payments",
   },
   {
     href: "/admin/donations",

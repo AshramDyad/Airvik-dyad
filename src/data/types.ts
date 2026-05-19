@@ -50,6 +50,28 @@ export interface GoogleSheetTransactionsApiResponse
   message?: string;
 }
 
+export type PaymentRequestStatus = "pending" | "paid" | "expired" | "cancelled";
+
+export interface PaymentRequest {
+  id: string;
+  identifier: string;
+  amount: number;
+  paidAmount: number;
+  status: PaymentRequestStatus;
+  upiId: string;
+  upiMerchantName: string;
+  upiUri: string;
+  requestedAt: string;
+  expiresAt: string;
+  paidAt: string | null;
+  paymentReference: string | null;
+  matchedTransaction: GoogleSheetTransaction | null;
+  notes: string | null;
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export const allPermissions: readonly Permission[] = [
   "create:guest", "read:guest", "update:guest", "delete:guest",
   "create:reservation", "read:reservation", "update:reservation", "delete:reservation",

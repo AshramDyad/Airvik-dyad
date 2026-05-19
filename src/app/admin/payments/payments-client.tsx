@@ -96,6 +96,10 @@ export function PaymentsClient() {
       payloadRef.current = nextPayload;
       setPayload(nextPayload);
       setError(null);
+      void authorizedFetch("/api/admin/payment-requests/reconcile", {
+        method: "POST",
+        cache: "no-store",
+      }).catch(() => undefined);
     } catch (loadError) {
       setError(
         loadError instanceof Error
