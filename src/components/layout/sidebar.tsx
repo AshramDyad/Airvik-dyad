@@ -11,7 +11,6 @@ import {
   DollarSign,
   BarChart3,
   Settings,
-  Package2,
   ClipboardList,
   Layers,
   FolderOpen,
@@ -22,12 +21,12 @@ import {
   History,
   Megaphone,
   Receipt,
+  CreditCard,
 } from "lucide-react";
 import * as React from "react";
 
 import { cn } from "@/lib/utils";
 import { useAuthContext } from "@/context/auth-context";
-import { useDataContext } from "@/context/data-context";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -104,6 +103,24 @@ const navItems: SidebarNavItem[] = [
     feature: "calendar",
   },
   {
+    href: "/admin/payments",
+    icon: CreditCard,
+    label: "Payments",
+    feature: "payments",
+    subItems: [
+      {
+        label: "Statement",
+        href: "/admin/payments",
+        feature: "payments",
+      },
+      {
+        label: "Create Payment",
+        href: "/admin/payments/create",
+        feature: "payments",
+      },
+    ],
+  },
+  {
     href: "/admin/posts",
     icon: Megaphone,
     label: "Engagement",
@@ -169,7 +186,6 @@ interface SidebarProps {
 export function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
   const pathname = usePathname() ?? "";
   const { hasPermission, hasAnyPermission } = useAuthContext();
-  const { property } = useDataContext();
   const [openDropdowns, setOpenDropdowns] = React.useState<
     Record<string, boolean>
   >({});
@@ -190,14 +206,17 @@ export function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
     return hasAnyPermission(required);
   };
 
-  const isPathActive = (href: string): boolean => {
+  const isPathActive = React.useCallback((href: string): boolean => {
     if (!href) return false;
     return pathname === href || pathname.startsWith(`${href}/`);
-  };
+  }, [pathname]);
 
-  const isExactPathActive = (href: string): boolean => pathname === href;
+  const isExactPathActive = React.useCallback(
+    (href: string): boolean => pathname === href,
+    [pathname]
+  );
 
-  const isSubItemActive = (subItem: SidebarSubItem): boolean => {
+  const isSubItemActive = React.useCallback((subItem: SidebarSubItem): boolean => {
     if (isPathActive(subItem.href)) {
       return true;
     }
@@ -205,7 +224,7 @@ export function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
       return subItem.children.some((child) => isPathActive(child.href));
     }
     return false;
-  };
+  }, [isPathActive]);
 
   const accessibleNavItems = navItems.filter(canAccessItem);
   if (canAccessItem({ feature: "activity" })) {
@@ -229,7 +248,7 @@ export function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
       });
       return next;
     });
-  }, [pathname]);
+  }, [isSubItemActive]);
 
   const toggleDropdown = (key: string) => {
     setOpenDropdowns((prev) => ({

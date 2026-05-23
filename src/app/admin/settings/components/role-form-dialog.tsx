@@ -61,6 +61,7 @@ const permissionGroups = (allPermissions as readonly Permission[]).reduce((acc, 
 const resourceLabels: Partial<Record<PermissionResource, string>> = {
   review: "Guest Reviews",
   donation: "Donations",
+  payment: "Payments",
 };
 
 export function RoleFormDialog({

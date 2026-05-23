@@ -25,6 +25,7 @@ export const FEATURE_PERMISSIONS = {
   reviewsUpdate: ["update:review"],
   reviewsDelete: ["delete:review"],
   reports: ["read:report"],
+  payments: ["read:payment"],
   activity: ["read:report"],
   settings: ["update:setting"],
   users: ["read:user"],

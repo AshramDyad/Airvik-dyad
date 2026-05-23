@@ -1,0 +1,69 @@
+[    5815ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3000/_next/static/chunks/8ce1a_next_dist_compiled_709fc63f._.js:16383
+[    5886ms] [LOG] [AppData] Postponing fetchData: session still loading @ http://localhost:3000/_next/static/chunks/src_7b6d4435._.js:2599
+[    5984ms] [LOG] [AppData] Fetching global data (userId: null) @ http://localhost:3000/_next/static/chunks/src_7b6d4435._.js:2612
+[    7000ms] [LOG] [AppData] No user session found, clearing state @ http://localhost:3000/_next/static/chunks/src_7b6d4435._.js:2671
+[   10325ms] [LOG] [Fast Refresh] done in NaNms @ http://localhost:3000/_next/static/chunks/8ce1a_next_dist_client_62998cb4._.js:14891
+[   10440ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/8ce1a_next_dist_client_62998cb4._.js:15027
+[   10808ms] [LOG] [Fast Refresh] done in 468ms @ http://localhost:3000/_next/static/chunks/8ce1a_next_dist_client_62998cb4._.js:14891
+[   32375ms] [LOG] [AppData] Fetching global data (userId: 5db7dad4-2856-47cb-af05-a147d7bec024) @ http://localhost:3000/_next/static/chunks/src_7b6d4435._.js:2612
+[   32449ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/admin?_rsc=1vuvx:0
+[   32451ms] [ERROR] Failed to fetch RSC payload for http://localhost:3000/admin. Falling back to browser navigation. TypeError: Failed to fetch
+    at createFetch (http://localhost:3000/_next/static/chunks/8ce1a_next_dist_client_62998cb4._.js:2756:12)
+    at fetchServerResponse (http://localhost:3000/_next/static/chunks/8ce1a_next_dist_client_62998cb4._.js:2685:27)
+    at http://localhost:3000/_next/static/chunks/8ce1a_next_dist_client_62998cb4._.js:4131:106
+    at Object.task (http://localhost:3000/_next/static/chunks/8ce1a_next_dist_client_62998cb4._.js:3856:38)
+    at PromiseQueue.processNext (http://localhost:3000/_next/static/chunks/8ce1a_next_dist_client_62998cb4._.js:3907:186)
+    at PromiseQueue.enqueue (http://localhost:3000/_next/static/chunks/8ce1a_next_dist_client_62998cb4._.js:3871:76)
+    at createLazyPrefetchEntry (http://localhost:3000/_next/static/chunks/8ce1a_next_dist_client_62998cb4._.js:4131:49)
+    at getOrCreatePrefetchCacheEntry (http://localhost:3000/_next/static/chunks/8ce1a_next_dist_client_62998cb4._.js:4078:12)
+    at navigateReducer (http://localhost:3000/_next/static/chunks/8ce1a_next_dist_client_62998cb4._.js:17399:82)
+    at clientReducer (http://localhost:3000/_next/static/chunks/8ce1a_next_dist_client_62998cb4._.js:18356:61)
+    at Object.action (http://localhost:3000/_next/static/chunks/8ce1a_next_dist_client_62998cb4._.js:18569:55)
+    at runAction (http://localhost:3000/_next/static/chunks/8ce1a_next_dist_client_62998cb4._.js:18479:38)
+    at dispatchAction (http://localhost:3000/_next/static/chunks/8ce1a_next_dist_client_62998cb4._.js:18533:9)
+    at Object.dispatch (http://localhost:3000/_next/static/chunks/8ce1a_next_dist_client_62998cb4._.js:18567:40)
+    at http://localhost:3000/_next/static/chunks/8ce1a_next_dist_client_62998cb4._.js:2135:29
+    at startTransition (http://localhost:3000/_next/static/chunks/8ce1a_next_dist_compiled_709fc63f._.js:7014:31)
+    at dispatch (http://localhost:3000/_next/static/chunks/8ce1a_next_dist_client_62998cb4._.js:2134:13)
+    at dispatchAppRouterAction (http://localhost:3000/_next/static/chunks/8ce1a_next_dist_client_62998cb4._.js:2118:5)
+    at dispatchNavigateAction (http://localhost:3000/_next/static/chunks/8ce1a_next_dist_client_62998cb4._.js:18622:49)
+    at http://localhost:3000/_next/static/chunks/8ce1a_next_dist_client_62998cb4._.js:18674:13
+    at exports.startTransition (http://localhost:3000/_next/static/chunks/8ce1a_next_dist_compiled_709fc63f._.js:1636:31)
+    at Object.push (http://localhost:3000/_next/static/chunks/8ce1a_next_dist_client_62998cb4._.js:18672:36)
+    at onSubmit (http://localhost:3000/_next/static/chunks/src_e641f2f3._.js:542:20)
+    at async http://localhost:3000/_next/static/chunks/node_modules__pnpm_772bfbd2._.js:2006:21 @ http://localhost:3000/_next/static/chunks/8ce1a_next_dist_client_62998cb4._.js:1225
+[   32500ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/__nextjs_font/geist-latin.woff2:0
+[   32500ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/__nextjs_original-stack-frames:0
+[   32514ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/admin/reservations?limit=1000&offset=0&includeCount=1:0
+[   32515ms] [ERROR] [AppData] Failed to load app data: TypeError: Failed to fetch
+    at authorizedFetch (http://localhost:3000/_next/static/chunks/src_7b6d4435._.js:2166:28)
+    at async fetchReservationsFromApi (http://localhost:3000/_next/static/chunks/src_7b6d4435._.js:2425:22)
+    at async Promise.all (index 14)
+    at async useAppData.useCallback[fetchData] (http://localhost:3000/_next/static/chunks/src_7b6d4435._.js:2614:277) @ http://localhost:3000/_next/static/chunks/8ce1a_next_dist_client_62998cb4._.js:1225
+[   32527ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/__nextjs_original-stack-frames:0
+[   76660ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3000/_next/static/chunks/8ce1a_next_dist_compiled_709fc63f._.js:16383
+[   76753ms] [LOG] [AppData] Postponing fetchData: session still loading @ http://localhost:3000/_next/static/chunks/src_7b6d4435._.js:2599
+[   76929ms] [LOG] [AppData] Fetching global data (userId: 5db7dad4-2856-47cb-af05-a147d7bec024) @ http://localhost:3000/_next/static/chunks/src_7b6d4435._.js:2612
+[   77103ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/8ce1a_next_dist_client_62998cb4._.js:15027
+[   77847ms] [LOG] [Fast Refresh] done in 845ms @ http://localhost:3000/_next/static/chunks/8ce1a_next_dist_client_62998cb4._.js:14891
+[   79014ms] [WARNING] Image with src "/logo.png" was detected as the Largest Contentful Paint (LCP). Please add the "priority" property if this image is above the fold.
+Read more: https://nextjs.org/docs/api-reference/next/image#priority @ http://localhost:3000/_next/static/chunks/8ce1a_next_dist_addfa58d._.js:1073
+[   81414ms] [LOG] [AppData] Global data fetch complete @ http://localhost:3000/_next/static/chunks/src_7b6d4435._.js:2730
+[   93168ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/8ce1a_next_dist_client_62998cb4._.js:15027
+[   94928ms] [LOG] [Fast Refresh] done in 1860ms @ http://localhost:3000/_next/static/chunks/8ce1a_next_dist_client_62998cb4._.js:14891
+[   95048ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/8ce1a_next_dist_client_62998cb4._.js:15027
+[   95119ms] [LOG] [Fast Refresh] done in 173ms @ http://localhost:3000/_next/static/chunks/8ce1a_next_dist_client_62998cb4._.js:14891
+[   95674ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/8ce1a_next_dist_client_62998cb4._.js:15027
+[   95749ms] [LOG] [Fast Refresh] done in 177ms @ http://localhost:3000/_next/static/chunks/8ce1a_next_dist_client_62998cb4._.js:14891
+[   95855ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/8ce1a_next_dist_client_62998cb4._.js:15027
+[   96878ms] [LOG] [Fast Refresh] done in 1124ms @ http://localhost:3000/_next/static/chunks/8ce1a_next_dist_client_62998cb4._.js:14891
+[  155899ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/8ce1a_next_dist_client_62998cb4._.js:15027
+[  155940ms] [LOG] [Fast Refresh] done in 144ms @ http://localhost:3000/_next/static/chunks/8ce1a_next_dist_client_62998cb4._.js:14891
+[  935891ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/8ce1a_next_dist_client_62998cb4._.js:15027
+[  935921ms] [LOG] [Fast Refresh] done in 133ms @ http://localhost:3000/_next/static/chunks/8ce1a_next_dist_client_62998cb4._.js:14891
+[ 1295835ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/8ce1a_next_dist_client_62998cb4._.js:15027
+[ 1295839ms] [LOG] [Fast Refresh] done in 105ms @ http://localhost:3000/_next/static/chunks/8ce1a_next_dist_client_62998cb4._.js:14891
+[35716230ms] [ERROR] Failed to load resource: net::ERR_INTERNET_DISCONNECTED @ https://crdksiypusddfbsgvbhj.supabase.co/auth/v1/token?grant_type=refresh_token:0
+[35717294ms] [ERROR] Failed to load resource: net::ERR_ADDRESS_UNREACHABLE @ https://crdksiypusddfbsgvbhj.supabase.co/auth/v1/token?grant_type=refresh_token:0
+[35719302ms] [ERROR] Failed to load resource: net::ERR_ADDRESS_UNREACHABLE @ https://crdksiypusddfbsgvbhj.supabase.co/auth/v1/token?grant_type=refresh_token:0
+[36109683ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/admin/google-sheet-transactions:0

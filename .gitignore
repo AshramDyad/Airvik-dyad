@@ -62,6 +62,7 @@ supabase/seed.sql
 # playwright / test artifacts
 playwright/
 test-results/
+.playwright-mcp
 
 
 ROOM_TYPE_PRICE_FIX.md
