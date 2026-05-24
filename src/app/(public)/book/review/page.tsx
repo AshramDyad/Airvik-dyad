@@ -24,6 +24,7 @@ import { calculateRoomPricing, calculateMultipleRoomPricing } from "@/lib/pricin
 import { useCurrencyFormatter } from "@/hooks/use-currency";
 import { getRoomTypeImageUrl } from "@/lib/room-type-images";
 import { distributeGuestsAcrossRooms } from "@/lib/reservations/guest-allocation";
+import { doesReservationBlockAvailability } from "@/lib/reservations/status";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -479,7 +480,7 @@ function BookingReviewContent() {
           return !reservations.some(
             (res) =>
               res.roomId === room.id &&
-              res.status !== "Cancelled" &&
+              doesReservationBlockAvailability(res) &&
               areIntervalsOverlapping(
                 { start: fromDate!, end: toDate! },
                 {

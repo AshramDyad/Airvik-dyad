@@ -19,6 +19,7 @@ import type {
 } from "@/data/types";
 import { isBookableRoom } from "@/lib/rooms";
 import { getBookingRestrictions, getPropertyClosures } from "@/lib/api";
+import { doesReservationBlockAvailability } from "@/lib/reservations/status";
 
 // Booking restriction validation helper
 const checkRestrictions = (
@@ -199,6 +200,7 @@ export function useAvailabilitySearch() {
             (res) =>
               roomsOfType.some((r) => r.id === res.roomId) &&
               res.status !== "Cancelled" &&
+              doesReservationBlockAvailability(res) &&
               areIntervalsOverlapping(
                 { start: dateRange.from!, end: dateRange.to! },
                 {

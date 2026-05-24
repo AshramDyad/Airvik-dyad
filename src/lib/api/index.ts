@@ -132,6 +132,7 @@ type DbReservation = {
   payment_method: Reservation["paymentMethod"] | null;
   adult_count: number | null;
   child_count: number | null;
+  hold_expires_at: string | null;
   tax_enabled_snapshot: boolean | null;
   tax_rate_snapshot: number | null;
   external_source: string | null;
@@ -166,6 +167,7 @@ type ReservationUpdatePayload = Partial<
     | "payment_method"
     | "adult_count"
     | "child_count"
+    | "hold_expires_at"
     | "tax_enabled_snapshot"
     | "tax_rate_snapshot"
     | "external_source"
@@ -189,6 +191,7 @@ type DbReservationInsert = ReservationUpdatePayload & {
   payment_method: Reservation["paymentMethod"];
   adult_count: number;
   child_count: number;
+  hold_expires_at?: string | null;
   tax_enabled_snapshot: boolean;
   tax_rate_snapshot: number;
 };
@@ -220,6 +223,7 @@ type CreateReservationsArgs = {
   p_payment_method?: Reservation["paymentMethod"] | null;
   p_adult_count?: number | null;
   p_child_count?: number | null;
+  p_hold_expires_at?: string | null;
   p_tax_enabled_snapshot?: boolean | null;
   p_tax_rate_snapshot?: number | null;
   p_custom_totals?: Array<number | null> | null;
@@ -464,6 +468,7 @@ const fromDbReservation = (dbReservation: DbReservation): Reservation => ({
     typeof dbReservation.child_count === "number"
       ? dbReservation.child_count
       : 0,
+  holdExpiresAt: dbReservation.hold_expires_at,
   taxEnabledSnapshot: Boolean(dbReservation.tax_enabled_snapshot ?? false),
   taxRateSnapshot: dbReservation.tax_rate_snapshot ?? 0,
   externalSource: dbReservation.external_source ?? undefined,
@@ -527,6 +532,9 @@ const toDbReservation = (
   }
   if (typeof appReservation.childCount === "number") {
     dbData.child_count = appReservation.childCount;
+  }
+  if (typeof appReservation.holdExpiresAt !== "undefined") {
+    dbData.hold_expires_at = appReservation.holdExpiresAt;
   }
   if (typeof appReservation.taxEnabledSnapshot === "boolean") {
     dbData.tax_enabled_snapshot = appReservation.taxEnabledSnapshot;
@@ -1048,6 +1056,9 @@ export const createReservationsWithTotal = async (
     p_payment_method: args.p_payment_method ?? 'Not specified',
     p_adult_count: args.p_adult_count ?? 1,
     p_child_count: args.p_child_count ?? 0,
+    p_hold_expires_at: args.p_hold_expires_at
+      ? formatTimestampForPostgres(args.p_hold_expires_at)
+      : null,
     p_tax_enabled_snapshot: args.p_tax_enabled_snapshot ?? false,
     p_tax_rate_snapshot: args.p_tax_rate_snapshot ?? 0,
     p_custom_totals: args.p_custom_totals ?? null,
@@ -1432,7 +1443,7 @@ export const getMonthlyAvailability = async (
 export type BookingValidationResult = {
   isValid: boolean;
   message?: string;
-  conflicts?: Array<Pick<Reservation, "id" | "bookingId" | "roomId" | "checkInDate" | "checkOutDate" | "status">>;
+  conflicts?: Array<Pick<Reservation, "id" | "bookingId" | "roomId" | "checkInDate" | "checkOutDate" | "status" | "holdExpiresAt">>;
 };
 
 export const validateBookingRequest = async (
@@ -1458,9 +1469,8 @@ export const validateBookingRequest = async (
 
   let conflictsQuery = supabase
     .from('reservations')
-    .select('id, booking_id, room_id, check_in_date, check_out_date, status')
+    .select('id, booking_id, room_id, check_in_date, check_out_date, status, hold_expires_at')
     .eq('room_id', roomId)
-    .neq('status', 'Cancelled')
     .lt('check_in_date', checkOut)
     .gt('check_out_date', checkIn);
 
@@ -1471,17 +1481,30 @@ export const validateBookingRequest = async (
   const { data: conflicts, error: conflictsError } = await conflictsQuery;
   if (conflictsError) throw conflictsError;
 
-  if (conflicts && conflicts.length) {
+  const blockingConflicts = (conflicts ?? []).filter((conflict) =>
+    conflict.status !== "Cancelled" &&
+    conflict.status !== "No-show" &&
+    (
+      conflict.status !== "Room Hold" ||
+      (
+        typeof conflict.hold_expires_at === "string" &&
+        new Date(conflict.hold_expires_at).getTime() > Date.now()
+      )
+    )
+  );
+
+  if (blockingConflicts.length) {
     return {
       isValid: false,
       message: 'Room unavailable for selected dates',
-      conflicts: conflicts.map((conflict) => ({
+      conflicts: blockingConflicts.map((conflict) => ({
         id: conflict.id,
         bookingId: conflict.booking_id,
         roomId: conflict.room_id,
         checkInDate: conflict.check_in_date,
         checkOutDate: conflict.check_out_date,
         status: conflict.status,
+        holdExpiresAt: conflict.hold_expires_at,
       })),
     } satisfies BookingValidationResult;
   }

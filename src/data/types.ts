@@ -290,7 +290,7 @@ export interface Guest {
 }
 
 export type ReservationStatus =
-  | "Tentative"
+  | "Room Hold"
   | "Standby"
   | "Confirmed"
   | "Checked-in"
@@ -456,6 +456,7 @@ export interface Reservation {
   paymentMethod: ReservationPaymentMethod;
   adultCount: number;
   childCount: number;
+  holdExpiresAt?: string | null;
   taxEnabledSnapshot: boolean;
   taxRateSnapshot: number;
   externalSource?: string;

@@ -114,7 +114,11 @@ function drawFooter(doc: jsPDF): void {
 
 // ── Financial helpers ────────────────────────────────────────────────────────
 
-const EXCLUDED_STATUSES = new Set<ReservationStatus>(["Cancelled", "No-show"]);
+const EXCLUDED_STATUSES = new Set<ReservationStatus>([
+  "Room Hold",
+  "Cancelled",
+  "No-show",
+]);
 
 interface BookingFinancials {
   displayAmount: number;

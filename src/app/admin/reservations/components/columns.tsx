@@ -44,7 +44,6 @@ import {
 import type {
   Reservation,
   ReservationSource,
-  ReservationStatus,
   Guest,
   Property,
   Room,
@@ -55,6 +54,7 @@ import type { InvoiceData } from "@/lib/invoice/generate-invoice";
 import { useCurrencyFormatter } from "@/hooks/use-currency";
 import { formatBookingCode } from "@/lib/reservations/formatting";
 import { cn } from "@/lib/utils";
+import { getReservationStatusLabel } from "@/lib/reservations/status";
 
 export type ReservationWithDetails = Reservation & {
   displayAmount?: number;
@@ -189,7 +189,7 @@ function InvoiceViewCell({ row }: CellContext<ReservationWithDetails, unknown>) 
 }
 
 export const statuses = [
-  { value: "Tentative", label: "Tentative", icon: HelpCircle },
+  { value: "Room Hold", label: getReservationStatusLabel("Room Hold"), icon: HelpCircle },
   { value: "Standby", label: "Standby", icon: Clock3 },
   { value: "Confirmed", label: "Confirmed", icon: CheckCircle2 },
   { value: "Checked-in", label: "Checked-in", icon: LogIn },

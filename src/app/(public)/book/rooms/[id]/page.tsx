@@ -72,6 +72,7 @@ import { calculateRoomPricing } from "@/lib/pricing-calculator";
 import { PricingBreakdown } from "@/components/ui/pricing-breakdown";
 import { useCurrencyFormatter } from "@/hooks/use-currency";
 import { isBookableRoom } from "@/lib/rooms";
+import { doesReservationBlockAvailability } from "@/lib/reservations/status";
 import { getRoomTypeImageUrl } from "@/lib/room-type-images";
 
 const bookingSchema = z.object({
@@ -324,7 +325,7 @@ export default function RoomDetailsPage() {
     const relevantReservations = reservations.filter(
       (res) =>
         roomsOfType.some((room) => room.id === res.roomId) &&
-        res.status !== "Cancelled"
+        doesReservationBlockAvailability(res)
     );
 
     relevantReservations.forEach((res) => {

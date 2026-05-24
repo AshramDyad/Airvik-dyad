@@ -30,7 +30,7 @@ const statusDefaults: Record<string, ReservationStatus> = {
   noshow: "No-show",
   "no show": "No-show",
   closure: "Cancelled",
-  tentative: "Tentative",
+  tentative: "Room Hold",
 };
 
 export const STATUS_MAP: Record<string, ReservationStatus> = statusDefaults;

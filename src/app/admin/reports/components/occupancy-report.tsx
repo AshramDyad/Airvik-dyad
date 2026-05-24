@@ -45,7 +45,13 @@ export function OccupancyReport() {
 
     return days.map((day) => {
       const occupiedCount = reservations.filter((res) => {
-        if (res.status === "Cancelled") return false;
+        if (
+          res.status === "Room Hold" ||
+          res.status === "Cancelled" ||
+          res.status === "No-show"
+        ) {
+          return false;
+        }
         const checkIn = parseISO(res.checkInDate);
         const checkOut = parseISO(res.checkOutDate);
         return (

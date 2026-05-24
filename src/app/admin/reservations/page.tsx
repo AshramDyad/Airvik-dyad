@@ -27,6 +27,7 @@ function sumAdditionalCharges(folioItems: FolioItem[] = []) {
 }
 
 const EXCLUDED_REVENUE_STATUSES = new Set<ReservationStatus>([
+  "Room Hold",
   "Cancelled",
   "No-show",
 ]);

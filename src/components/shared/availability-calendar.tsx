@@ -51,12 +51,16 @@ import {
 import { RoomTypeRow } from "@/components/shared/room-type-row";
 import { cn } from "@/lib/utils";
 import { useFullscreen } from "@/hooks/use-fullscreen";
+import {
+  doesReservationBlockAvailability,
+  getReservationStatusLabel,
+} from "@/lib/reservations/status";
 
 const reservationStatusStyles: Record<
   ReservationStatus,
   { ribbon: string; dot: string }
 > = {
-  Tentative: {
+  "Room Hold": {
     ribbon: "border border-amber-200 bg-amber-50 text-amber-900",
     dot: "bg-amber-500",
   },
@@ -617,7 +621,9 @@ function LegacyAvailabilityCalendar() {
 
   const getReservationForDate = (roomId: string, date: Date) => {
     return reservations.find((res) => {
-      if (res.roomId !== roomId || res.status === "Cancelled") return false;
+      if (res.roomId !== roomId || !doesReservationBlockAvailability(res)) {
+        return false;
+      }
       const checkIn = parseISO(res.checkInDate);
       const checkOut = parseISO(res.checkOutDate);
       return (
@@ -767,7 +773,7 @@ function LegacyAvailabilityCalendar() {
                                     {guest?.firstName} {guest?.lastName}
                                   </p>
                                   <p className="text-sm">
-                                    Status: {reservation.status}
+                                    Status: {getReservationStatusLabel(reservation.status)}
                                   </p>
                                   <p className="text-sm">
                                     Check-in: {format(checkIn, "MMM d, yyyy")}
@@ -832,11 +838,11 @@ function LegacyAvailabilityCalendar() {
               <div
                 className={cn(
                   "h-2.5 w-2.5 sm:h-3 sm:w-3 rounded-full shrink-0",
-                  getStatusStyle("Tentative").dot
+                  getStatusStyle("Room Hold").dot
                 )}
               />
               <span className="text-xs sm:text-sm text-muted-foreground">
-                Tentative
+                Room Hold
               </span>
             </div>
           </div>

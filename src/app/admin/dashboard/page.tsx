@@ -44,6 +44,7 @@ import { useDataContext } from "@/context/data-context";
   } from "./components/dashboard-skeleton";
 import { getTodayRange } from "@/lib/date";
 import { PermissionGate } from "@/components/admin/permission-gate";
+import { isActiveRoomHold } from "@/lib/reservations/status";
   
   export default function DashboardPage() {
     const { todayReservations, guests, dashboardLayout, updateDashboardLayout, rooms, isLoading } = useDataContext();
@@ -71,11 +72,16 @@ import { PermissionGate } from "@/components/admin/permission-gate";
       const roomsAvailableForSale = rooms.filter((room) => room.status !== "Maintenance");
 
       let occupiedRooms = 0;
+      let heldRooms = 0;
       const arrivals: Array<{ row: DashboardTableRow; sort: number }> = [];
       const departures: Array<{ row: DashboardTableRow; sort: number }> = [];
 
       todayReservations.forEach((reservation) => {
         if (CANCELLED_STATUSES.has(reservation.status)) {
+          return;
+        }
+
+        if (reservation.status === "Room Hold" && !isActiveRoomHold(reservation)) {
           return;
         }
 
@@ -113,12 +119,17 @@ import { PermissionGate } from "@/components/admin/permission-gate";
         }
 
         const stayCoversToday = todayRange.start >= checkIn && todayRange.start < checkOut;
+        if (stayCoversToday && isActiveRoomHold(reservation)) {
+          heldRooms += 1;
+          return;
+        }
+
         if (reservation.status === "Checked-in" || (stayCoversToday && reservation.status === "Confirmed")) {
           occupiedRooms += 1;
         }
       });
 
-      const availableRoomsCount = Math.max(roomsAvailableForSale.length - occupiedRooms, 0);
+      const availableRoomsCount = Math.max(roomsAvailableForSale.length - occupiedRooms - heldRooms, 0);
       const occupancy = roomsAvailableForSale.length
         ? (occupiedRooms / roomsAvailableForSale.length) * 100
         : 0;

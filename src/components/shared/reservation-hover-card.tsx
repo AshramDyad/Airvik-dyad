@@ -13,13 +13,16 @@ import {
 import { useDataContext } from "@/context/data-context";
 import type { Reservation, ReservationStatus } from "@/data/types";
 import { cn } from "@/lib/utils";
-import { isActiveReservationStatus } from "@/lib/reservations/status";
+import {
+  getReservationStatusLabel,
+  isActiveReservationStatus,
+} from "@/lib/reservations/status";
 
 const reservationStatusStyles: Record<
   ReservationStatus,
   { ribbon: string; dot: string }
 > = {
-  Tentative: {
+  "Room Hold": {
     ribbon: "border border-secondary/50 bg-secondary/30 text-secondary-foreground",
     dot: "bg-secondary/80",
   },
@@ -446,7 +449,9 @@ export function ReservationHoverCard({
                         )}
                       </div>
                       <Badge className={cn("text-sm", group.statusStyle.ribbon)}>
-                        {group.statusLabel}
+                        {group.statusLabel === "Mixed"
+                          ? group.statusLabel
+                          : getReservationStatusLabel(group.statusLabel)}
                       </Badge>
                     </div>
 

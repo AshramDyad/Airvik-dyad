@@ -196,12 +196,12 @@ function buildNormalizedRow(input: z.infer<typeof RequiredRowSchema>): {
   }
 
   const rawStatus = getField(row, "booking status");
-  const status = STATUS_MAP[rawStatus.toLowerCase()] ?? "Tentative";
+  const status = STATUS_MAP[rawStatus.toLowerCase()] ?? "Room Hold";
   if (!STATUS_MAP[rawStatus.toLowerCase()]) {
     issues.push({
       rowNumber,
       field: "Booking Status",
-      message: `Unrecognized booking status "${rawStatus}"; defaulted to Tentative`,
+      message: `Unrecognized booking status "${rawStatus}"; defaulted to Room Hold`,
       severity: "warning",
     });
   }

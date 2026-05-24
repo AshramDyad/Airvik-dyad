@@ -41,7 +41,10 @@ import {
 } from "@/lib/pricing-calculator";
 import { resolveReservationTaxConfig } from "@/lib/reservations/calculate-financials";
 import { buildRoomOccupancyAssignments } from "@/lib/reservations/guest-allocation";
-import { isActiveReservationStatus } from "@/lib/reservations/status";
+import {
+  doesReservationBlockAvailability,
+  isActiveReservationStatus,
+} from "@/lib/reservations/status";
 import { markReservationAsRemoved } from "@/lib/reservations/filters";
 import { useCurrencyFormatter } from "@/hooks/use-currency";
 import type { Reservation, RoomType } from "@/data/types";
@@ -331,7 +334,7 @@ export function ReservationEditForm({
       const overlaps = reservations.some((resEntry) => {
         if (resEntry.bookingId === reservation.bookingId) return false;
         if (resEntry.roomId !== room.id) return false;
-        if (resEntry.status === "Cancelled") return false;
+        if (!doesReservationBlockAvailability(resEntry)) return false;
         return areIntervalsOverlapping(
           { start: windowStart, end: windowEnd },
           { start: parseISO(resEntry.checkInDate), end: parseISO(resEntry.checkOutDate) },

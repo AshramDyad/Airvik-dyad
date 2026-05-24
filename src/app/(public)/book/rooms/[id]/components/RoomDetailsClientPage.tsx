@@ -48,6 +48,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Icon } from "@/components/shared/icon";
 import { getRoomTypeImageUrl } from "@/lib/room-type-images";
+import { doesReservationBlockAvailability } from "@/lib/reservations/status";
 import type { Amenity, RatePlan, Reservation, Room, RoomType } from "@/data/types";
 
 const bookingSchema = z.object({
@@ -140,7 +141,7 @@ export function RoomDetailsClientPage({
     const relevantReservations = reservations.filter(
       (res) =>
         roomsOfType.some((r) => r.id === res.roomId) &&
-        res.status !== "Cancelled"
+        doesReservationBlockAvailability(res)
     );
 
     relevantReservations.forEach((res) => {

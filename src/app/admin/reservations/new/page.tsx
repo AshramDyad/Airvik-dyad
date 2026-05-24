@@ -50,6 +50,11 @@ import { isBookableRoom, ROOM_STATUS_LABELS } from "@/lib/rooms";
 import { useCurrencyFormatter } from "@/hooks/use-currency";
 import { buildRoomOccupancyAssignments } from "@/lib/reservations/guest-allocation";
 import { PermissionGate } from "@/components/admin/permission-gate";
+import {
+  doesReservationBlockAvailability,
+  getActiveHoldRoomIdsForDateRange,
+  getReservationStatusLabel,
+} from "@/lib/reservations/status";
 
 const paymentMethodOptions = [
   "Not specified",
@@ -60,7 +65,7 @@ const paymentMethodOptions = [
   "Anurag Ji",
 ] as const satisfies ReservationPaymentMethod[];
 
-const creatableStatuses = ["Confirmed", "Tentative", "Standby"] as const satisfies ReservationStatus[];
+const creatableStatuses = ["Confirmed", "Room Hold", "Standby"] as const satisfies ReservationStatus[];
 
 const dateRangeSchema = z.object({
   from: z.date({ required_error: "Check-in is required." }),
@@ -101,6 +106,7 @@ export default function CreateReservationPage() {
     ratePlans,
     seasonalPrices,
     addReservation,
+    refreshReservations,
     isLoading,
     property,
   } = useDataContext();
@@ -143,11 +149,49 @@ export default function CreateReservationPage() {
   const adults = Number(adultsInput ?? 0) || 0;
   const children = Number(childrenInput ?? 0) || 0;
   const totalGuests = adults + children;
+  const [holdClock, setHoldClock] = React.useState(() => new Date());
+
+  React.useEffect(() => {
+    const timer = window.setInterval(() => setHoldClock(new Date()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  React.useEffect(() => {
+    const refresh = () => {
+      setHoldClock(new Date());
+      void refreshReservations();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        refresh();
+      }
+    };
+
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [refreshReservations]);
 
   const nights = React.useMemo(() => {
     if (!watchedDateRange?.from || !watchedDateRange?.to) return 0;
     return Math.max(differenceInDays(watchedDateRange.to, watchedDateRange.from), 1);
   }, [watchedDateRange]);
+
+  const roomHoldByRoomId = React.useMemo(() => {
+    if (!watchedDateRange?.from || !watchedDateRange?.to) {
+      return new Set<string>();
+    }
+
+    return getActiveHoldRoomIdsForDateRange(
+      reservations,
+      { from: watchedDateRange.from, to: watchedDateRange.to },
+      holdClock
+    );
+  }, [holdClock, reservations, watchedDateRange]);
 
   const allAvailableRooms = React.useMemo(() => {
     if (!watchedDateRange?.from || !watchedDateRange?.to) {
@@ -157,7 +201,10 @@ export default function CreateReservationPage() {
     return rooms.filter((room) => {
       const isBooked = reservations.some((res) => {
         if (res.roomId !== room.id) return false;
-        if (res.status === "Cancelled") return false;
+        if (res.status === "Room Hold" && roomHoldByRoomId.has(room.id)) {
+          return false;
+        }
+        if (!doesReservationBlockAvailability(res, holdClock)) return false;
         return areIntervalsOverlapping(
           { start: watchedDateRange.from!, end: watchedDateRange.to! },
           { start: parseISO(res.checkInDate), end: parseISO(res.checkOutDate) },
@@ -171,7 +218,7 @@ export default function CreateReservationPage() {
 
       return isBookableRoom(room);
     });
-  }, [rooms, reservations, watchedDateRange]);
+  }, [holdClock, roomHoldByRoomId, rooms, reservations, watchedDateRange]);
 
   const filteredAvailableRooms = React.useMemo(() => {
     if (!selectedRoomTypeId) return allAvailableRooms;
@@ -180,13 +227,17 @@ export default function CreateReservationPage() {
 
   React.useEffect(() => {
     if (!watchedDateRange?.from || !watchedDateRange?.to) return;
-    const availableIds = new Set(allAvailableRooms.map((room) => room.id));
+    const availableIds = new Set(
+      allAvailableRooms
+        .filter((room) => !roomHoldByRoomId.has(room.id))
+        .map((room) => room.id)
+    );
     const current = form.getValues("roomIds");
     const filtered = current.filter((id) => availableIds.has(id));
     if (filtered.length !== current.length) {
       form.setValue("roomIds", filtered, { shouldValidate: true });
     }
-  }, [allAvailableRooms, form, watchedDateRange]);
+  }, [allAvailableRooms, form, roomHoldByRoomId, watchedDateRange]);
 
   const roomMap = React.useMemo(() => new Map(rooms.map((room) => [room.id, room])), [rooms]);
   const roomTypeMap = React.useMemo(() => new Map(roomTypes.map((rt) => [rt.id, rt])), [roomTypes]);
@@ -199,6 +250,13 @@ export default function CreateReservationPage() {
   }, [roomMap, roomTypeMap]);
 
   const handleRoomToggle = (roomId: string) => {
+    if (roomHoldByRoomId.has(roomId)) {
+      toast.error("Room is on hold.", {
+        description: "This room hold will expire automatically after 30 minutes.",
+      });
+      return;
+    }
+
     const current = form.getValues("roomIds") ?? [];
     if (current.includes(roomId)) {
       form.setValue(
@@ -683,16 +741,19 @@ export default function CreateReservationPage() {
                           filteredAvailableRooms.map((room) => {
                             const roomType = roomTypes.find((rt) => rt.id === room.roomTypeId);
                             const isSelected = selectedRoomIds.includes(room.id);
+                            const isHeld = roomHoldByRoomId.has(room.id);
                             return (
                               <div
                                 key={room.id}
                                 className={cn(
                                   "flex items-center gap-4 rounded-2xl border px-4 py-3",
-                                  isSelected ? "border-primary/60 bg-primary/5" : "border-border/40 bg-card"
+                                  isSelected ? "border-primary/60 bg-primary/5" : "border-border/40 bg-card",
+                                  isHeld && "opacity-70"
                                 )}
                               >
                                 <Checkbox
                                   checked={isSelected}
+                                  disabled={isHeld}
                                   onCheckedChange={() => handleRoomToggle(room.id)}
                                   id={`room-${room.id}`}
                                 />
@@ -705,6 +766,14 @@ export default function CreateReservationPage() {
                                     >
                                       {ROOM_STATUS_LABELS[room.status]}
                                     </Badge>
+                                    {isHeld && (
+                                      <Badge
+                                        variant="outline"
+                                        className="rounded-full border-amber-300 bg-amber-50 px-2 py-0 text-[10px] font-semibold text-amber-700"
+                                      >
+                                        Room Hold
+                                      </Badge>
+                                    )}
                                   </span>
                                   <span className="text-xs text-muted-foreground">{roomType?.name}</span>
                                 </label>
@@ -837,7 +906,7 @@ export default function CreateReservationPage() {
                             <SelectContent>
                               {creatableStatuses.map((status) => (
                                 <SelectItem key={status} value={status}>
-                                  {status}
+                                  {getReservationStatusLabel(status)}
                                 </SelectItem>
                               ))}
                             </SelectContent>
