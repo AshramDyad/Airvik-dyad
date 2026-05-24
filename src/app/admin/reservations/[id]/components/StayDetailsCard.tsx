@@ -57,55 +57,61 @@ export function StayDetailsCard({ reservation }: StayDetailsCardProps) {
   };
 
   return (
-    <Card>
+    <Card className="min-w-0">
       <CardHeader>
         <CardTitle>Stay Details</CardTitle>
         <CardDescription>
           Information about the guest&apos;s stay.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-5 text-sm">
-        <div className="flex flex-wrap items-center gap-3 text-base">
-          <CalendarDays className="h-5 w-5 text-muted-foreground" />
-          <span className="font-semibold">
-            {format(parseISO(reservation.checkInDate), "MMM d, yyyy")}
-          </span>
-          <span className="text-muted-foreground">&rarr;</span>
-          <span className="font-semibold">
-            {format(parseISO(reservation.checkOutDate), "MMM d, yyyy")}
-          </span>
+      <CardContent className="min-w-0 space-y-5 text-sm">
+        <div className="flex min-w-0 items-start gap-3 text-base">
+          <CalendarDays className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
+          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+            <span className="whitespace-nowrap font-semibold">
+              {format(parseISO(reservation.checkInDate), "MMM d, yyyy")}
+            </span>
+            <span className="text-muted-foreground">&rarr;</span>
+            <span className="whitespace-nowrap font-semibold">
+              {format(parseISO(reservation.checkOutDate), "MMM d, yyyy")}
+            </span>
+          </div>
         </div>
         <Separator />
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="flex items-center gap-3">
-            <Moon className="h-4 w-4 text-muted-foreground" />
-            <span>{reservation.nights} nights</span>
+        <div className="grid min-w-0 gap-4">
+          <div className="flex min-w-0 items-start gap-3">
+            <Moon className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+            <span className="min-w-0 break-words">{reservation.nights} nights</span>
           </div>
-          <div className="flex items-center gap-3">
-            <Users className="h-4 w-4 text-muted-foreground" />
-            <span>
+          <div className="flex min-w-0 items-start gap-3">
+            <Users className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+            <span className="min-w-0 break-words">
               {reservation.numberOfGuests} guests ({reservation.adultCount} adults · {reservation.childCount} children)
             </span>
           </div>
-          <div className="flex items-center gap-3">
-            <BedDouble className="h-4 w-4 text-muted-foreground" />
-            <span>{ratePlanLabel}</span>
+          <div className="flex min-w-0 items-start gap-3">
+            <BedDouble className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+            <span className="min-w-0 break-words">{ratePlanLabel}</span>
           </div>
-          <div className="flex items-center gap-3">
-            <CreditCard className="h-4 w-4 text-muted-foreground" />
-            <span>{reservation.paymentMethod || "Payment on file"}</span>
+          <div className="flex min-w-0 items-start gap-3">
+            <CreditCard className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+            <span className="min-w-0 break-words">
+              {reservation.paymentMethod || "Payment on file"}
+            </span>
           </div>
-          <div className="flex flex-wrap items-center justify-between gap-3 sm:col-span-2">
-            <div className="flex items-center gap-3">
-              <Hash className="h-4 w-4 text-muted-foreground" />
-              <span>
-                Booking ID: <span className="font-mono text-xs">{bookingIdLabel}</span>
+          <div className="flex min-w-0 flex-col gap-3">
+            <div className="flex min-w-0 items-start gap-3">
+              <Hash className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+              <span className="min-w-0 break-words">
+                Booking ID:{" "}
+                <span className="font-mono text-xs">{bookingIdLabel}</span>
               </span>
             </div>
             <Button
               variant="outline"
               size="sm"
               type="button"
+              className="self-start"
               onClick={() => {
                 void handleCopyBookingId();
               }}
@@ -118,11 +124,13 @@ export function StayDetailsCard({ reservation }: StayDetailsCardProps) {
         {reservation.notes?.trim() && (
           <>
             <Separator />
-            <div>
+            <div className="min-w-0">
               <h4 className="mb-2 font-serif text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                 Guest Notes
               </h4>
-              <p className="whitespace-pre-wrap text-muted-foreground">{reservation.notes}</p>
+              <p className="whitespace-pre-wrap break-words text-muted-foreground">
+                {reservation.notes}
+              </p>
             </div>
           </>
         )}

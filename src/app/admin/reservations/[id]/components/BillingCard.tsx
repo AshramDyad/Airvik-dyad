@@ -100,10 +100,10 @@ export function BillingCard({ reservation, groupSummary }: BillingCardProps) {
     : null;
 
   return (
-    <Card className="flex flex-col">
+    <Card className="flex min-w-0 flex-col">
       <CardHeader>
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="space-y-2">
+        <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0 space-y-2">
             <CardTitle className="font-serif text-lg font-semibold">
               Billing & Folio
             </CardTitle>
@@ -111,7 +111,7 @@ export function BillingCard({ reservation, groupSummary }: BillingCardProps) {
               Charges and payments for this booking.
             </CardDescription>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 lg:justify-end">
             {!isGatewayReservation && (
               <RecordPaymentDialog
                 reservationId={reservation.id}
@@ -131,16 +131,16 @@ export function BillingCard({ reservation, groupSummary }: BillingCardProps) {
           </div>
         </div>
       </CardHeader>
-      <CardContent className="space-y-6">
-        <div className="rounded-2xl border border-border/40">
-          <Table>
+      <CardContent className="min-w-0 space-y-6">
+        <div className="min-w-0 overflow-hidden rounded-2xl border border-border/40">
+          <Table className="min-w-[820px]">
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[120px]">Date</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead className="w-[140px]">Method</TableHead>
-                <TableHead className="w-[140px]">Transaction ID</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
+                <TableHead className="w-[132px] whitespace-nowrap">Date</TableHead>
+                <TableHead className="min-w-[220px]">Description</TableHead>
+                <TableHead className="w-[150px] whitespace-nowrap">Method</TableHead>
+                <TableHead className="w-[180px] whitespace-nowrap">Transaction ID</TableHead>
+                <TableHead className="w-[140px] whitespace-nowrap text-right">Amount</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -151,19 +151,21 @@ export function BillingCard({ reservation, groupSummary }: BillingCardProps) {
 
                 return (
                   <TableRow key={item.id}>
-                    <TableCell className="text-sm text-muted-foreground">
+                    <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
                       {displayDate}
                     </TableCell>
-                    <TableCell>{item.description}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
+                    <TableCell className="min-w-0 break-words">
+                      {item.description}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
                       {item.paymentMethod || "-"}
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
+                    <TableCell className="break-words text-sm text-muted-foreground">
                       {item.transactionId || "-"}
                     </TableCell>
                     <TableCell
                       className={cn(
-                        "text-right font-medium",
+                        "whitespace-nowrap text-right font-medium tabular-nums",
                         item.amount < 0 ? "text-emerald-600" : "text-foreground"
                       )}
                     >
@@ -188,8 +190,8 @@ export function BillingCard({ reservation, groupSummary }: BillingCardProps) {
           </Table>
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
-          <div className="rounded-2xl border border-border/40 bg-muted/20 p-4 text-sm text-muted-foreground">
+        <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(280px,320px)]">
+          <div className="min-w-0 rounded-2xl border border-border/40 bg-muted/20 p-4 text-sm text-muted-foreground">
             {roomCountLabel}
             {groupSummary.hasMixedTaxRates && (
               <span className="mt-1 block">
@@ -198,40 +200,50 @@ export function BillingCard({ reservation, groupSummary }: BillingCardProps) {
               </span>
             )}
           </div>
-          <div className="rounded-2xl border border-border/40 p-4 text-sm">
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Room Charges</span>
-              <span className="font-medium">{formatCurrency(roomCharges)}</span>
+          <div className="min-w-0 rounded-2xl border border-border/40 p-4 text-sm">
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4">
+              <span className="min-w-0 text-muted-foreground">Room Charges</span>
+              <span className="whitespace-nowrap font-medium tabular-nums">
+                {formatCurrency(roomCharges)}
+              </span>
             </div>
-            <div className="mt-2 flex items-center justify-between">
-              <span className="text-muted-foreground">Additional Charges</span>
-              <span className="font-medium">{formatCurrency(additionalCharges)}</span>
+            <div className="mt-2 grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4">
+              <span className="min-w-0 text-muted-foreground">Additional Charges</span>
+              <span className="whitespace-nowrap font-medium tabular-nums">
+                {formatCurrency(additionalCharges)}
+              </span>
             </div>
-            <div className="mt-2 flex items-center justify-between">
-              <span className="text-muted-foreground">
+            <div className="mt-2 grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4">
+              <span className="min-w-0 text-muted-foreground">
                 Taxes & Fees
                 {taxPercentDisplay !== null && (
                   <span> ({taxPercentDisplay.toFixed(2)}%)</span>
                 )}
               </span>
-              <span className="font-medium">{formatCurrency(taxesAndFees)}</span>
+              <span className="whitespace-nowrap font-medium tabular-nums">
+                {formatCurrency(taxesAndFees)}
+              </span>
             </div>
             <div className="mt-3 border-t pt-3">
-              <div className="flex items-center justify-between">
-                <span className="font-medium">Total Charges</span>
-                <span className="font-semibold">{formatCurrency(totalCharges)}</span>
+              <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4">
+                <span className="min-w-0 font-medium">Total Charges</span>
+                <span className="whitespace-nowrap font-semibold tabular-nums">
+                  {formatCurrency(totalCharges)}
+                </span>
               </div>
-              <div className="mt-2 flex items-center justify-between">
-                <span className="text-muted-foreground">Payments Recorded</span>
-                <span className="font-medium text-emerald-600">
+              <div className="mt-2 grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4">
+                <span className="min-w-0 text-muted-foreground">Payments Recorded</span>
+                <span className="whitespace-nowrap font-medium tabular-nums text-emerald-600">
                   {totalPaid === 0 ? "-" : formatCurrency(totalPaid)}
                 </span>
               </div>
-              <div className="mt-2 flex items-center justify-between">
-                <span className="font-medium text-primary">Balance Due (Total)</span>
+              <div className="mt-2 grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4">
+                <span className="min-w-0 font-medium text-primary">
+                  Balance Due (Total)
+                </span>
                 <span
                   className={cn(
-                    "font-semibold",
+                    "whitespace-nowrap font-semibold tabular-nums",
                     balance > 0 ? "text-rose-600" : "text-emerald-600"
                   )}
                 >

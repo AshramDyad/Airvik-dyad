@@ -380,7 +380,7 @@ export function ReservationPaymentRequestsPanel({
   }
 
   return (
-    <div className="space-y-4 rounded-2xl border border-border/40 p-4">
+    <div className="min-w-0 space-y-4 rounded-2xl border border-border/40 p-4">
       {error && (
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
@@ -389,9 +389,12 @@ export function ReservationPaymentRequestsPanel({
         </Alert>
       )}
 
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <form onSubmit={handleCreatePayment} className="grid flex-1 gap-3 sm:grid-cols-[minmax(180px,260px)_auto] sm:items-end">
-          <div className="space-y-2">
+      <div className="flex min-w-0 flex-col gap-4 xl:flex-row xl:flex-wrap xl:items-end xl:justify-between">
+        <form
+          onSubmit={handleCreatePayment}
+          className="flex min-w-0 flex-1 flex-col gap-3 sm:flex-row sm:items-end"
+        >
+          <div className="min-w-0 flex-1 space-y-2 sm:max-w-[260px]">
             <Label htmlFor="reservation-payment-amount">UPI Gateway Amount</Label>
             <Input
               id="reservation-payment-amount"
@@ -404,7 +407,11 @@ export function ReservationPaymentRequestsPanel({
               placeholder="Enter amount"
             />
           </div>
-          <Button type="submit" disabled={isCreating}>
+          <Button
+            type="submit"
+            className="w-full shrink-0 sm:w-auto"
+            disabled={isCreating}
+          >
             {isCreating ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
@@ -414,11 +421,12 @@ export function ReservationPaymentRequestsPanel({
           </Button>
         </form>
 
-        <div className="flex flex-col gap-2 sm:flex-row">
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap xl:justify-end">
           {canOverridePayment && (
             <Button
               type="button"
               variant="outline"
+              className="w-full shrink-0 sm:w-auto"
               onClick={() => setIsOverrideDialogOpen(true)}
               disabled={defaultAmount <= 0}
             >
@@ -429,6 +437,7 @@ export function ReservationPaymentRequestsPanel({
           <Button
             type="button"
             variant="outline"
+            className="w-full shrink-0 sm:w-auto"
             onClick={() => void loadRequests(true)}
             disabled={isRefreshing}
           >
@@ -452,76 +461,89 @@ export function ReservationPaymentRequestsPanel({
           No payment QR created for this reservation.
         </div>
       ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Payment ID</TableHead>
-              <TableHead>Amount</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Expires</TableHead>
-              <TableHead>Reference</TableHead>
-              <TableHead className="text-right">QR</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {requests.map((request) => (
-              <TableRow key={request.id}>
-                <TableCell className="font-mono font-semibold">
-                  {getPaymentRequestCode(request.identifier)}
-                </TableCell>
-                <TableCell>{formatCurrency(request.amount, currency)}</TableCell>
-                <TableCell>
-                  <StatusBadge status={request.status} />
-                </TableCell>
-                <TableCell>{formatDateTime(request.expiresAt)}</TableCell>
-                <TableCell>
-                  <span className="block max-w-[180px] truncate">
-                    {request.paymentReference ?? "-"}
-                  </span>
-                </TableCell>
-                <TableCell>
-                  <div className="flex justify-end gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => void handleViewQr(request)}
-                    >
-                      <Eye className="h-3.5 w-3.5" />
-                      View
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => void handleDownloadQr(request)}
-                      disabled={isPreparingQr}
-                    >
-                      <Download className="h-3.5 w-3.5" />
-                      Download
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => void handleSendQr(request)}
-                      disabled={isSendingQr || !guest?.phone}
-                      title={!guest?.phone ? "Guest has no phone number" : undefined}
-                    >
-                      {isSendingQr && activeRequest?.id === request.id ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <Send className="h-3.5 w-3.5" />
-                      )}
-                      Send
-                    </Button>
-                  </div>
-                </TableCell>
+        <div className="min-w-0 overflow-hidden rounded-lg border border-border/40">
+          <Table className="min-w-[960px]">
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[150px] whitespace-nowrap">
+                  Payment ID
+                </TableHead>
+                <TableHead className="w-[130px] whitespace-nowrap">Amount</TableHead>
+                <TableHead className="w-[120px] whitespace-nowrap">Status</TableHead>
+                <TableHead className="w-[180px] whitespace-nowrap">Expires</TableHead>
+                <TableHead className="min-w-[160px]">Reference</TableHead>
+                <TableHead className="w-[330px] whitespace-nowrap text-right">
+                  QR
+                </TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {requests.map((request) => (
+                <TableRow key={request.id}>
+                  <TableCell className="whitespace-nowrap font-mono text-xs font-semibold">
+                    {getPaymentRequestCode(request.identifier)}
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap tabular-nums">
+                    {formatCurrency(request.amount, currency)}
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    <StatusBadge status={request.status} />
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    {formatDateTime(request.expiresAt)}
+                  </TableCell>
+                  <TableCell>
+                    <span className="block max-w-[220px] break-words">
+                      {request.paymentReference ?? "-"}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="shrink-0"
+                        onClick={() => void handleViewQr(request)}
+                      >
+                        <Eye className="h-3.5 w-3.5" />
+                        View
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="shrink-0"
+                        onClick={() => void handleDownloadQr(request)}
+                        disabled={isPreparingQr}
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                        Download
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="shrink-0"
+                        onClick={() => void handleSendQr(request)}
+                        disabled={isSendingQr || !guest?.phone}
+                        title={!guest?.phone ? "Guest has no phone number" : undefined}
+                      >
+                        {isSendingQr && activeRequest?.id === request.id ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Send className="h-3.5 w-3.5" />
+                        )}
+                        Send
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       )}
 
       <Dialog open={isQrDialogOpen} onOpenChange={setIsQrDialogOpen}>
-        <DialogContent className="max-w-[520px] p-6">
+        <DialogContent className="max-h-[calc(100vh-2rem)] max-w-[520px] overflow-y-auto p-6">
           <DialogHeader>
             <DialogTitle className="font-sans text-lg">Payment QR</DialogTitle>
             <DialogDescription>
@@ -533,11 +555,11 @@ export function ReservationPaymentRequestsPanel({
               <div
                 role="img"
                 aria-label="Payment QR with amount, identifier, expiry, and UPI details"
-                className="h-[70vh] max-h-[660px] w-full max-w-[492px] rounded-lg border bg-white bg-contain bg-center bg-no-repeat"
+                className="h-[60vh] min-h-[320px] w-full max-w-[492px] rounded-lg border bg-white bg-contain bg-center bg-no-repeat sm:h-[70vh] sm:max-h-[660px]"
                 style={{ backgroundImage: `url("${qrPreviewDataUrl}")` }}
               />
             ) : (
-              <div className="flex h-[420px] w-full items-center justify-center rounded-lg border border-dashed text-sm text-muted-foreground">
+              <div className="flex h-[60vh] min-h-[320px] w-full items-center justify-center rounded-lg border border-dashed text-sm text-muted-foreground sm:h-[420px]">
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Preparing QR
               </div>
@@ -546,7 +568,7 @@ export function ReservationPaymentRequestsPanel({
           {activeRequest ? (
             <div className="flex flex-col gap-2 sm:flex-row">
               <Button
-                className="flex-1"
+                className="w-full shrink-0 sm:flex-1"
                 onClick={() => void handleDownloadQr(activeRequest)}
                 disabled={isPreparingQr}
               >
@@ -554,7 +576,7 @@ export function ReservationPaymentRequestsPanel({
                 Download QR
               </Button>
               <Button
-                className="flex-1"
+                className="w-full shrink-0 sm:flex-1"
                 variant="outline"
                 onClick={() => void handleSendQr(activeRequest)}
                 disabled={isSendingQr || !guest?.phone}
@@ -633,7 +655,7 @@ function StatusBadge({ status }: { status: PaymentRequestStatus }) {
     <Badge
       variant="outline"
       className={cn(
-        "capitalize",
+        "whitespace-nowrap capitalize",
         status === "paid" && "border-emerald-200 bg-emerald-50 text-emerald-700",
         status === "pending" && "border-amber-200 bg-amber-50 text-amber-700",
         status === "expired" && "border-slate-200 bg-slate-50 text-slate-600",

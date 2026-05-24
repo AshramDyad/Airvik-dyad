@@ -63,28 +63,46 @@ export function ReservationHeader({ reservation, bookingStatus }: ReservationHea
 
   return (
     <>
-      <div className="mb-6 flex flex-wrap items-center gap-3 rounded-2xl border border-border/40 bg-card/80 px-4 py-3 shadow-sm">
-        <Button variant="outline" size="icon" className="h-9 w-9 rounded-xl border-border/50" asChild>
-          <Link href="/admin/reservations">
-            <ArrowLeft className="h-4 w-4" />
-            <span className="sr-only">Back</span>
-          </Link>
-        </Button>
-        <h1 className="flex-1 text-base font-semibold uppercase tracking-wide text-muted-foreground sm:text-sm">
-          Reservation Details
-        </h1>
-        <Badge variant="outline" className="ml-auto rounded-full px-3 py-1 text-xs font-medium sm:ml-0">
-          {effectiveStatus}
-        </Badge>
-        {isNewlyCreated && (
-          <Badge variant="secondary" className="rounded-full px-3 py-1 text-xs font-semibold text-primary">
-            Just created
-          </Badge>
-        )}
-        <div className="hidden items-center gap-2 md:ml-auto md:flex">
+      <div className="mb-6 min-w-0 rounded-2xl border border-border/40 bg-card/80 px-4 py-3 shadow-sm">
+        <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 items-center gap-3">
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-9 w-9 shrink-0 rounded-xl border-border/50"
+              asChild
+            >
+              <Link href="/admin/reservations">
+                <ArrowLeft className="h-4 w-4" />
+                <span className="sr-only">Back</span>
+              </Link>
+            </Button>
+            <h1 className="min-w-0 truncate text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+              Reservation Details
+            </h1>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+            <Badge
+              variant="outline"
+              className="whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium"
+            >
+              {effectiveStatus}
+            </Badge>
+            {isNewlyCreated && (
+              <Badge
+                variant="secondary"
+                className="whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold text-primary"
+              >
+                Just created
+              </Badge>
+            )}
+          </div>
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border/40 pt-3">
           <Button
             variant="outline"
             size="sm"
+            className="shrink-0"
             disabled={!canBeModified}
             asChild={canBeModified}
           >
@@ -109,6 +127,7 @@ export function ReservationHeader({ reservation, bookingStatus }: ReservationHea
             invoiceType="invoice"
             variant="outline"
             size="sm"
+            className="shrink-0"
           />
           <SendInvoiceWhatsAppButton
             reservations={bookingReservations}
@@ -122,6 +141,7 @@ export function ReservationHeader({ reservation, bookingStatus }: ReservationHea
           <Button
             variant="outline"
             size="sm"
+            className="shrink-0"
             onClick={() => {
               void handleStatusUpdate("Checked-in");
             }}
@@ -133,6 +153,7 @@ export function ReservationHeader({ reservation, bookingStatus }: ReservationHea
           <Button
             variant="outline"
             size="sm"
+            className="shrink-0"
             onClick={() => {
               void handleStatusUpdate("Checked-out");
             }}
@@ -144,6 +165,7 @@ export function ReservationHeader({ reservation, bookingStatus }: ReservationHea
           <Button
             variant="destructive"
             size="sm"
+            className="shrink-0"
             onClick={() => setIsCancelDialogOpen(true)}
             disabled={!canBeCancelled}
           >

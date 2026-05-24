@@ -234,20 +234,20 @@ export default function ReservationDetailsPage() {
 
   return (
     <PermissionGate feature="reservations">
-      <div className="space-y-6">
+      <div className="min-w-0 space-y-6">
         <ReservationHeader
           reservation={reservationWithDetails}
           bookingStatus={bookingAggregateStatus}
         />
-        <div className="grid gap-6 lg:grid-cols-3">
-          <div className="lg:col-span-1 space-y-6">
+        <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(300px,360px)_minmax(0,1fr)]">
+          <div className="min-w-0 space-y-6">
             <GuestDetailsCard guest={guest} />
             <StayDetailsCard reservation={stayDetailsReservation} />
             <LinkedReservationsCard
               reservations={groupSummary.reservations}
             />
           </div>
-          <div className="lg:col-span-2 space-y-6">
+          <div className="min-w-0 space-y-6">
             <BillingCard
               reservation={reservationWithDetails}
               groupSummary={groupSummary}
@@ -262,15 +262,15 @@ export default function ReservationDetailsPage() {
 
 function ReservationDetailsSkeleton() {
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6">
       <Skeleton className="h-10 w-64" />
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-1 space-y-6">
+      <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(300px,360px)_minmax(0,1fr)]">
+        <div className="min-w-0 space-y-6">
           <Skeleton className="h-32 w-full" />
           <Skeleton className="h-40 w-full" />
           <Skeleton className="h-40 w-full" />
         </div>
-        <div className="lg:col-span-2 space-y-6">
+        <div className="min-w-0 space-y-6">
           <Skeleton className="h-48 w-full" />
           <Skeleton className="h-48 w-full" />
         </div>

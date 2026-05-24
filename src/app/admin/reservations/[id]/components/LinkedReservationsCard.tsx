@@ -7,7 +7,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useDataContext } from "@/context/data-context";
 import type { ReservationWithDetails } from "@/app/admin/reservations/components/columns";
@@ -37,7 +36,7 @@ export function LinkedReservationsCard({
   const description = `${descriptionPrefix} Rooms listed here reflect the latest selection for this booking.`;
 
   return (
-    <Card>
+    <Card className="min-w-0">
       <CardHeader>
         <CardTitle className="font-serif text-lg font-semibold">
           Group Booking
@@ -50,33 +49,32 @@ export function LinkedReservationsCard({
             No rooms are currently assigned to this booking.
           </p>
         ) : (
-          <div className="rounded-2xl border border-border/40 max-h-80 overflow-y-auto">
-            <Table>
-              <TableBody>
-                {sortedReservations.map((res) => {
-                  const room = rooms.find((r) => r.id === res.roomId);
-                  const roomType = roomTypes.find(
-                    (rt) => rt.id === room?.roomTypeId,
-                  );
-                  const roomLabel = room?.roomNumber || res.roomNumber || "N/A";
-                  return (
-                    <TableRow key={res.id}>
-                      <TableCell className="space-y-1">
-                        <p className="font-medium">
-                          {roomType?.name || "Room type"} · Room {roomLabel}
-                        </p>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Badge variant="outline" className="capitalize">
-                          {res.status}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
+          <ul className="max-h-80 divide-y divide-border/40 overflow-y-auto rounded-2xl border border-border/40">
+            {sortedReservations.map((res) => {
+              const room = rooms.find((r) => r.id === res.roomId);
+              const roomType = roomTypes.find(
+                (rt) => rt.id === room?.roomTypeId,
+              );
+              const roomLabel = room?.roomNumber || res.roomNumber || "N/A";
+
+              return (
+                <li
+                  key={res.id}
+                  className="flex min-w-0 items-start justify-between gap-3 px-4 py-3"
+                >
+                  <p className="min-w-0 break-words text-sm font-medium">
+                    {roomType?.name || "Room type"} · Room {roomLabel}
+                  </p>
+                  <Badge
+                    variant="outline"
+                    className="shrink-0 whitespace-nowrap capitalize"
+                  >
+                    {res.status}
+                  </Badge>
+                </li>
+              );
+            })}
+          </ul>
         )}
       </CardContent>
     </Card>
