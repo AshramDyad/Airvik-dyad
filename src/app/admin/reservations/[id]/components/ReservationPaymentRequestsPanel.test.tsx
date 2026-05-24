@@ -107,14 +107,54 @@ describe("ReservationPaymentRequestsPanel", () => {
     expect(refreshReservations).toHaveBeenCalled();
     expect(loadBookingDetails).toHaveBeenCalledWith("reservation-1");
   });
+
+  it("allows manual QR creation even when the balance is fully paid", async () => {
+    const user = userEvent.setup();
+    mockedUseAuthContext.mockReturnValue({
+      hasPermission: () => false,
+    } as unknown as ReturnType<typeof useAuthContext>);
+    mockedAuthorizedFetch
+      .mockResolvedValueOnce(jsonResponse({ requests: [] }, { status: 200 }))
+      .mockResolvedValueOnce(
+        jsonResponse({ request: buildPendingRequest(500) }, { status: 201 })
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({ requests: [buildPendingRequest(500)] }, { status: 200 })
+      );
+
+    renderPanel({ balanceDue: 0 });
+
+    await screen.findByText("No payment QR created for this reservation.");
+    const amountInput = screen.getByLabelText("UPI Gateway Amount");
+    const generateButton = screen.getByRole("button", { name: /generate qr/i });
+
+    expect(amountInput).toBeEnabled();
+    expect(generateButton).toBeEnabled();
+
+    await user.type(amountInput, "500");
+    await user.click(generateButton);
+
+    await waitFor(() => {
+      expect(mockedAuthorizedFetch).toHaveBeenCalledWith(
+        "/api/admin/payment-requests",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({
+            amount: 500,
+            reservationId: "reservation-1",
+          }),
+        })
+      );
+    });
+  });
 });
 
-function renderPanel() {
+function renderPanel(options: { balanceDue?: number } = {}) {
   render(
     <ReservationPaymentRequestsPanel
       reservationId="reservation-1"
       guest={null}
-      balanceDue={1500}
+      balanceDue={options.balanceDue ?? 1500}
       currency="INR"
       logoUrl=""
     />
@@ -149,5 +189,19 @@ function buildPaidRequest(): PaymentRequest {
     createdBy: "user-1",
     createdAt: "2026-05-24T08:00:00.000Z",
     updatedAt: "2026-05-24T08:10:00.000Z",
+  };
+}
+
+function buildPendingRequest(amount: number): PaymentRequest {
+  return {
+    ...buildPaidRequest(),
+    id: "payment-request-pending",
+    folioItemId: null,
+    amount,
+    paidAmount: 0,
+    status: "pending",
+    paidAt: null,
+    paymentReference: null,
+    updatedAt: "2026-05-24T08:00:00.000Z",
   };
 }

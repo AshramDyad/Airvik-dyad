@@ -1,5 +1,4 @@
 import { NextResponse, type NextRequest } from "next/server";
-import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { Permission } from "@/data/types";
 import { createServerSupabaseClient } from "@/integrations/supabase/server";
@@ -12,11 +11,6 @@ import {
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-type DbReservationPaymentMethod = {
-  id: string;
-  payment_method: string | null;
-};
 
 export async function GET(request: NextRequest) {
   try {
@@ -88,10 +82,6 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = createServerSupabaseClient();
-    if (reservationId) {
-      await assertGatewayReservation(supabase, reservationId);
-    }
-
     const paymentRequest = await createPaymentRequest({
       supabase,
       amount,
@@ -115,33 +105,6 @@ function requireAllPermissions(
 
   if (!isAllowed) {
     throw new HttpError(403, "Insufficient permissions");
-  }
-}
-
-async function assertGatewayReservation(
-  supabase: SupabaseClient,
-  reservationId: string
-): Promise<void> {
-  const { data, error } = await supabase
-    .from("reservations")
-    .select("id, payment_method")
-    .eq("id", reservationId)
-    .maybeSingle();
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  if (!data) {
-    throw new HttpError(404, "Reservation not found.");
-  }
-
-  const reservation = data as unknown as DbReservationPaymentMethod;
-  if (reservation.payment_method !== "UPI Gateway") {
-    throw new HttpError(
-      409,
-      "Payment QR can be generated only for UPI Gateway reservations."
-    );
   }
 }
 

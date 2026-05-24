@@ -242,23 +242,21 @@ export function BillingCard({ reservation, groupSummary }: BillingCardProps) {
           </div>
         </div>
 
-        {isGatewayReservation && (
-          <div className="space-y-3">
-            <div>
-              <h3 className="text-sm font-semibold">UPI Gateway Payments</h3>
-              <p className="text-xs text-muted-foreground">
-                Generate a linked QR and auto-record the payment when it is received.
-              </p>
-            </div>
-            <ReservationPaymentRequestsPanel
-              reservationId={reservation.id}
-              guest={guest}
-              balanceDue={Math.max(balance, 0)}
-              currency={property?.currency || "INR"}
-              logoUrl={property?.logo_url || "/logo.png"}
-            />
+        <div className="space-y-3">
+          <div>
+            <h3 className="text-sm font-semibold">UPI Gateway Payments</h3>
+            <p className="text-xs text-muted-foreground">
+              Generate a linked QR and auto-record the payment when it is received.
+            </p>
           </div>
-        )}
+          <ReservationPaymentRequestsPanel
+            reservationId={reservation.id}
+            guest={guest}
+            balanceDue={Math.max(balance, 0)}
+            currency={property?.currency || "INR"}
+            logoUrl={property?.logo_url || "/logo.png"}
+          />
+        </div>
       </CardContent>
     </Card>
   );

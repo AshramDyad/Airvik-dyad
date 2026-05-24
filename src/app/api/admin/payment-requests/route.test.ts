@@ -34,11 +34,6 @@ vi.mock("@/lib/payments/payment-requests-server", () => ({
 
 const RESERVATION_ID = "00000000-0000-0000-0000-000000000201";
 
-type ReservationPaymentMethodRow = {
-  id: string;
-  payment_method: string | null;
-};
-
 const mockedCreateServerSupabaseClient = vi.mocked(createServerSupabaseClient);
 const mockedRequireFeature = vi.mocked(requireFeature);
 const mockedRequirePermissions = vi.mocked(requirePermissions);
@@ -58,16 +53,12 @@ describe("payment requests route", () => {
     });
   });
 
-  it("rejects linked payment QR creation for non-gateway reservations", async () => {
-    const supabase = createSupabaseMock({
-      reservation: {
-        id: RESERVATION_ID,
-        payment_method: "Cash",
-      },
-    });
+  it("creates linked payment QR for legacy reservation payment methods", async () => {
+    const supabase = createSupabaseMock();
     mockedCreateServerSupabaseClient.mockReturnValue(
       supabase.client as unknown as ReturnType<typeof createServerSupabaseClient>
     );
+    mockedCreatePaymentRequest.mockResolvedValue(buildPaymentRequest());
 
     const response = await POST(buildRequest({
       amount: 500,
@@ -75,11 +66,19 @@ describe("payment requests route", () => {
     }));
     const body = await response.json();
 
-    expect(response.status).toBe(409);
-    expect(body).toEqual({
-      message: "Payment QR can be generated only for UPI Gateway reservations.",
-    });
-    expect(mockedCreatePaymentRequest).not.toHaveBeenCalled();
+    expect(response.status).toBe(201);
+    expect(mockedCreatePaymentRequest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        supabase: supabase.client,
+        amount: 500,
+        createdBy: "profile-1",
+        reservationId: RESERVATION_ID,
+      })
+    );
+    expect(body.request).toEqual(expect.objectContaining({
+      id: "payment-request-1",
+      reservationId: RESERVATION_ID,
+    }));
   });
 
   it("requires full linked payment permissions", async () => {
@@ -101,12 +100,7 @@ describe("payment requests route", () => {
   });
 
   it("creates linked payment QR for UPI Gateway reservations", async () => {
-    const supabase = createSupabaseMock({
-      reservation: {
-        id: RESERVATION_ID,
-        payment_method: "UPI Gateway",
-      },
-    });
+    const supabase = createSupabaseMock();
     mockedCreateServerSupabaseClient.mockReturnValue(
       supabase.client as unknown as ReturnType<typeof createServerSupabaseClient>
     );
@@ -148,22 +142,9 @@ function buildRequest(body: unknown): NextRequest {
   }) as unknown as NextRequest;
 }
 
-function createSupabaseMock(args: { reservation: ReservationPaymentMethodRow | null }) {
-  const maybeSingle = vi.fn(async () => ({
-    data: args.reservation,
-    error: null,
-  }));
-  const eq = vi.fn(() => ({ maybeSingle }));
-  const select = vi.fn(() => ({ eq }));
-  const from = vi.fn((table: string): unknown => {
-    if (table === "reservations") {
-      return { select };
-    }
-    throw new Error(`Unexpected table ${table}`);
-  });
-
+function createSupabaseMock() {
   return {
-    client: { from },
+    client: { from: vi.fn() },
   };
 }
 

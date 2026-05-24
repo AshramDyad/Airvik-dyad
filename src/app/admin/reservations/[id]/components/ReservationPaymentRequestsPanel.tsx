@@ -402,10 +402,9 @@ export function ReservationPaymentRequestsPanel({
               value={amount}
               onChange={(event) => setAmount(event.target.value)}
               placeholder="Enter amount"
-              disabled={defaultAmount <= 0}
             />
           </div>
-          <Button type="submit" disabled={isCreating || defaultAmount <= 0}>
+          <Button type="submit" disabled={isCreating}>
             {isCreating ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
