@@ -1,0 +1,13 @@
+.next
+node_modules
+coverage
+test-results
+playwright
+.playwright-mcp
+supabase/backups
+supabase/.temp
+supabase/.branches
+supabase/migrations_backup
+supabase/seed.sql
+.env*
+*.tsbuildinfo

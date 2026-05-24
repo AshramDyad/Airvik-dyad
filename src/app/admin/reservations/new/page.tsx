@@ -50,6 +50,7 @@ import { isBookableRoom, ROOM_STATUS_LABELS } from "@/lib/rooms";
 import { useCurrencyFormatter } from "@/hooks/use-currency";
 import { buildRoomOccupancyAssignments } from "@/lib/reservations/guest-allocation";
 import { PermissionGate } from "@/components/admin/permission-gate";
+import { authorizedFetch } from "@/lib/auth/client-session";
 import {
   doesReservationBlockAvailability,
   getActiveHoldRoomIdsForDateRange,
@@ -61,6 +62,7 @@ const paymentMethodOptions = [
   "Bank/IMPS",
   "Cash",
   "UPI",
+  "UPI Gateway",
   "Bhagat Ji",
   "Anurag Ji",
 ] as const satisfies ReservationPaymentMethod[];
@@ -80,6 +82,16 @@ const customRateRecordSchema = z
   .default({})
   .transform((value) => value ?? {});
 
+const optionalGatewayAmountSchema = z.preprocess(
+  (value) => {
+    if (typeof value === "string" && value.trim() === "") {
+      return undefined;
+    }
+    return value;
+  },
+  z.coerce.number().positive("Payment amount must be greater than 0.").optional()
+);
+
 const reservationFormSchema = z.object({
   guestId: z.string({ required_error: "Please select a guest." }),
   dateRange: dateRangeSchema,
@@ -91,6 +103,23 @@ const reservationFormSchema = z.object({
   roomIds: z.array(z.string()).min(1, "Select at least one room."),
   notes: z.string().max(500).optional(),
   customRates: customRateRecordSchema,
+  gatewayPaymentAmount: optionalGatewayAmountSchema,
+}).superRefine((values, ctx) => {
+  if (values.paymentMethod !== "UPI Gateway") {
+    return;
+  }
+
+  if (
+    typeof values.gatewayPaymentAmount !== "number" ||
+    !Number.isFinite(values.gatewayPaymentAmount) ||
+    values.gatewayPaymentAmount <= 0
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Enter the UPI Gateway payment amount.",
+      path: ["gatewayPaymentAmount"],
+    });
+  }
 });
 
 type ReservationFormValues = z.input<typeof reservationFormSchema>;
@@ -129,6 +158,7 @@ export default function CreateReservationPage() {
       roomIds: [],
       notes: "",
       customRates: {},
+      gatewayPaymentAmount: undefined,
     },
   });
 
@@ -140,6 +170,7 @@ export default function CreateReservationPage() {
 
   const watchedDateRange = form.watch("dateRange") as DateRange | undefined;
   const selectedRoomTypeId = form.watch("roomTypeId") || "";
+  const selectedPaymentMethod = form.watch("paymentMethod");
   const watchedRoomIds = form.watch("roomIds");
   const selectedRoomIds = React.useMemo(() => watchedRoomIds ?? [], [watchedRoomIds]);
   const customRates = form.watch("customRates");
@@ -390,6 +421,36 @@ export default function CreateReservationPage() {
 
   const formatCurrency = useCurrencyFormatter({ maximumFractionDigits: 0 });
   const customRateErrors = form.formState.errors.customRates as CustomRateFieldErrors | undefined;
+  const isGatewayPayment = selectedPaymentMethod === "UPI Gateway";
+
+  React.useEffect(() => {
+    if (!isGatewayPayment) {
+      return;
+    }
+
+    if (form.getValues("status") !== "Room Hold") {
+      form.setValue("status", "Room Hold", {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
+    }
+  }, [form, isGatewayPayment]);
+
+  React.useEffect(() => {
+    if (!isGatewayPayment || !pricing) {
+      return;
+    }
+
+    const currentAmount = Number(form.getValues("gatewayPaymentAmount"));
+    if (Number.isFinite(currentAmount) && currentAmount > 0) {
+      return;
+    }
+
+    form.setValue("gatewayPaymentAmount", Number(pricing.grandTotal.toFixed(2)), {
+      shouldDirty: false,
+      shouldValidate: true,
+    });
+  }, [form, isGatewayPayment, pricing]);
 
   const handleCustomRateInput = React.useCallback(
     (roomTypeId: string, rawValue: string) => {
@@ -470,6 +531,36 @@ export default function CreateReservationPage() {
     }
 
     try {
+      const gatewayPaymentAmount =
+        values.paymentMethod === "UPI Gateway"
+          ? Number(values.gatewayPaymentAmount)
+          : null;
+
+      if (
+        values.paymentMethod === "UPI Gateway" &&
+        (!gatewayPaymentAmount ||
+          !Number.isFinite(gatewayPaymentAmount) ||
+          gatewayPaymentAmount <= 0)
+      ) {
+        form.setError("gatewayPaymentAmount", {
+          type: "manual",
+          message: "Enter the UPI Gateway payment amount.",
+        });
+        return;
+      }
+
+      if (
+        gatewayPaymentAmount &&
+        pricing &&
+        gatewayPaymentAmount > pricing.grandTotal
+      ) {
+        form.setError("gatewayPaymentAmount", {
+          type: "manual",
+          message: "Payment amount cannot be more than the grand total.",
+        });
+        return;
+      }
+
       const roomOccupancies = buildRoomOccupancyAssignments(
         values.roomIds,
         values.adults,
@@ -508,7 +599,40 @@ export default function CreateReservationPage() {
         return;
       }
 
-      toast.success("Reservation created successfully.");
+      let linkedPaymentCreated = false;
+      if (gatewayPaymentAmount) {
+        try {
+          const response = await authorizedFetch("/api/admin/payment-requests", {
+            method: "POST",
+            cache: "no-store",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              amount: gatewayPaymentAmount,
+              reservationId: result[0].id,
+            }),
+          });
+
+          if (!response.ok) {
+            const body: unknown = await response.json().catch(() => null);
+            throw new Error(readApiMessage(body) ?? "Unable to create payment QR.");
+          }
+
+          linkedPaymentCreated = true;
+        } catch (paymentError) {
+          toast.error("Reservation created, but payment QR failed.", {
+            description:
+              paymentError instanceof Error
+                ? paymentError.message
+                : "Open the reservation and try again.",
+          });
+        }
+      }
+
+      toast.success(
+        linkedPaymentCreated
+          ? "Reservation hold and payment QR created."
+          : "Reservation created successfully."
+      );
       router.replace(`/admin/reservations/${result[0].id}?createdBooking=1`);
     } catch (error) {
       const isConflict =
@@ -1000,6 +1124,37 @@ export default function CreateReservationPage() {
                       <span className="font-medium">Grand Total</span>
                       <span className="font-semibold">{pricing ? formatCurrency(pricing.grandTotal) : "-"}</span>
                     </div>
+                    {isGatewayPayment && (
+                      <FormField
+                        control={form.control}
+                        name="gatewayPaymentAmount"
+                        render={({ field }) => (
+                          <FormItem className="rounded-xl border border-border/40 bg-muted/20 p-3">
+                            <FormLabel>UPI Gateway Amount</FormLabel>
+                            <FormControl>
+                              <Input
+                                name={field.name}
+                                ref={field.ref}
+                                onBlur={field.onBlur}
+                                onChange={(event) => field.onChange(event.target.value)}
+                                type="number"
+                                min="1"
+                                step="0.01"
+                                inputMode="decimal"
+                                placeholder="Enter advance amount"
+                                value={
+                                  typeof field.value === "number" ||
+                                  typeof field.value === "string"
+                                    ? field.value
+                                    : ""
+                                }
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    )}
                   </div>
                   {!taxConfig.enabled && (
                     <p className="text-xs text-muted-foreground">
@@ -1025,7 +1180,13 @@ export default function CreateReservationPage() {
                     )}
                   </div>
                   <Button type="submit" className="w-full mt-4" disabled={form.formState.isSubmitting || !hasCapacityForGuests}>
-                    {form.formState.isSubmitting ? "Saving..." : !hasCapacityForGuests ? "Add more capacity" : "Save Reservation & Generate Invoice"}
+                    {form.formState.isSubmitting
+                      ? "Saving..."
+                      : !hasCapacityForGuests
+                        ? "Add more capacity"
+                        : isGatewayPayment
+                          ? "Save Hold & Generate Payment QR"
+                          : "Save Reservation & Generate Invoice"}
                   </Button>
                 </CardContent>
               </Card>
@@ -1059,4 +1220,18 @@ export default function CreateReservationPage() {
       </div>
     </PermissionGate>
   );
+}
+
+function readApiMessage(value: unknown): string | null {
+  if (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value) &&
+    "message" in value &&
+    typeof value.message === "string"
+  ) {
+    return value.message;
+  }
+
+  return null;
 }

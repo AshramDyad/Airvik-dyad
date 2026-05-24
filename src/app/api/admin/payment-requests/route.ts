@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { createServerSupabaseClient } from "@/integrations/supabase/server";
-import { HttpError, requireFeature } from "@/lib/server/auth";
+import { HttpError, requireFeature, requirePermissions } from "@/lib/server/auth";
 import {
   createPaymentRequest,
   listPaymentRequests,
@@ -13,14 +13,29 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   try {
-    await requireFeature(request, "payments");
-    const supabase = createServerSupabaseClient();
+    const reservationId = readOptionalUuid(
+      request.nextUrl.searchParams.get("reservationId"),
+      "reservationId"
+    );
     const shouldSync = request.nextUrl.searchParams.get("sync") === "1";
+
+    if (reservationId && shouldSync) {
+      await requirePermissions(
+        request,
+        "read:payment",
+        "create:reservation",
+        "update:reservation"
+      );
+    } else {
+      await requireFeature(request, reservationId ? ["payments", "reservations"] : "payments");
+    }
+
+    const supabase = createServerSupabaseClient();
     let syncMessage: string | undefined;
 
     if (shouldSync) {
       try {
-        await reconcilePaymentRequests(supabase);
+        await reconcilePaymentRequests(supabase, { reservationId });
       } catch (syncError) {
         syncMessage =
           syncError instanceof Error
@@ -29,7 +44,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const requests = await listPaymentRequests(supabase);
+    const requests = await listPaymentRequests(supabase, { reservationId });
     return noStoreJson({
       requests,
       ...(syncMessage ? { message: syncMessage } : {}),
@@ -41,20 +56,56 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const profile = await requireFeature(request, "payments");
     const body: unknown = await request.json();
     const amount = readAmount(body);
+    const reservationId = readOptionalBodyUuid(body, "reservationId");
+    const profile = reservationId
+      ? await requirePermissions(
+          request,
+          "read:payment",
+          "create:reservation",
+          "update:reservation"
+        )
+      : await requireFeature(request, "payments");
     const supabase = createServerSupabaseClient();
     const paymentRequest = await createPaymentRequest({
       supabase,
       amount,
       createdBy: profile.userId,
+      reservationId,
     });
 
     return noStoreJson({ request: paymentRequest }, { status: 201 });
   } catch (error) {
     return handleApiError(error);
   }
+}
+
+function readOptionalBodyUuid(
+  body: unknown,
+  key: string
+): string | null {
+  if (!isRecord(body)) {
+    return null;
+  }
+
+  const value = body[key];
+  return typeof value === "string" ? readOptionalUuid(value, key) : null;
+}
+
+function readOptionalUuid(value: string | null, fieldName: string): string | null {
+  if (!value || !value.trim()) {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trimmed)
+  ) {
+    throw new HttpError(400, `${fieldName} must be a valid UUID.`);
+  }
+
+  return trimmed;
 }
 
 function readAmount(body: unknown): number {

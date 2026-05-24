@@ -23,6 +23,8 @@ const IDENTIFIER_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
 const PAYMENT_REQUEST_SELECT = [
   "id",
   "identifier",
+  "reservation_id",
+  "folio_item_id",
   "amount",
   "paid_amount",
   "status",
@@ -43,6 +45,8 @@ const PAYMENT_REQUEST_SELECT = [
 type DbPaymentRequest = {
   id: string;
   identifier: string;
+  reservation_id: string | null;
+  folio_item_id: string | null;
   amount: number | string;
   paid_amount: number | string;
   status: string;
@@ -62,6 +66,7 @@ type DbPaymentRequest = {
 
 type PaymentRequestInsert = {
   identifier: string;
+  reservation_id?: string | null;
   amount: number;
   upi_id: string;
   upi_merchant_name: string;
@@ -71,14 +76,21 @@ type PaymentRequestInsert = {
 };
 
 export async function listPaymentRequests(
-  supabase: SupabaseClient
+  supabase: SupabaseClient,
+  options: { reservationId?: string | null } = {}
 ): Promise<PaymentRequest[]> {
-  await markExpiredPaymentRequests(supabase);
+  await markExpiredPaymentRequests(supabase, options);
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("payment_requests")
     .select(PAYMENT_REQUEST_SELECT)
     .order("created_at", { ascending: false });
+
+  if (options.reservationId) {
+    query = query.eq("reservation_id", options.reservationId);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     throw new Error(error.message);
@@ -91,8 +103,9 @@ export async function createPaymentRequest(args: {
   supabase: SupabaseClient;
   amount: number;
   createdBy: string;
+  reservationId?: string | null;
 }): Promise<PaymentRequest> {
-  const { supabase, amount, createdBy } = args;
+  const { supabase, amount, createdBy, reservationId } = args;
   const identifier = await createUniqueIdentifier(supabase);
   const upiUri = buildUpiPaymentUri({ identifier, amount });
   const expiresAt = new Date(
@@ -101,6 +114,7 @@ export async function createPaymentRequest(args: {
 
   const payload: PaymentRequestInsert = {
     identifier,
+    reservation_id: reservationId ?? null,
     amount,
     upi_id: PAYMENT_UPI_ID,
     upi_merchant_name: PAYMENT_MERCHANT_NAME,
@@ -123,15 +137,22 @@ export async function createPaymentRequest(args: {
 }
 
 export async function reconcilePaymentRequests(
-  supabase: SupabaseClient
+  supabase: SupabaseClient,
+  options: { reservationId?: string | null } = {}
 ): Promise<{ matched: number; expired: number }> {
-  const expired = await markExpiredPaymentRequests(supabase);
+  const expired = await markExpiredPaymentRequests(supabase, options);
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("payment_requests")
     .select("id, identifier, amount, expires_at")
     .eq("status", "pending")
     .order("created_at", { ascending: true });
+
+  if (options.reservationId) {
+    query = query.eq("reservation_id", options.reservationId);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     throw new Error(error.message);
@@ -157,17 +178,15 @@ export async function reconcilePaymentRequests(
   const matches = findPaymentRequestMatches(pendingRequests, payload.rows);
 
   for (const match of matches) {
-    const { error: updateError } = await supabase
-      .from("payment_requests")
-      .update({
-        status: "paid",
-        paid_amount: match.request.amount,
-        paid_at: new Date().toISOString(),
-        payment_reference: match.transaction.reference,
-        matched_transaction: match.transaction,
-      })
-      .eq("id", match.request.id)
-      .eq("status", "pending");
+    const { error: updateError } = await supabase.rpc(
+      "mark_payment_request_paid",
+      {
+        p_payment_request_id: match.request.id,
+        p_paid_amount: match.request.amount,
+        p_payment_reference: match.transaction.reference,
+        p_matched_transaction: match.transaction,
+      }
+    );
 
     if (updateError) {
       throw new Error(updateError.message);
@@ -181,6 +200,8 @@ function toPaymentRequest(row: DbPaymentRequest): PaymentRequest {
   return {
     id: row.id,
     identifier: row.identifier,
+    reservationId: row.reservation_id,
+    folioItemId: row.folio_item_id,
     amount: readMoney(row.amount),
     paidAmount: readMoney(row.paid_amount),
     status: toPaymentRequestStatus(row.status),
@@ -232,14 +253,21 @@ function createIdentifier(): string {
 }
 
 async function markExpiredPaymentRequests(
-  supabase: SupabaseClient
+  supabase: SupabaseClient,
+  options: { reservationId?: string | null } = {}
 ): Promise<number> {
-  const { data, error } = await supabase
+  let query = supabase
     .from("payment_requests")
     .update({ status: "expired" })
     .eq("status", "pending")
     .lt("expires_at", new Date().toISOString())
     .select("id");
+
+  if (options.reservationId) {
+    query = query.eq("reservation_id", options.reservationId);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     throw new Error(error.message);

@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/table";
 import { AddChargeDialog } from "@/app/admin/reservations/components/add-charge-dialog";
 import { RecordPaymentDialog } from "@/app/admin/reservations/components/record-payment-dialog";
+import { ReservationPaymentRequestsPanel } from "./ReservationPaymentRequestsPanel";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { ReservationWithDetails } from "@/app/admin/reservations/components/columns";
@@ -42,8 +43,9 @@ interface BillingCardProps {
 }
 
 export function BillingCard({ reservation, groupSummary }: BillingCardProps) {
-  const { property } = useDataContext();
+  const { guests, property } = useDataContext();
   const formatCurrency = useCurrencyFormatter();
+  const guest = guests.find((entry) => entry.id === reservation.guestId);
   const baseTaxConfig = resolveReservationTaxConfig(reservation, property);
   const hasGroupData = groupSummary.roomCount > 0;
   const folioEntries = hasGroupData && groupSummary.folio.length > 0
@@ -235,6 +237,22 @@ export function BillingCard({ reservation, groupSummary }: BillingCardProps) {
               </div>
             </div>
           </div>
+        </div>
+
+        <div className="space-y-3">
+          <div>
+            <h3 className="text-sm font-semibold">UPI Gateway Payments</h3>
+            <p className="text-xs text-muted-foreground">
+              Generate a linked QR and auto-record the payment when it is received.
+            </p>
+          </div>
+          <ReservationPaymentRequestsPanel
+            reservationId={reservation.id}
+            guest={guest}
+            balanceDue={Math.max(balance, 0)}
+            currency={property?.currency || "INR"}
+            logoUrl={property?.logo_url || "/logo.png"}
+          />
         </div>
       </CardContent>
     </Card>

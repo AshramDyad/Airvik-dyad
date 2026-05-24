@@ -55,6 +55,8 @@ export type PaymentRequestStatus = "pending" | "paid" | "expired" | "cancelled";
 export interface PaymentRequest {
   id: string;
   identifier: string;
+  reservationId: string | null;
+  folioItemId: string | null;
   amount: number;
   paidAmount: number;
   status: PaymentRequestStatus;
@@ -303,6 +305,7 @@ export type ReservationPaymentMethod =
   | "Bank/IMPS"
   | "Cash"
   | "UPI"
+  | "UPI Gateway"
   | "Bhagat Ji"
   | "Anurag Ji";
 
