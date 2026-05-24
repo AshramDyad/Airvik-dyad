@@ -7,12 +7,13 @@ import { differenceInDays, parseISO } from "date-fns";
 import { columns, ReservationWithDetails } from "./components/columns";
 import { DataTable } from "./components/data-table";
 import { useDataContext } from "@/context/data-context";
-import type { FolioItem, ReservationStatus } from "@/data/types";
+import type { FolioItem } from "@/data/types";
 import {
   calculateReservationTaxAmount,
   calculateReservationFinancials,
   resolveReservationTaxConfig,
 } from "@/lib/reservations/calculate-financials";
+import { shouldShowReservationFinancials } from "@/lib/reservations/status";
 import { PermissionGate } from "@/components/admin/permission-gate";
 
 function sumAdditionalCharges(folioItems: FolioItem[] = []) {
@@ -24,16 +25,6 @@ function sumAdditionalCharges(folioItems: FolioItem[] = []) {
         !item.externalReference?.startsWith("payment-")
     )
     .reduce((sum, item) => sum + item.amount, 0);
-}
-
-const EXCLUDED_REVENUE_STATUSES = new Set<ReservationStatus>([
-  "Room Hold",
-  "Cancelled",
-  "No-show",
-]);
-
-function isRevenueReservation(status: ReservationStatus) {
-  return !EXCLUDED_REVENUE_STATUSES.has(status);
 }
 
 function getReservationDisplayAmount(
@@ -132,7 +123,7 @@ export default function ReservationsPage() {
         detailedBooking.subRows = (booking.subRows as unknown as ReservationWithDetails[]).map((sub: ReservationWithDetails) => {
           const subWithDetails = { ...sub } as unknown as ReservationWithDetails;
           subWithDetails.nights = calculateNights(sub);
-          if (isRevenueReservation(sub.status)) {
+          if (shouldShowReservationFinancials(sub.status)) {
             subWithDetails.displayAmount = getReservationDisplayAmount(subWithDetails, property);
             const { paidAmount, remainingBalance } = getReservationPaidAndBalance(subWithDetails, property);
             subWithDetails.paidAmount = paidAmount;
@@ -151,14 +142,14 @@ export default function ReservationsPage() {
           detailedBooking.paidAmount = detailedBooking.subRows.reduce((sum, sub) => sum + (sub.paidAmount ?? 0), 0);
           detailedBooking.remainingBalance = detailedBooking.subRows.reduce((sum, sub) => sum + (sub.remainingBalance ?? 0), 0);
         } else {
-          detailedBooking.displayAmount = isRevenueReservation(detailedBooking.status)
+          detailedBooking.displayAmount = shouldShowReservationFinancials(detailedBooking.status)
             ? getReservationDisplayAmount(detailedBooking, property)
             : 0;
           detailedBooking.paidAmount = 0;
           detailedBooking.remainingBalance = 0;
         }
       } else {
-        if (isRevenueReservation(detailedBooking.status)) {
+        if (shouldShowReservationFinancials(detailedBooking.status)) {
           detailedBooking.displayAmount = getReservationDisplayAmount(detailedBooking, property);
           const { paidAmount, remainingBalance } = getReservationPaidAndBalance(detailedBooking, property);
           detailedBooking.paidAmount = paidAmount;

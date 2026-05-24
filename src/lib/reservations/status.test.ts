@@ -11,6 +11,7 @@ import {
   isActiveReservationStatus,
   ROOM_HOLD_LABEL,
   resolveAggregateStatus,
+  shouldShowReservationFinancials,
 } from "./status";
 
 describe("reservation status helpers", () => {
@@ -25,6 +26,16 @@ describe("reservation status helpers", () => {
   it("detects when a list contains active reservations", () => {
     expect(hasActiveReservations(["Cancelled", "No-show"])).toBe(false);
     expect(hasActiveReservations(["Cancelled", "Confirmed"])).toBe(true);
+  });
+
+  it("shows financials for all statuses except cancelled and no-show", () => {
+    expect(shouldShowReservationFinancials("Room Hold")).toBe(true);
+    expect(shouldShowReservationFinancials("Confirmed")).toBe(true);
+    expect(shouldShowReservationFinancials("Checked-in")).toBe(true);
+    expect(shouldShowReservationFinancials("Checked-out")).toBe(true);
+    expect(shouldShowReservationFinancials("Standby")).toBe(true);
+    expect(shouldShowReservationFinancials("Cancelled")).toBe(false);
+    expect(shouldShowReservationFinancials("No-show")).toBe(false);
   });
 
   it("resolves aggregate status by priority", () => {

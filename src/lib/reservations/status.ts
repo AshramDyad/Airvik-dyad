@@ -39,6 +39,12 @@ export function isActiveReservationStatus(status: ReservationStatus): boolean {
   return ACTIVE_RESERVATION_STATUSES.includes(status);
 }
 
+export function shouldShowReservationFinancials(
+  status: ReservationStatus
+): boolean {
+  return status !== "Cancelled" && status !== "No-show";
+}
+
 export function getReservationStatusLabel(status: ReservationStatus): string {
   return status === ROOM_HOLD_STATUS ? ROOM_HOLD_LABEL : status;
 }
