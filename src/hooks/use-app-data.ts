@@ -844,6 +844,8 @@ export function useAppData() {
       external_source: item.externalSource ?? undefined,
       external_reference: item.externalReference ?? null,
       external_metadata: item.externalMetadata ?? undefined,
+      received_by: item.receivedBy ?? null,
+      received_at: item.receivedAt ?? null,
     });
     if (error || !data) {
       if (error && typeof error === "object" && "message" in error) {
@@ -861,6 +863,8 @@ export function useAppData() {
       external_source: string | null;
       external_reference: string | null;
       external_metadata: Record<string, unknown> | null;
+      received_by: string | null;
+      received_at: string | null;
     };
     const folioItem: FolioItem = {
       id: inserted.id,
@@ -872,6 +876,8 @@ export function useAppData() {
       externalSource: inserted.external_source ?? undefined,
       externalReference: inserted.external_reference ?? undefined,
       externalMetadata: inserted.external_metadata ?? undefined,
+      receivedBy: inserted.received_by ?? undefined,
+      receivedAt: inserted.received_at ?? undefined,
     };
     setReservations(prev =>
       prev.map(r =>

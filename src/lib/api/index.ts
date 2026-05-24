@@ -111,6 +111,8 @@ type DbFolioItem = {
   external_source: string | null;
   external_reference: string | null;
   external_metadata: Record<string, unknown> | null;
+  received_by: string | null;
+  received_at: string | null;
 };
 
 
@@ -248,6 +250,8 @@ type FolioItemInsertPayload = {
   external_source?: string | null;
   external_reference?: string | null;
   external_metadata?: Record<string, unknown> | null;
+  received_by?: string | null;
+  received_at?: string | null;
 };
 
 type StickyNoteInsertPayload = Omit<StickyNote, "id" | "createdAt"> & {
@@ -441,6 +445,8 @@ const fromDbFolioItem = (dbFolio: DbFolioItem): FolioItem => ({
   externalSource: dbFolio.external_source ?? undefined,
   externalReference: dbFolio.external_reference ?? undefined,
   externalMetadata: dbFolio.external_metadata ?? undefined,
+  receivedBy: dbFolio.received_by ?? undefined,
+  receivedAt: dbFolio.received_at ?? undefined,
 });
 
 
@@ -495,6 +501,8 @@ const toDbFolioItem = (folioItem: FolioItem, reservationId?: string): DbFolioIte
   external_source: folioItem.externalSource ?? null,
   external_reference: folioItem.externalReference ?? null,
   external_metadata: folioItem.externalMetadata ?? null,
+  received_by: folioItem.receivedBy ?? null,
+  received_at: folioItem.receivedAt ?? null,
 });
 
 const toDbReservation = (
@@ -1113,6 +1121,8 @@ export const addFolioItem = (itemData: FolioItemInsertPayload) =>
         external_source: itemData.external_source ?? INTERNAL_FOLIO_SOURCE,
         external_reference: itemData.external_reference ?? null,
         external_metadata: itemData.external_metadata ?? {},
+        received_by: itemData.received_by ?? null,
+        received_at: itemData.received_at ?? null,
         ...(itemData.timestamp ? { timestamp: itemData.timestamp } : {}),
       },
     ])

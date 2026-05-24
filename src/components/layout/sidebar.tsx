@@ -118,6 +118,11 @@ const navItems: SidebarNavItem[] = [
         href: "/admin/payments/create",
         feature: "payments",
       },
+      {
+        label: "Accounts",
+        href: "/admin/payments/accounts",
+        feature: "payments",
+      },
     ],
   },
   {

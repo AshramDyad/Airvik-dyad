@@ -24,17 +24,11 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useDataContext } from "@/context/data-context";
 import type { Reservation } from "@/data/types";
+import { authorizedFetch } from "@/lib/auth/client-session";
 import {
   calculateReservationFinancials,
   resolveReservationTaxConfig,
@@ -42,34 +36,15 @@ import {
 } from "@/lib/reservations/calculate-financials";
 import { useCurrencyFormatter } from "@/hooks/use-currency";
 
-const METHODS_REQUIRING_TXN_ID = ["Credit Card", "Bank Transfer"] as const;
-
-const paymentSchema = z
-  .object({
-    amount: z.coerce.number().min(0.01, "Amount must be greater than 0."),
-    method: z.string({ required_error: "Please select a payment method." }),
-    percentage: z
-      .number()
-      .min(0, "Percentage must be at least 0%.")
-      .max(100, "Percentage cannot exceed 100%")
-      .optional(),
-    entryMode: z.enum(["amount", "percentage"]),
-    transactionId: z.string().optional(),
-  })
-  .superRefine((data, ctx) => {
-    if (
-      METHODS_REQUIRING_TXN_ID.includes(
-        data.method as (typeof METHODS_REQUIRING_TXN_ID)[number]
-      ) &&
-      (!data.transactionId || data.transactionId.trim() === "")
-    ) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Transaction ID is required for this payment method.",
-        path: ["transactionId"],
-      });
-    }
-  });
+const paymentSchema = z.object({
+  amount: z.coerce.number().min(0.01, "Amount must be greater than 0."),
+  percentage: z
+    .number()
+    .min(0, "Percentage must be at least 0%.")
+    .max(100, "Percentage cannot exceed 100%")
+    .optional(),
+  entryMode: z.enum(["amount", "percentage"]),
+});
 
 interface RecordPaymentDialogProps {
   reservationId: string;
@@ -85,7 +60,12 @@ export function RecordPaymentDialog({
   taxConfig,
 }: RecordPaymentDialogProps) {
   const [open, setOpen] = React.useState(false);
-  const { addFolioItem, reservations, property } = useDataContext();
+  const {
+    loadBookingDetails,
+    refreshReservations,
+    reservations,
+    property,
+  } = useDataContext();
   const formatCurrency = useCurrencyFormatter();
 
   const reservation = React.useMemo(
@@ -120,10 +100,6 @@ export function RecordPaymentDialog({
 
   const entryMode = form.watch("entryMode");
   const percentageValue = form.watch("percentage");
-  const selectedMethod = form.watch("method");
-  const requiresTransactionId = METHODS_REQUIRING_TXN_ID.includes(
-    selectedMethod as (typeof METHODS_REQUIRING_TXN_ID)[number]
-  );
   const isPercentageMode = entryMode === "percentage";
   const normalizedPercentage = React.useMemo(() => {
     if (percentageValue === undefined || percentageValue === null) {
@@ -191,12 +167,6 @@ export function RecordPaymentDialog({
     });
   }, [normalizedPercentage, outstandingBalance, form, isPercentageMode]);
 
-  React.useEffect(() => {
-    if (!requiresTransactionId) {
-      form.setValue("transactionId", "", { shouldValidate: false });
-    }
-  }, [requiresTransactionId, form]);
-
   async function onSubmit(values: z.infer<typeof paymentSchema>) {
     if (!reservation) {
       toast.error("Reservation not found.");
@@ -218,14 +188,29 @@ export function RecordPaymentDialog({
 
     try {
       const paymentAmount = Math.abs(values.amount);
-      await addFolioItem(reservationId, {
-        description: `Payment - ${values.method}`,
-        amount: -paymentAmount,
-        paymentMethod: values.method,
-        transactionId: values.transactionId?.trim() || undefined,
+      const response = await authorizedFetch(
+        `/api/admin/reservations/${reservationId}/cash-payment`,
+        {
+          method: "POST",
+          cache: "no-store",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ amount: paymentAmount }),
+        }
+      );
+      const body: unknown = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(readMessage(body) ?? "Failed to record cash payment.");
+      }
+
+      await refreshReservations();
+      await loadBookingDetails(reservationId);
+      toast.success("Cash payment recorded successfully.");
+      form.reset({
+        amount: 0,
+        percentage: undefined,
+        entryMode: "amount",
       });
-      toast.success("Payment recorded successfully!");
-      form.reset();
       setOpen(false);
     } catch (error) {
       console.error("Failed to record payment:", error);
@@ -240,9 +225,9 @@ export function RecordPaymentDialog({
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Record Payment</DialogTitle>
+          <DialogTitle>Record Cash Payment</DialogTitle>
           <DialogDescription>
-            Record a new payment to the reservation folio.
+            Record cash received by the signed-in staff account.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -336,55 +321,12 @@ export function RecordPaymentDialog({
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control}
-              name="method"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Payment Method</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    defaultValue={field.value}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a method" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="Credit Card">Credit Card</SelectItem>
-                      <SelectItem value="Cash">Cash</SelectItem>
-                      <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="transactionId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>
-                    Transaction ID
-                    {requiresTransactionId && <span className="text-destructive"> *</span>}
-                  </FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder={requiresTransactionId ? "Enter transaction ID" : "Not required for Cash"}
-                      disabled={!requiresTransactionId}
-                      {...field}
-                      value={field.value ?? ""}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div className="rounded-md border border-border/50 px-3 py-2 text-sm">
+              Payment method: <span className="font-medium">Cash</span>
+            </div>
             <DialogFooter className="border-t border-border/40 pt-4 sm:justify-end">
               <Button type="submit" disabled={outstandingBalance <= 0}>
-                {outstandingBalance <= 0 ? "Fully Paid" : "Record Payment"}
+                {outstandingBalance <= 0 ? "Fully Paid" : "Record Cash"}
               </Button>
             </DialogFooter>
           </form>
@@ -392,4 +334,17 @@ export function RecordPaymentDialog({
       </DialogContent>
     </Dialog>
   );
+}
+
+function readMessage(body: unknown): string | null {
+  if (
+    typeof body === "object" &&
+    body !== null &&
+    "message" in body &&
+    typeof body.message === "string"
+  ) {
+    return body.message;
+  }
+
+  return null;
 }

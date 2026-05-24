@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
+import type { Permission } from "@/data/types";
 import { createServerSupabaseClient } from "@/integrations/supabase/server";
 import { HttpError, requireFeature, requirePermissions } from "@/lib/server/auth";
 import {
@@ -11,6 +13,11 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+type DbReservationPaymentMethod = {
+  id: string;
+  payment_method: string | null;
+};
+
 export async function GET(request: NextRequest) {
   try {
     const reservationId = readOptionalUuid(
@@ -20,12 +27,17 @@ export async function GET(request: NextRequest) {
     const shouldSync = request.nextUrl.searchParams.get("sync") === "1";
 
     if (reservationId && shouldSync) {
-      await requirePermissions(
+      const profile = await requirePermissions(
         request,
         "read:payment",
         "create:reservation",
         "update:reservation"
       );
+      requireAllPermissions(profile.permissions, [
+        "read:payment",
+        "create:reservation",
+        "update:reservation",
+      ]);
     } else {
       await requireFeature(request, reservationId ? ["payments", "reservations"] : "payments");
     }
@@ -67,7 +79,19 @@ export async function POST(request: NextRequest) {
           "update:reservation"
         )
       : await requireFeature(request, "payments");
+    if (reservationId) {
+      requireAllPermissions(profile.permissions, [
+        "read:payment",
+        "create:reservation",
+        "update:reservation",
+      ]);
+    }
+
     const supabase = createServerSupabaseClient();
+    if (reservationId) {
+      await assertGatewayReservation(supabase, reservationId);
+    }
+
     const paymentRequest = await createPaymentRequest({
       supabase,
       amount,
@@ -78,6 +102,46 @@ export async function POST(request: NextRequest) {
     return noStoreJson({ request: paymentRequest }, { status: 201 });
   } catch (error) {
     return handleApiError(error);
+  }
+}
+
+function requireAllPermissions(
+  permissions: Permission[],
+  requiredPermissions: Permission[]
+): void {
+  const isAllowed = requiredPermissions.every((permission) =>
+    permissions.includes(permission)
+  );
+
+  if (!isAllowed) {
+    throw new HttpError(403, "Insufficient permissions");
+  }
+}
+
+async function assertGatewayReservation(
+  supabase: SupabaseClient,
+  reservationId: string
+): Promise<void> {
+  const { data, error } = await supabase
+    .from("reservations")
+    .select("id, payment_method")
+    .eq("id", reservationId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (!data) {
+    throw new HttpError(404, "Reservation not found.");
+  }
+
+  const reservation = data as unknown as DbReservationPaymentMethod;
+  if (reservation.payment_method !== "UPI Gateway") {
+    throw new HttpError(
+      409,
+      "Payment QR can be generated only for UPI Gateway reservations."
+    );
   }
 }
 

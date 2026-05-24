@@ -86,7 +86,7 @@ export const allPermissions: readonly Permission[] = [
   "create:feedback", "read:feedback", "update:feedback", "delete:feedback",
   "create:review", "read:review", "update:review", "delete:review",
   "create:donation", "read:donation", "update:donation", "delete:donation",
-  "read:payment",
+  "read:payment", "update:payment",
   "read:report",
   "update:setting",
   "create:user", "read:user", "update:user", "delete:user",
@@ -319,6 +319,8 @@ export interface FolioItem {
   externalSource?: string | null;
   externalReference?: string | null;
   externalMetadata?: Record<string, unknown> | null;
+  receivedBy?: string | null;
+  receivedAt?: string | null;
 }
 
 export type ActivitySection =

@@ -74,6 +74,7 @@ export function BillingCard({ reservation, groupSummary }: BillingCardProps) {
   const roomCountLabel = groupSummary.roomCount === 1
     ? "Totals include 1 room in this booking"
     : `Totals include ${groupSummary.roomCount} rooms in this booking`;
+  const isGatewayReservation = reservation.paymentMethod === "UPI Gateway";
 
   const {
     roomCharges,
@@ -111,15 +112,17 @@ export function BillingCard({ reservation, groupSummary }: BillingCardProps) {
             </CardDescription>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <RecordPaymentDialog
-              reservationId={reservation.id}
-              billingSource={billingSource}
-              taxConfig={summaryTaxConfig}
-            >
-              <Button variant="outline" size="sm">
-                Record Payment
-              </Button>
-            </RecordPaymentDialog>
+            {!isGatewayReservation && (
+              <RecordPaymentDialog
+                reservationId={reservation.id}
+                billingSource={billingSource}
+                taxConfig={summaryTaxConfig}
+              >
+                <Button variant="outline" size="sm">
+                  Record Cash
+                </Button>
+              </RecordPaymentDialog>
+            )}
             <AddChargeDialog reservationId={reservation.id}>
               <Button variant="outline" size="sm">
                 Add Charge
@@ -239,21 +242,23 @@ export function BillingCard({ reservation, groupSummary }: BillingCardProps) {
           </div>
         </div>
 
-        <div className="space-y-3">
-          <div>
-            <h3 className="text-sm font-semibold">UPI Gateway Payments</h3>
-            <p className="text-xs text-muted-foreground">
-              Generate a linked QR and auto-record the payment when it is received.
-            </p>
+        {isGatewayReservation && (
+          <div className="space-y-3">
+            <div>
+              <h3 className="text-sm font-semibold">UPI Gateway Payments</h3>
+              <p className="text-xs text-muted-foreground">
+                Generate a linked QR and auto-record the payment when it is received.
+              </p>
+            </div>
+            <ReservationPaymentRequestsPanel
+              reservationId={reservation.id}
+              guest={guest}
+              balanceDue={Math.max(balance, 0)}
+              currency={property?.currency || "INR"}
+              logoUrl={property?.logo_url || "/logo.png"}
+            />
           </div>
-          <ReservationPaymentRequestsPanel
-            reservationId={reservation.id}
-            guest={guest}
-            balanceDue={Math.max(balance, 0)}
-            currency={property?.currency || "INR"}
-            logoUrl={property?.logo_url || "/logo.png"}
-          />
-        </div>
+        )}
       </CardContent>
     </Card>
   );

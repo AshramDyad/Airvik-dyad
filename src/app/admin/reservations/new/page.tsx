@@ -12,7 +12,7 @@ import type { DateRange } from "react-day-picker";
 import { Check, ChevronsUpDown } from "lucide-react";
 
 import { useDataContext } from "@/context/data-context";
-import type { ReservationPaymentMethod, ReservationStatus, RoomType } from "@/data/types";
+import type { ReservationPaymentMethod, RoomType } from "@/data/types";
 import { ReservationDateRangePicker } from "@/components/reservations/date-range-picker";
 import { Button } from "@/components/ui/button";
 import {
@@ -54,20 +54,17 @@ import { authorizedFetch } from "@/lib/auth/client-session";
 import {
   doesReservationBlockAvailability,
   getActiveHoldRoomIdsForDateRange,
-  getReservationStatusLabel,
 } from "@/lib/reservations/status";
+import {
+  getRequiredReservationStatusForPayment,
+  NEW_RESERVATION_PAYMENT_METHODS,
+  validateReservationPaymentAmount,
+} from "@/lib/payments/reservation-payment-policy";
 
-const paymentMethodOptions = [
-  "Not specified",
-  "Bank/IMPS",
-  "Cash",
-  "UPI",
-  "UPI Gateway",
-  "Bhagat Ji",
-  "Anurag Ji",
-] as const satisfies ReservationPaymentMethod[];
+const paymentMethodOptions =
+  NEW_RESERVATION_PAYMENT_METHODS satisfies readonly ReservationPaymentMethod[];
 
-const creatableStatuses = ["Confirmed", "Room Hold", "Standby"] as const satisfies ReservationStatus[];
+const createReservationStatuses = ["Room Hold", "Confirmed"] as const;
 
 const dateRangeSchema = z.object({
   from: z.date({ required_error: "Check-in is required." }),
@@ -97,7 +94,7 @@ const reservationFormSchema = z.object({
   dateRange: dateRangeSchema,
   adults: z.coerce.number().min(1, "At least one adult is required."),
   children: z.coerce.number().min(0, "Children cannot be negative."),
-  status: z.enum(creatableStatuses),
+  status: z.enum(createReservationStatuses),
   paymentMethod: z.enum(paymentMethodOptions),
   roomTypeId: z.string().optional(),
   roomIds: z.array(z.string()).min(1, "Select at least one room."),
@@ -105,10 +102,6 @@ const reservationFormSchema = z.object({
   customRates: customRateRecordSchema,
   gatewayPaymentAmount: optionalGatewayAmountSchema,
 }).superRefine((values, ctx) => {
-  if (values.paymentMethod !== "UPI Gateway") {
-    return;
-  }
-
   if (
     typeof values.gatewayPaymentAmount !== "number" ||
     !Number.isFinite(values.gatewayPaymentAmount) ||
@@ -116,7 +109,7 @@ const reservationFormSchema = z.object({
   ) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      message: "Enter the UPI Gateway payment amount.",
+      message: "Enter the payment amount.",
       path: ["gatewayPaymentAmount"],
     });
   }
@@ -152,8 +145,8 @@ export default function CreateReservationPage() {
       guestId: guestPrefillId ?? "",
       adults: 1,
       children: 0,
-      status: "Confirmed",
-      paymentMethod: "Not specified",
+      status: "Room Hold",
+      paymentMethod: "UPI Gateway",
       roomTypeId: undefined,
       roomIds: [],
       notes: "",
@@ -422,22 +415,26 @@ export default function CreateReservationPage() {
   const formatCurrency = useCurrencyFormatter({ maximumFractionDigits: 0 });
   const customRateErrors = form.formState.errors.customRates as CustomRateFieldErrors | undefined;
   const isGatewayPayment = selectedPaymentMethod === "UPI Gateway";
+  const isCashPayment = selectedPaymentMethod === "Cash";
 
   React.useEffect(() => {
-    if (!isGatewayPayment) {
+    if (!selectedPaymentMethod) {
       return;
     }
 
-    if (form.getValues("status") !== "Room Hold") {
-      form.setValue("status", "Room Hold", {
+    const requiredStatus = getRequiredReservationStatusForPayment(
+      selectedPaymentMethod
+    );
+    if (form.getValues("status") !== requiredStatus) {
+      form.setValue("status", requiredStatus, {
         shouldDirty: true,
         shouldValidate: true,
       });
     }
-  }, [form, isGatewayPayment]);
+  }, [form, selectedPaymentMethod]);
 
   React.useEffect(() => {
-    if (!isGatewayPayment || !pricing) {
+    if (!pricing) {
       return;
     }
 
@@ -450,7 +447,7 @@ export default function CreateReservationPage() {
       shouldDirty: false,
       shouldValidate: true,
     });
-  }, [form, isGatewayPayment, pricing]);
+  }, [form, pricing]);
 
   const handleCustomRateInput = React.useCallback(
     (roomTypeId: string, rawValue: string) => {
@@ -531,32 +528,16 @@ export default function CreateReservationPage() {
     }
 
     try {
-      const gatewayPaymentAmount =
-        values.paymentMethod === "UPI Gateway"
-          ? Number(values.gatewayPaymentAmount)
-          : null;
+      const paymentAmount = Number(values.gatewayPaymentAmount);
+      const paymentAmountError = validateReservationPaymentAmount({
+        amount: paymentAmount,
+        balanceDue: pricing?.grandTotal ?? 0,
+      });
 
-      if (
-        values.paymentMethod === "UPI Gateway" &&
-        (!gatewayPaymentAmount ||
-          !Number.isFinite(gatewayPaymentAmount) ||
-          gatewayPaymentAmount <= 0)
-      ) {
+      if (paymentAmountError) {
         form.setError("gatewayPaymentAmount", {
           type: "manual",
-          message: "Enter the UPI Gateway payment amount.",
-        });
-        return;
-      }
-
-      if (
-        gatewayPaymentAmount &&
-        pricing &&
-        gatewayPaymentAmount > pricing.grandTotal
-      ) {
-        form.setError("gatewayPaymentAmount", {
-          type: "manual",
-          message: "Payment amount cannot be more than the grand total.",
+          message: paymentAmountError,
         });
         return;
       }
@@ -576,6 +557,41 @@ export default function CreateReservationPage() {
         (total) => typeof total === "number" && total > 0
       );
 
+      if (isCashPayment) {
+        const response = await authorizedFetch("/api/admin/reservations/cash-booking", {
+          method: "POST",
+          cache: "no-store",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            guestId: values.guestId,
+            roomIds: values.roomIds,
+            ratePlanId: defaultRatePlan.id,
+            checkInDate: formatISO(values.dateRange.from, { representation: "date" }),
+            checkOutDate: formatISO(values.dateRange.to, { representation: "date" }),
+            numberOfGuests: values.adults + values.children,
+            adultCount: values.adults,
+            childCount: values.children,
+            notes: values.notes ?? null,
+            bookingDate: new Date().toISOString(),
+            source: "reception",
+            taxEnabledSnapshot: taxConfig.enabled,
+            taxRateSnapshot: taxConfig.enabled ? taxConfig.percentage : 0,
+            customRoomTotals: hasCustomTotals ? customTotals : null,
+            cashAmount: paymentAmount,
+          }),
+        });
+        const body: unknown = await response.json().catch(() => null);
+
+        if (!response.ok) {
+          throw new Error(readApiMessage(body) ?? "Unable to create cash booking.");
+        }
+
+        const primaryReservationId = readCreatedReservationId(body);
+        toast.success("Cash reservation and payment recorded.");
+        router.replace(`/admin/reservations/${primaryReservationId}?createdBooking=1`);
+        return;
+      }
+
       const result = await addReservation({
         guestId: values.guestId,
         roomIds: values.roomIds,
@@ -585,7 +601,7 @@ export default function CreateReservationPage() {
         numberOfGuests: values.adults + values.children,
         adultCount: values.adults,
         childCount: values.children,
-        status: values.status,
+        status: getRequiredReservationStatusForPayment(values.paymentMethod),
         notes: values.notes,
         bookingDate: new Date().toISOString(),
         source: "reception",
@@ -600,14 +616,14 @@ export default function CreateReservationPage() {
       }
 
       let linkedPaymentCreated = false;
-      if (gatewayPaymentAmount) {
+      if (isGatewayPayment) {
         try {
           const response = await authorizedFetch("/api/admin/payment-requests", {
             method: "POST",
             cache: "no-store",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              amount: gatewayPaymentAmount,
+              amount: paymentAmount,
               reservationId: result[0].id,
             }),
           });
@@ -631,7 +647,7 @@ export default function CreateReservationPage() {
       toast.success(
         linkedPaymentCreated
           ? "Reservation hold and payment QR created."
-          : "Reservation created successfully."
+          : "Reservation hold created. Generate the QR from reservation details."
       );
       router.replace(`/admin/reservations/${result[0].id}?createdBooking=1`);
     } catch (error) {
@@ -1015,30 +1031,12 @@ export default function CreateReservationPage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid gap-4 md:grid-cols-2">
-                    <FormField
-                      control={form.control}
-                      name="status"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Booking Status</FormLabel>
-                          <Select value={field.value} onValueChange={field.onChange}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {creatableStatuses.map((status) => (
-                                <SelectItem key={status} value={status}>
-                                  {getReservationStatusLabel(status)}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                    <div className="rounded-xl border border-border/50 px-3 py-2">
+                      <p className="text-xs text-muted-foreground">Booking Status</p>
+                      <p className="text-sm font-medium">
+                        {isGatewayPayment ? "Room Hold" : "Confirmed"}
+                      </p>
+                    </div>
                     <FormField
                       control={form.control}
                       name="paymentMethod"
@@ -1124,37 +1122,37 @@ export default function CreateReservationPage() {
                       <span className="font-medium">Grand Total</span>
                       <span className="font-semibold">{pricing ? formatCurrency(pricing.grandTotal) : "-"}</span>
                     </div>
-                    {isGatewayPayment && (
-                      <FormField
-                        control={form.control}
-                        name="gatewayPaymentAmount"
-                        render={({ field }) => (
-                          <FormItem className="rounded-xl border border-border/40 bg-muted/20 p-3">
-                            <FormLabel>UPI Gateway Amount</FormLabel>
-                            <FormControl>
-                              <Input
-                                name={field.name}
-                                ref={field.ref}
-                                onBlur={field.onBlur}
-                                onChange={(event) => field.onChange(event.target.value)}
-                                type="number"
-                                min="1"
-                                step="0.01"
-                                inputMode="decimal"
-                                placeholder="Enter advance amount"
-                                value={
-                                  typeof field.value === "number" ||
-                                  typeof field.value === "string"
-                                    ? field.value
-                                    : ""
-                                }
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    )}
+                    <FormField
+                      control={form.control}
+                      name="gatewayPaymentAmount"
+                      render={({ field }) => (
+                        <FormItem className="rounded-xl border border-border/40 bg-muted/20 p-3">
+                          <FormLabel>
+                            {isGatewayPayment ? "UPI Gateway Amount" : "Cash Amount"}
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              name={field.name}
+                              ref={field.ref}
+                              onBlur={field.onBlur}
+                              onChange={(event) => field.onChange(event.target.value)}
+                              type="number"
+                              min="1"
+                              step="0.01"
+                              inputMode="decimal"
+                              placeholder="Enter payment amount"
+                              value={
+                                typeof field.value === "number" ||
+                                typeof field.value === "string"
+                                  ? field.value
+                                  : ""
+                              }
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   </div>
                   {!taxConfig.enabled && (
                     <p className="text-xs text-muted-foreground">
@@ -1186,7 +1184,7 @@ export default function CreateReservationPage() {
                         ? "Add more capacity"
                         : isGatewayPayment
                           ? "Save Hold & Generate Payment QR"
-                          : "Save Reservation & Generate Invoice"}
+                          : "Save Cash Booking"}
                   </Button>
                 </CardContent>
               </Card>
@@ -1234,4 +1232,26 @@ function readApiMessage(value: unknown): string | null {
   }
 
   return null;
+}
+
+function readCreatedReservationId(value: unknown): string {
+  if (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value) &&
+    "reservations" in value &&
+    Array.isArray(value.reservations)
+  ) {
+    const firstReservation = value.reservations[0];
+    if (
+      typeof firstReservation === "object" &&
+      firstReservation !== null &&
+      "id" in firstReservation &&
+      typeof firstReservation.id === "string"
+    ) {
+      return firstReservation.id;
+    }
+  }
+
+  throw new Error("Cash booking response was not valid.");
 }
