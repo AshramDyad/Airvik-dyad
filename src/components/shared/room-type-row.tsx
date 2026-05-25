@@ -25,7 +25,7 @@ const availabilityStatusClasses: Record<AvailabilityCellStatus, string> = {
 };
 
 const bookedPillClasses =
-  "relative flex h-11 w-full items-center justify-center rounded-xl border border-indigo-300 bg-indigo-300 px-4 text-xs font-semibold text-indigo-900 transition-all";
+  "relative flex h-11 w-full items-center justify-center rounded-xl border border-indigo-300 bg-indigo-300 px-4 text-xs font-semibold text-indigo-900 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2";
 
 const cellBaseClasses =
   "relative flex min-h-[60px] w-full items-center justify-center rounded-none px-6 text-lg font-semibold transition focus-visible:outline-none";
@@ -147,9 +147,11 @@ export function RoomTypeRow({
                 : remainingUnits;
 
           const hasBookings = day.reservationIds && day.reservationIds.length > 0;
+          const isBookingDetailsTrigger = bookedUnits > 0 && hasBookings;
 
           const isDisabled =
-            baseStatus === "busy" || baseStatus === "closed" || day.isClosed;
+            !isBookingDetailsTrigger &&
+            (baseStatus === "busy" || baseStatus === "closed" || day.isClosed);
 
           const isTodayColumn = todayIso === day.date;
           const formattedDate = format(parseISO(day.date), "MMMM d, yyyy");
@@ -174,6 +176,7 @@ export function RoomTypeRow({
                 availabilityStatusClasses[baseStatus],
                 columnTextClass,
                 isDisabled && "cursor-not-allowed",
+                isBookingDetailsTrigger && "cursor-pointer",
                 isSelected && "outline outline-2 outline-offset-[-2px]",
                 isTodayColumn && "bg-primary border-0 text-white"
               )}
@@ -286,18 +289,27 @@ export function RoomTypeRow({
                         reservationIds={[entry.reservationId]}
                         date={day.date}
                       >
-                        <div
+                        <button
+                          type="button"
                           className={cn(
                             bookedPillClasses,
                             columnTextClass,
                             "cursor-pointer",
                             isTodayColumn && "bg-primary border-primary text-white shadow-[0_0_0_2px_rgba(15,118,110,0.15)]"
                           )}
+                          aria-label={`View booking details for ${guestName} in Room ${
+                            room.roomNumber
+                          } on ${format(parseISO(day.date), "MMMM d, yyyy")}`}
                         >
-                          <span className={cn("max-w-full truncate text-sm font-semibold", columnTextClass)}>
+                          <span
+                            className={cn(
+                              "max-w-full truncate text-sm font-semibold",
+                              columnTextClass
+                            )}
+                          >
                             {guestName}
                           </span>
-                        </div>
+                        </button>
                       </ReservationHoverCard>
                     </TableCell>
                   );
