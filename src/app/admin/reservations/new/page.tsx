@@ -4,7 +4,13 @@ import * as React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { formatISO, differenceInDays, areIntervalsOverlapping, parseISO } from "date-fns";
+import {
+  addDays,
+  differenceInCalendarMonths,
+  differenceInDays,
+  formatISO,
+  startOfMonth,
+} from "date-fns";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -12,7 +18,7 @@ import type { DateRange } from "react-day-picker";
 import { Check, ChevronsUpDown } from "lucide-react";
 
 import { useDataContext } from "@/context/data-context";
-import type { ReservationPaymentMethod, RoomType } from "@/data/types";
+import type { AvailabilityDay, ReservationPaymentMethod, RoomType } from "@/data/types";
 import { ReservationDateRangePicker } from "@/components/reservations/date-range-picker";
 import { Button } from "@/components/ui/button";
 import {
@@ -40,6 +46,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
+import { useMultiMonthAvailability } from "@/hooks/use-monthly-availability";
 import {
   calculateMultipleRoomPricing,
   resolveRoomNightlyRate,
@@ -51,10 +58,6 @@ import { useCurrencyFormatter } from "@/hooks/use-currency";
 import { buildRoomOccupancyAssignments } from "@/lib/reservations/guest-allocation";
 import { PermissionGate } from "@/components/admin/permission-gate";
 import { authorizedFetch } from "@/lib/auth/client-session";
-import {
-  doesReservationBlockAvailability,
-  getActiveHoldRoomIdsForDateRange,
-} from "@/lib/reservations/status";
 import {
   getRequiredReservationStatusForPayment,
   NEW_RESERVATION_PAYMENT_METHODS,
@@ -124,11 +127,9 @@ export default function CreateReservationPage() {
     guests,
     rooms,
     roomTypes,
-    reservations,
     ratePlans,
     seasonalPrices,
     addReservation,
-    refreshReservations,
     isLoading,
     property,
   } = useDataContext();
@@ -173,95 +174,125 @@ export default function CreateReservationPage() {
   const adults = Number(adultsInput ?? 0) || 0;
   const children = Number(childrenInput ?? 0) || 0;
   const totalGuests = adults + children;
-  const [holdClock, setHoldClock] = React.useState(() => new Date());
-
-  React.useEffect(() => {
-    const timer = window.setInterval(() => setHoldClock(new Date()), 30_000);
-    return () => window.clearInterval(timer);
-  }, []);
-
-  React.useEffect(() => {
-    const refresh = () => {
-      setHoldClock(new Date());
-      void refreshReservations();
-    };
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        refresh();
-      }
-    };
-
-    window.addEventListener("focus", refresh);
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => {
-      window.removeEventListener("focus", refresh);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
-  }, [refreshReservations]);
 
   const nights = React.useMemo(() => {
     if (!watchedDateRange?.from || !watchedDateRange?.to) return 0;
     return Math.max(differenceInDays(watchedDateRange.to, watchedDateRange.from), 1);
   }, [watchedDateRange]);
 
-  const roomHoldByRoomId = React.useMemo(() => {
+  const availabilityStartMonth = React.useMemo(() => {
+    return startOfMonth(watchedDateRange?.from ?? new Date());
+  }, [watchedDateRange?.from]);
+
+  const availabilityMonthCount = React.useMemo(() => {
     if (!watchedDateRange?.from || !watchedDateRange?.to) {
-      return new Set<string>();
+      return 1;
     }
 
-    return getActiveHoldRoomIdsForDateRange(
-      reservations,
-      { from: watchedDateRange.from, to: watchedDateRange.to },
-      holdClock
-    );
-  }, [holdClock, reservations, watchedDateRange]);
+    return getStayMonthCount(watchedDateRange.from, watchedDateRange.to);
+  }, [watchedDateRange?.from, watchedDateRange?.to]);
 
-  const allAvailableRooms = React.useMemo(() => {
+  const {
+    dataByMonth: availabilityByMonth,
+    isLoading: isAvailabilityLoading,
+    error: availabilityError,
+  } = useMultiMonthAvailability(availabilityStartMonth, availabilityMonthCount);
+
+  const stayDateKeys = React.useMemo(() => {
     if (!watchedDateRange?.from || !watchedDateRange?.to) {
       return [];
     }
 
-    return rooms.filter((room) => {
-      const isBooked = reservations.some((res) => {
-        if (res.roomId !== room.id) return false;
-        if (res.status === "Room Hold" && roomHoldByRoomId.has(room.id)) {
-          return false;
-        }
-        if (!doesReservationBlockAvailability(res, holdClock)) return false;
-        return areIntervalsOverlapping(
-          { start: watchedDateRange.from!, end: watchedDateRange.to! },
-          { start: parseISO(res.checkInDate), end: parseISO(res.checkOutDate) },
-          { inclusive: false }
-        );
-      });
+    return getStayDateKeys(watchedDateRange.from, watchedDateRange.to);
+  }, [watchedDateRange?.from, watchedDateRange?.to]);
 
-      if (isBooked) {
+  const availabilityDaysByRoomType = React.useMemo(() => {
+    const next = new Map<string, Map<string, AvailabilityDay>>();
+
+    Object.values(availabilityByMonth).forEach((monthAvailability) => {
+      monthAvailability.forEach((roomTypeAvailability) => {
+        const roomTypeId = roomTypeAvailability.roomType.id;
+        const dateMap = next.get(roomTypeId) ?? new Map<string, AvailabilityDay>();
+
+        roomTypeAvailability.availability.forEach((day) => {
+          dateMap.set(day.date, day);
+        });
+
+        next.set(roomTypeId, dateMap);
+      });
+    });
+
+    return next;
+  }, [availabilityByMonth]);
+
+  const hasAvailabilityForStay = React.useMemo(() => {
+    if (stayDateKeys.length === 0) {
+      return false;
+    }
+
+    const neededMonthKeys = new Set(
+      stayDateKeys.map((dateKey) => `${dateKey.slice(0, 7)}-01`)
+    );
+
+    return Array.from(neededMonthKeys).every((monthKey) =>
+      Array.isArray(availabilityByMonth[monthKey])
+    );
+  }, [availabilityByMonth, stayDateKeys]);
+
+  const allAvailableRooms = React.useMemo(() => {
+    if (
+      stayDateKeys.length === 0 ||
+      isAvailabilityLoading ||
+      !hasAvailabilityForStay ||
+      availabilityError
+    ) {
+      return [];
+    }
+
+    return rooms.filter((room) => {
+      if (!isBookableRoom(room)) {
         return false;
       }
 
-      return isBookableRoom(room);
+      const availabilityByDate = availabilityDaysByRoomType.get(room.roomTypeId);
+      if (!availabilityByDate) {
+        return false;
+      }
+
+      return stayDateKeys.every((dateKey) => {
+        const day = availabilityByDate.get(dateKey);
+        return Boolean(day && !day.isClosed && !day.roomReservations[room.id]);
+      });
     });
-  }, [holdClock, roomHoldByRoomId, rooms, reservations, watchedDateRange]);
+  }, [
+    availabilityDaysByRoomType,
+    availabilityError,
+    hasAvailabilityForStay,
+    isAvailabilityLoading,
+    rooms,
+    stayDateKeys,
+  ]);
 
   const filteredAvailableRooms = React.useMemo(() => {
     if (!selectedRoomTypeId) return allAvailableRooms;
     return allAvailableRooms.filter((room) => room.roomTypeId === selectedRoomTypeId);
   }, [allAvailableRooms, selectedRoomTypeId]);
 
+  const hasCompleteDateRange = Boolean(watchedDateRange?.from && watchedDateRange?.to);
+  const isCheckingAvailability =
+    hasCompleteDateRange &&
+    !availabilityError &&
+    (isAvailabilityLoading || !hasAvailabilityForStay);
+
   React.useEffect(() => {
     if (!watchedDateRange?.from || !watchedDateRange?.to) return;
-    const availableIds = new Set(
-      allAvailableRooms
-        .filter((room) => !roomHoldByRoomId.has(room.id))
-        .map((room) => room.id)
-    );
+    const availableIds = new Set(allAvailableRooms.map((room) => room.id));
     const current = form.getValues("roomIds");
     const filtered = current.filter((id) => availableIds.has(id));
     if (filtered.length !== current.length) {
       form.setValue("roomIds", filtered, { shouldValidate: true });
     }
-  }, [allAvailableRooms, form, roomHoldByRoomId, watchedDateRange]);
+  }, [allAvailableRooms, form, watchedDateRange]);
 
   const roomMap = React.useMemo(() => new Map(rooms.map((room) => [room.id, room])), [rooms]);
   const roomTypeMap = React.useMemo(() => new Map(roomTypes.map((rt) => [rt.id, rt])), [roomTypes]);
@@ -274,13 +305,6 @@ export default function CreateReservationPage() {
   }, [roomMap, roomTypeMap]);
 
   const handleRoomToggle = (roomId: string) => {
-    if (roomHoldByRoomId.has(roomId)) {
-      toast.error("Room is on hold.", {
-        description: "This room hold will expire automatically after 30 minutes.",
-      });
-      return;
-    }
-
     const current = form.getValues("roomIds") ?? [];
     if (current.includes(roomId)) {
       form.setValue(
@@ -876,24 +900,29 @@ export default function CreateReservationPage() {
                 <CardContent>
                   <div className="max-h-72 overflow-y-auto pr-1">
                     <div className="space-y-3">
-                      {watchedDateRange?.from && watchedDateRange?.to ? (
-                        filteredAvailableRooms.length ? (
+                      {hasCompleteDateRange ? (
+                        isCheckingAvailability ? (
+                          <div className="rounded-xl border border-dashed border-border/60 bg-muted/10 p-8 text-center text-sm text-muted-foreground">
+                            Checking available rooms...
+                          </div>
+                        ) : availabilityError ? (
+                          <div className="rounded-xl border border-dashed border-destructive/50 bg-destructive/10 p-8 text-center text-sm text-destructive">
+                            Could not check room availability. Try again.
+                          </div>
+                        ) : filteredAvailableRooms.length ? (
                           filteredAvailableRooms.map((room) => {
                             const roomType = roomTypes.find((rt) => rt.id === room.roomTypeId);
                             const isSelected = selectedRoomIds.includes(room.id);
-                            const isHeld = roomHoldByRoomId.has(room.id);
                             return (
                               <div
                                 key={room.id}
                                 className={cn(
                                   "flex items-center gap-4 rounded-2xl border px-4 py-3",
-                                  isSelected ? "border-primary/60 bg-primary/5" : "border-border/40 bg-card",
-                                  isHeld && "opacity-70"
+                                  isSelected ? "border-primary/60 bg-primary/5" : "border-border/40 bg-card"
                                 )}
                               >
                                 <Checkbox
                                   checked={isSelected}
-                                  disabled={isHeld}
                                   onCheckedChange={() => handleRoomToggle(room.id)}
                                   id={`room-${room.id}`}
                                 />
@@ -906,14 +935,6 @@ export default function CreateReservationPage() {
                                     >
                                       {ROOM_STATUS_LABELS[room.status]}
                                     </Badge>
-                                    {isHeld && (
-                                      <Badge
-                                        variant="outline"
-                                        className="rounded-full border-amber-300 bg-amber-50 px-2 py-0 text-[10px] font-semibold text-amber-700"
-                                      >
-                                        Room Hold
-                                      </Badge>
-                                    )}
                                   </span>
                                   <span className="text-xs text-muted-foreground">{roomType?.name}</span>
                                 </label>
@@ -1217,6 +1238,28 @@ export default function CreateReservationPage() {
         </Form>
       </div>
     </PermissionGate>
+  );
+}
+
+function getStayMonthCount(from: Date, to: Date): number {
+  const lastBookedNight = addDays(to, -1);
+  if (lastBookedNight < from) {
+    return 1;
+  }
+
+  return (
+    differenceInCalendarMonths(
+      startOfMonth(lastBookedNight),
+      startOfMonth(from)
+    ) + 1
+  );
+}
+
+function getStayDateKeys(from: Date, to: Date): string[] {
+  const nightCount = Math.max(differenceInDays(to, from), 0);
+
+  return Array.from({ length: nightCount }, (_, index) =>
+    formatISO(addDays(from, index), { representation: "date" })
   );
 }
 
