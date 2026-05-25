@@ -6,6 +6,7 @@ import { useAuthContext } from "@/context/auth-context";
 import { useDataContext } from "@/context/data-context";
 import type { PaymentRequest, Permission } from "@/data/types";
 import { authorizedFetch } from "@/lib/auth/client-session";
+import { revalidateReservationsCache } from "@/lib/reservations/cache-client";
 import { ReservationPaymentRequestsPanel } from "./ReservationPaymentRequestsPanel";
 
 vi.mock("@/context/auth-context", () => ({
@@ -18,6 +19,10 @@ vi.mock("@/context/data-context", () => ({
 
 vi.mock("@/lib/auth/client-session", () => ({
   authorizedFetch: vi.fn(),
+}));
+
+vi.mock("@/lib/reservations/cache-client", () => ({
+  revalidateReservationsCache: vi.fn(),
 }));
 
 vi.mock("@/lib/payments/payment-qr-client", () => ({
@@ -36,10 +41,13 @@ vi.mock("sonner", () => ({
 const mockedUseAuthContext = vi.mocked(useAuthContext);
 const mockedUseDataContext = vi.mocked(useDataContext);
 const mockedAuthorizedFetch = vi.mocked(authorizedFetch);
+const mockedRevalidateReservationsCache = vi.mocked(revalidateReservationsCache);
 
 describe("ReservationPaymentRequestsPanel", () => {
   beforeEach(() => {
     mockedAuthorizedFetch.mockReset();
+    mockedRevalidateReservationsCache.mockReset();
+    mockedRevalidateReservationsCache.mockResolvedValue(true);
     mockedUseDataContext.mockReturnValue({
       refreshReservations: vi.fn().mockResolvedValue(undefined),
       loadBookingDetails: vi.fn().mockResolvedValue(undefined),
@@ -106,6 +114,7 @@ describe("ReservationPaymentRequestsPanel", () => {
     });
     expect(refreshReservations).toHaveBeenCalled();
     expect(loadBookingDetails).toHaveBeenCalledWith("reservation-1");
+    expect(mockedRevalidateReservationsCache).toHaveBeenCalled();
   });
 
   it("allows manual QR creation even when the balance is fully paid", async () => {
@@ -146,6 +155,122 @@ describe("ReservationPaymentRequestsPanel", () => {
         })
       );
     });
+  });
+
+  it("refreshes folio data when an existing pending request becomes paid", async () => {
+    const user = userEvent.setup();
+    const refreshReservations = vi.fn().mockResolvedValue(undefined);
+    const loadBookingDetails = vi.fn().mockResolvedValue(undefined);
+    const pendingRequest = buildPendingRequest(1);
+    const paidRequest = {
+      ...pendingRequest,
+      folioItemId: "folio-second-payment",
+      paidAmount: 1,
+      status: "paid",
+      paidAt: "2026-05-24T08:15:00.000Z",
+      paymentReference: "SW-3Y2AN",
+      updatedAt: "2026-05-24T08:15:00.000Z",
+    } satisfies PaymentRequest;
+
+    mockedUseDataContext.mockReturnValue({
+      refreshReservations,
+      loadBookingDetails,
+    } as unknown as ReturnType<typeof useDataContext>);
+    mockedUseAuthContext.mockReturnValue({
+      hasPermission: () => false,
+    } as unknown as ReturnType<typeof useAuthContext>);
+    mockedAuthorizedFetch
+      .mockResolvedValueOnce(
+        jsonResponse({ requests: [pendingRequest] }, { status: 200 })
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({ requests: [paidRequest] }, { status: 200 })
+      );
+
+    renderPanel();
+
+    await screen.findByText("SW-XAL6S");
+    await user.click(screen.getByRole("button", { name: /refresh/i }));
+
+    await waitFor(() => {
+      expect(mockedRevalidateReservationsCache).toHaveBeenCalled();
+    });
+    expect(refreshReservations).toHaveBeenCalled();
+    expect(loadBookingDetails).toHaveBeenCalledWith("reservation-1");
+  });
+
+  it("does not refresh reservation data when paid requests are unchanged", async () => {
+    const user = userEvent.setup();
+    const refreshReservations = vi.fn().mockResolvedValue(undefined);
+    const loadBookingDetails = vi.fn().mockResolvedValue(undefined);
+    const paidRequest = buildPaidRequest();
+
+    mockedUseDataContext.mockReturnValue({
+      refreshReservations,
+      loadBookingDetails,
+    } as unknown as ReturnType<typeof useDataContext>);
+    mockedUseAuthContext.mockReturnValue({
+      hasPermission: () => false,
+    } as unknown as ReturnType<typeof useAuthContext>);
+    mockedAuthorizedFetch
+      .mockResolvedValueOnce(
+        jsonResponse({ requests: [paidRequest] }, { status: 200 })
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({ requests: [paidRequest] }, { status: 200 })
+      );
+
+    renderPanel();
+
+    await screen.findByText("UPI123");
+    await user.click(screen.getByRole("button", { name: /refresh/i }));
+
+    await waitFor(() => {
+      expect(mockedAuthorizedFetch).toHaveBeenCalledTimes(2);
+    });
+    expect(mockedRevalidateReservationsCache).not.toHaveBeenCalled();
+    expect(refreshReservations).not.toHaveBeenCalled();
+    expect(loadBookingDetails).not.toHaveBeenCalled();
+  });
+
+  it("refreshes folio data when a paid request receives a folio item id", async () => {
+    const user = userEvent.setup();
+    const refreshReservations = vi.fn().mockResolvedValue(undefined);
+    const loadBookingDetails = vi.fn().mockResolvedValue(undefined);
+    const paidWithoutFolio = {
+      ...buildPaidRequest(),
+      folioItemId: null,
+    } satisfies PaymentRequest;
+    const paidWithFolio = {
+      ...paidWithoutFolio,
+      folioItemId: "folio-payment-1",
+    } satisfies PaymentRequest;
+
+    mockedUseDataContext.mockReturnValue({
+      refreshReservations,
+      loadBookingDetails,
+    } as unknown as ReturnType<typeof useDataContext>);
+    mockedUseAuthContext.mockReturnValue({
+      hasPermission: () => false,
+    } as unknown as ReturnType<typeof useAuthContext>);
+    mockedAuthorizedFetch
+      .mockResolvedValueOnce(
+        jsonResponse({ requests: [paidWithoutFolio] }, { status: 200 })
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({ requests: [paidWithFolio] }, { status: 200 })
+      );
+
+    renderPanel();
+
+    await screen.findByText("UPI123");
+    await user.click(screen.getByRole("button", { name: /refresh/i }));
+
+    await waitFor(() => {
+      expect(mockedRevalidateReservationsCache).toHaveBeenCalled();
+    });
+    expect(refreshReservations).toHaveBeenCalled();
+    expect(loadBookingDetails).toHaveBeenCalledWith("reservation-1");
   });
 });
 
@@ -196,6 +321,7 @@ function buildPendingRequest(amount: number): PaymentRequest {
   return {
     ...buildPaidRequest(),
     id: "payment-request-pending",
+    identifier: "XAL6S",
     folioItemId: null,
     amount,
     paidAmount: 0,

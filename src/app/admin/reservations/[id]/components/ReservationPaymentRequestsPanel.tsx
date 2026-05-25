@@ -43,6 +43,7 @@ import type { Guest, PaymentRequest, PaymentRequestStatus } from "@/data/types";
 import { authorizedFetch } from "@/lib/auth/client-session";
 import { validateReservationPaymentAmount } from "@/lib/payments/reservation-payment-policy";
 import { getPaymentRequestCode } from "@/lib/payments/payment-request-matching";
+import { revalidateReservationsCache } from "@/lib/reservations/cache-client";
 import {
   createPaymentQrBlob,
   createShareablePaymentQrImage,
@@ -115,6 +116,7 @@ export function ReservationPaymentRequestsPanel({
     async (sync = false) => {
       setIsRefreshing(true);
       try {
+        const previousRequests = requestsRef.current;
         const params = new URLSearchParams({ reservationId });
         if (sync) {
           params.set("sync", "1");
@@ -131,10 +133,8 @@ export function ReservationPaymentRequestsPanel({
         }
 
         const next = readRequests(body);
-        const hadPaidRequest = requestsRef.current.some(
-          (request) => request.status === "paid"
-        );
-        const hasNewPaidRequest = next.some((request) => request.status === "paid");
+        const shouldRefreshReservationData =
+          sync && hasNewPaidFolioData(previousRequests, next);
 
         setRequests(next);
         setActiveRequest((current) => {
@@ -145,9 +145,10 @@ export function ReservationPaymentRequestsPanel({
         });
         setError(null);
 
-        if (sync && hasNewPaidRequest && !hadPaidRequest) {
-          await refreshReservations();
+        if (shouldRefreshReservationData) {
+          await revalidateReservationsCache();
           await loadBookingDetails(reservationId);
+          void refreshReservations();
         }
       } catch (loadError) {
         setError(
@@ -364,8 +365,9 @@ export function ReservationPaymentRequestsPanel({
       setIsOverrideDialogOpen(false);
       setOverrideReason("");
       setOverrideReference("");
-      await refreshReservations();
+      await revalidateReservationsCache();
       await loadBookingDetails(reservationId);
+      void refreshReservations();
       await loadRequests(true);
       toast.success("Payment override recorded and booking confirmed.");
     } catch (overrideError) {
@@ -674,6 +676,35 @@ function readRequests(body: unknown): PaymentRequest[] {
   }
 
   return body.requests.filter(isPaymentRequest);
+}
+
+function hasNewPaidFolioData(
+  previousRequests: PaymentRequest[],
+  nextRequests: PaymentRequest[]
+): boolean {
+  const previousById = new Map(
+    previousRequests.map((request) => [request.id, request])
+  );
+
+  return nextRequests.some((request) => {
+    if (request.status !== "paid") {
+      return false;
+    }
+
+    const previous = previousById.get(request.id);
+    if (!previous) {
+      return false;
+    }
+
+    if (previous.status !== "paid") {
+      return true;
+    }
+
+    return (
+      Boolean(request.folioItemId) &&
+      previous.folioItemId !== request.folioItemId
+    );
+  });
 }
 
 function readRequest(body: unknown): PaymentRequest {

@@ -309,7 +309,10 @@ export function useAppData() {
       setLookupStatus(prev => ({ ...prev, [id]: 'pending' }));
 
       try {
-        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+        const isUUID =
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+            id
+          );
         let targetBookingId = "";
 
         if (isUUID) {
