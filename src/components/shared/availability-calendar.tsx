@@ -125,6 +125,9 @@ export function AvailabilityCalendar() {
   const [selectedCell, setSelectedCell] = React.useState<SelectedCell | null>(
     null
   );
+  const [activeReservationCardId, setActiveReservationCardId] = React.useState<
+    string | null
+  >(null);
   const [unitsView, setUnitsView] = React.useState<UnitsViewMode>(
     property.defaultUnitsView
   );
@@ -175,6 +178,7 @@ export function AvailabilityCalendar() {
 
   React.useEffect(() => {
     setSelectedCell(null);
+    setActiveReservationCardId(null);
   }, [currentMonth, visibleMonths]);
 
   const handleMonthSelect = (value: string) => {
@@ -366,7 +370,7 @@ export function AvailabilityCalendar() {
         ) : hasAvailability ? (
           <TooltipProvider delayDuration={0}>
             <div className="space-y-6">
-              {monthSequence.map((monthDate, index) => {
+              {monthSequence.map((monthDate) => {
                 const monthKey = formatMonthStart(monthDate);
                 const monthAvailability = dataByMonth[monthKey] ?? [];
                 const visibleMonthRooms = monthAvailability.filter(
@@ -429,6 +433,10 @@ export function AvailabilityCalendar() {
                                 todayIso={todayIso}
                                 onCellClick={handleCellSelection}
                                 selectedCell={selectedCell}
+                                activeReservationCardId={activeReservationCardId}
+                                onActiveReservationCardChange={
+                                  setActiveReservationCardId
+                                }
                               />
                             ))}
                           </TableBody>

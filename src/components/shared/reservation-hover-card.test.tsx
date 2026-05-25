@@ -1,6 +1,6 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useDataContext } from "@/context/data-context";
 import type { Guest, Reservation, Room, RoomType } from "@/data/types";
@@ -129,11 +129,16 @@ function buildReservationFixture() {
 
 describe("ReservationHoverCard", () => {
   beforeEach(() => {
+    vi.useRealTimers();
     resetBuilderSequences();
     mockedGetReservationById.mockResolvedValue(reservationByIdResponse(null));
     mockedGetReservationsByBookingId.mockResolvedValue(
       reservationsByBookingIdResponse([])
     );
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("opens on click and shows locally available reservation details", async () => {
@@ -168,6 +173,48 @@ describe("ReservationHoverCard", () => {
     expect(
       screen.getByRole("link", { name: "View reservation ABCDEFG" })
     ).toHaveAttribute("href", "/admin/reservations/reservation-101");
+    expect(mockedGetReservationById).not.toHaveBeenCalled();
+  });
+
+  it("opens from hover only after the hover delay", () => {
+    vi.useFakeTimers();
+
+    const { guest, reservation, room, roomType } = buildReservationFixture();
+
+    mockDataContext({
+      reservations: [reservation],
+      guests: [guest],
+      rooms: [room],
+      roomTypes: [roomType],
+    });
+
+    render(
+      <ReservationHoverCard
+        reservationIds={[reservation.id]}
+        date="2026-05-20"
+      >
+        <button type="button">Hover booking details</button>
+      </ReservationHoverCard>
+    );
+
+    const trigger = screen.getByRole("button", {
+      name: "Hover booking details",
+    });
+
+    fireEvent.mouseEnter(trigger);
+
+    act(() => {
+      vi.advanceTimersByTime(179);
+    });
+
+    expect(screen.queryByText("Alex Morgan")).not.toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+
+    expect(screen.getByText("Alex Morgan")).toBeInTheDocument();
+    expect(screen.getByText("Booking ID: ABCDEFG")).toBeInTheDocument();
     expect(mockedGetReservationById).not.toHaveBeenCalled();
   });
 

@@ -6,7 +6,6 @@ import { ChevronDown, ChevronRight, Lock } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { TableCell, TableRow } from "@/components/ui/table";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ReservationHoverCard } from "@/components/shared/reservation-hover-card";
 import type {
   AvailabilityCellStatus,
@@ -37,6 +36,8 @@ interface RoomTypeRowProps {
   todayIso: string;
   onCellClick?: (roomTypeId: string, date: string, status: AvailabilityCellStatus, isClosed: boolean) => void;
   selectedCell?: { roomTypeId: string; date: string } | null;
+  activeReservationCardId?: string | null;
+  onActiveReservationCardChange?: (cardId: string | null) => void;
 }
 
 export function RoomTypeRow({
@@ -46,10 +47,13 @@ export function RoomTypeRow({
   todayIso,
   onCellClick,
   selectedCell,
+  activeReservationCardId,
+  onActiveReservationCardChange,
 }: RoomTypeRowProps) {
   const [isExpanded, setIsExpanded] = React.useState(false);
   const { roomType, availability } = data;
   const { guests } = useDataContext();
+  const activeReservationCardScope = `${roomType.id}:`;
 
   const guestMap = React.useMemo(() => {
     return new Map<string, Guest>(guests.map((guest) => [guest.id, guest]));
@@ -74,7 +78,16 @@ export function RoomTypeRow({
 
   const toggleExpand = () => {
     if (canExpand) {
-      setIsExpanded((prev) => !prev);
+      setIsExpanded((prev) => {
+        const nextExpanded = !prev;
+        if (
+          !nextExpanded &&
+          activeReservationCardId?.startsWith(activeReservationCardScope)
+        ) {
+          onActiveReservationCardChange?.(null);
+        }
+        return nextExpanded;
+      });
     }
   };
 
@@ -146,12 +159,8 @@ export function RoomTypeRow({
                 ? ""
                 : remainingUnits;
 
-          const hasBookings = day.reservationIds && day.reservationIds.length > 0;
-          const isBookingDetailsTrigger = bookedUnits > 0 && hasBookings;
-
           const isDisabled =
-            !isBookingDetailsTrigger &&
-            (baseStatus === "busy" || baseStatus === "closed" || day.isClosed);
+            baseStatus === "busy" || baseStatus === "closed" || day.isClosed;
 
           const isTodayColumn = todayIso === day.date;
           const formattedDate = format(parseISO(day.date), "MMMM d, yyyy");
@@ -176,7 +185,7 @@ export function RoomTypeRow({
                 availabilityStatusClasses[baseStatus],
                 columnTextClass,
                 isDisabled && "cursor-not-allowed",
-                isBookingDetailsTrigger && "cursor-pointer",
+                !isDisabled && "cursor-pointer",
                 isSelected && "outline outline-2 outline-offset-[-2px]",
                 isTodayColumn && "bg-primary border-0 text-white"
               )}
@@ -213,32 +222,7 @@ export function RoomTypeRow({
 
           return (
             <TableCell key={day.date} className="p-0">
-              {bookedUnits === 0 ? (
-                cellContent
-              ) : hasBookings ? (
-                <ReservationHoverCard
-                  reservationIds={day.reservationIds}
-                  date={day.date}
-                >
-                  {cellContent}
-                </ReservationHoverCard>
-              ) : (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    {cellContent}
-                  </TooltipTrigger>
-                  <TooltipContent className="text-sm">
-                    <div className="space-y-1">
-                      <p className="font-medium text-foreground">
-                        {day.bookedCount} of {day.unitsTotal} units booked
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {format(parseISO(day.date), "MMM d, yyyy")}
-                      </p>
-                    </div>
-                  </TooltipContent>
-                </Tooltip>
-              )}
+              {cellContent}
             </TableCell>
           );
         })}
@@ -279,6 +263,7 @@ export function RoomTypeRow({
                   }
 
                   const guestName = getGuestName(entry.guestId);
+                  const reservationCardId = `${roomType.id}:${room.id}:${entry.reservationId}:${day.date}`;
                   dayCells.push(
                     <TableCell
                       key={`${room.id}-${entry.reservationId}-${day.date}`}
@@ -288,6 +273,9 @@ export function RoomTypeRow({
                       <ReservationHoverCard
                         reservationIds={[entry.reservationId]}
                         date={day.date}
+                        cardId={reservationCardId}
+                        activeCardId={activeReservationCardId}
+                        onActiveCardChange={onActiveReservationCardChange}
                       >
                         <button
                           type="button"

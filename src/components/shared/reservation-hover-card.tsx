@@ -98,9 +98,13 @@ interface ReservationHoverCardProps {
   children: React.ReactNode;
   reservationIds: string[];
   date: string;
+  cardId?: string;
+  activeCardId?: string | null;
+  onActiveCardChange?: (cardId: string | null) => void;
 }
 
 const BOOKING_ID_VISIBLE_LENGTH = 7 as const;
+const HOVER_OPEN_DELAY_MS = 180;
 const HOVER_CLOSE_DELAY_MS = 180;
 
 type OpenMode = "hover" | "focus" | "click";
@@ -241,9 +245,12 @@ export function ReservationHoverCard({
   children,
   reservationIds,
   date,
+  cardId,
+  activeCardId,
+  onActiveCardChange,
 }: ReservationHoverCardProps) {
   const { reservations, guests, rooms, roomTypes } = useDataContext();
-  const [isOpen, setIsOpen] = React.useState(false);
+  const [uncontrolledOpen, setUncontrolledOpen] = React.useState(false);
   const [fetchedReservations, setFetchedReservations] = React.useState<
     Reservation[]
   >([]);
@@ -254,10 +261,22 @@ export function ReservationHoverCard({
   const closeTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(
     null
   );
+  const openTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
   const openModeRef = React.useRef<OpenMode | null>(null);
   const pendingReservationIdsRef = React.useRef<Set<string>>(new Set());
   const activeFetchCountRef = React.useRef(0);
   const isMountedRef = React.useRef(true);
+
+  const hasActiveCardControl =
+    typeof cardId === "string" &&
+    cardId.length > 0 &&
+    activeCardId !== undefined &&
+    onActiveCardChange !== undefined;
+  const isOpen = hasActiveCardControl
+    ? activeCardId === cardId
+    : uncontrolledOpen;
 
   const hoverDate = React.useMemo(() => {
     const parsed = parseISO(date);
@@ -303,61 +322,119 @@ export function ReservationHoverCard({
     }
   }, []);
 
+  const clearOpenTimer = React.useCallback(() => {
+    if (openTimerRef.current) {
+      clearTimeout(openTimerRef.current);
+      openTimerRef.current = null;
+    }
+  }, []);
+
+  const setOpenState = React.useCallback(
+    (nextOpen: boolean) => {
+      if (
+        typeof cardId === "string" &&
+        cardId.length > 0 &&
+        activeCardId !== undefined &&
+        onActiveCardChange !== undefined
+      ) {
+        onActiveCardChange(nextOpen ? cardId : null);
+        return;
+      }
+
+      setUncontrolledOpen(nextOpen);
+    },
+    [activeCardId, cardId, onActiveCardChange]
+  );
+
   const openForTransientInteraction = React.useCallback(
     (mode: Exclude<OpenMode, "click">) => {
+      clearOpenTimer();
       clearCloseTimer();
       if (openModeRef.current !== "click") {
         openModeRef.current = mode;
-        setIsOpen(true);
+        setOpenState(true);
       }
     },
-    [clearCloseTimer]
+    [clearCloseTimer, clearOpenTimer, setOpenState]
   );
+
+  const scheduleHoverOpen = React.useCallback(() => {
+    clearCloseTimer();
+    clearOpenTimer();
+    if (openModeRef.current === "click") {
+      return;
+    }
+
+    openTimerRef.current = setTimeout(() => {
+      openTimerRef.current = null;
+      if (openModeRef.current !== "click") {
+        openModeRef.current = "hover";
+        setOpenState(true);
+      }
+    }, HOVER_OPEN_DELAY_MS);
+  }, [clearCloseTimer, clearOpenTimer, setOpenState]);
 
   const openForClick = React.useCallback(
     (event: React.MouseEvent<HTMLElement>) => {
+      clearOpenTimer();
       clearCloseTimer();
       openModeRef.current = "click";
-      setIsOpen(true);
+      setOpenState(true);
       event.preventDefault();
     },
-    [clearCloseTimer]
+    [clearCloseTimer, clearOpenTimer, setOpenState]
   );
 
+  const closeTransientInteraction = React.useCallback(() => {
+    openModeRef.current = null;
+    setOpenState(false);
+  }, [setOpenState]);
+
   const scheduleTransientClose = React.useCallback(() => {
+    clearOpenTimer();
     if (openModeRef.current === "click") {
       return;
     }
 
     clearCloseTimer();
-    closeTimerRef.current = setTimeout(() => {
-      openModeRef.current = null;
-      setIsOpen(false);
-    }, HOVER_CLOSE_DELAY_MS);
-  }, [clearCloseTimer]);
+    closeTimerRef.current = setTimeout(
+      closeTransientInteraction,
+      HOVER_CLOSE_DELAY_MS
+    );
+  }, [clearCloseTimer, clearOpenTimer, closeTransientInteraction]);
 
   const handleOpenChange = React.useCallback(
     (nextOpen: boolean) => {
+      clearOpenTimer();
       clearCloseTimer();
       if (nextOpen) {
         openModeRef.current = "click";
-        setIsOpen(true);
+        setOpenState(true);
         return;
       }
 
       openModeRef.current = null;
-      setIsOpen(false);
+      setOpenState(false);
     },
-    [clearCloseTimer]
+    [clearCloseTimer, clearOpenTimer, setOpenState]
   );
+
+  React.useEffect(() => {
+    if (!isOpen) {
+      openModeRef.current = null;
+      clearCloseTimer();
+      clearOpenTimer();
+    }
+  }, [clearCloseTimer, clearOpenTimer, isOpen]);
 
   React.useEffect(() => {
     isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
       clearCloseTimer();
+      clearOpenTimer();
     };
-  }, [clearCloseTimer]);
+  }, [clearCloseTimer, clearOpenTimer]);
 
   React.useEffect(() => {
     if (!isOpen || targetReservationIds.length === 0) {
@@ -680,7 +757,7 @@ export function ReservationHoverCard({
     React.cloneElement(children, {
       onMouseEnter: composeEventHandlers(
         children.props.onMouseEnter,
-        () => openForTransientInteraction("hover")
+        scheduleHoverOpen
       ),
       onMouseLeave: composeEventHandlers(
         children.props.onMouseLeave,
@@ -698,7 +775,7 @@ export function ReservationHoverCard({
     })
   ) : (
     <span
-      onMouseEnter={() => openForTransientInteraction("hover")}
+      onMouseEnter={scheduleHoverOpen}
       onMouseLeave={scheduleTransientClose}
       onFocus={() => openForTransientInteraction("focus")}
       onBlur={scheduleTransientClose}
