@@ -46,6 +46,7 @@ import {
   isActiveReservationStatus,
 } from "@/lib/reservations/status";
 import { markReservationAsRemoved } from "@/lib/reservations/filters";
+import { isReservationUuid } from "@/lib/reservations/identifiers";
 import { useCurrencyFormatter } from "@/hooks/use-currency";
 import type { Reservation, RoomType } from "@/data/types";
 import type { ReservationWithDetails } from "@/app/admin/reservations/components/columns";
@@ -153,13 +154,6 @@ export function ReservationEditForm({
   } = useDataContext();
 
   const guest = React.useMemo(() => guests.find((g) => g.id === reservation.guestId), [guests, reservation.guestId]);
-
-  // Helper function to validate UUID format
-  const isValidUUID = (uuid: string | undefined): uuid is string => {
-    if (!uuid) return false;
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    return uuidRegex.test(uuid);
-  };
 
   const groupReservations = React.useMemo(
     () => (activeBookingReservations.length > 0 ? activeBookingReservations : reservations)
@@ -709,14 +703,14 @@ export function ReservationEditForm({
     console.log('reservation.ratePlanId:', reservation.ratePlanId);
     console.log('effectiveRatePlan:', effectiveRatePlan);
     console.log('effectiveRatePlan.id:', effectiveRatePlan?.id);
-    console.log('isValidUUID(effectiveRatePlan.id):', isValidUUID(effectiveRatePlan?.id));
+    console.log('isReservationUuid(effectiveRatePlan.id):', isReservationUuid(effectiveRatePlan?.id));
 
     const baseReservationPayload = {
       checkInDate: formatISO(dateRange.from, { representation: "date" }),
       checkOutDate: formatISO(dateRange.to, { representation: "date" }),
       notes: notes?.trim() || undefined,
       // Only include rate plan ID if it's a valid UUID
-      ...(reservation.ratePlanId === null && isValidUUID(effectiveRatePlan?.id) && {
+      ...(reservation.ratePlanId === null && isReservationUuid(effectiveRatePlan?.id) && {
         ratePlanId: effectiveRatePlan.id
       }),
     };

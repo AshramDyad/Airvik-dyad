@@ -8,6 +8,7 @@ import { extractChangedFields } from "@/lib/activity/change-detector";
 import { authorizedFetch } from "@/lib/auth/client-session";
 import { revalidateReservationsCache } from "@/lib/reservations/cache-client";
 import { sortReservationsByBookingDate } from "@/lib/reservations/sort";
+import { isReservationUuid } from "@/lib/reservations/identifiers";
 import {
   buildRoomOccupancyAssignments,
   type RoomOccupancyAssignment,
@@ -309,10 +310,7 @@ export function useAppData() {
       setLookupStatus(prev => ({ ...prev, [id]: 'pending' }));
 
       try {
-        const isUUID =
-          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-            id
-          );
+        const isUUID = isReservationUuid(id);
         let targetBookingId = "";
 
         if (isUUID) {
