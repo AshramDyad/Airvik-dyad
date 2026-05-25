@@ -18,9 +18,14 @@ import * as React from "react";
 interface ReservationHeaderProps {
   reservation: ReservationWithDetails;
   bookingStatus?: ReservationStatus;
+  bookingReservations?: ReservationWithDetails[];
 }
 
-export function ReservationHeader({ reservation, bookingStatus }: ReservationHeaderProps) {
+export function ReservationHeader({
+  reservation,
+  bookingStatus,
+  bookingReservations: resolvedBookingReservations,
+}: ReservationHeaderProps) {
   const { updateReservationStatus, updateBookingReservationStatus, guests, rooms, roomTypes, property, reservations } = useDataContext();
   const [isCancelDialogOpen, setIsCancelDialogOpen] = React.useState(false);
   const searchParams = useSearchParams();
@@ -28,8 +33,12 @@ export function ReservationHeader({ reservation, bookingStatus }: ReservationHea
 
   // Get all reservations for this booking
   const bookingReservations = React.useMemo(() => {
+    if (resolvedBookingReservations && resolvedBookingReservations.length > 0) {
+      return resolvedBookingReservations;
+    }
+
     return reservations.filter((r) => r.bookingId === reservation.bookingId);
-  }, [reservations, reservation.bookingId]);
+  }, [reservation.bookingId, reservations, resolvedBookingReservations]);
 
   // Get guest for this reservation
   const guest = React.useMemo(() => {

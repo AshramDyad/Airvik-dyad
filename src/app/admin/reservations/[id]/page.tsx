@@ -15,6 +15,7 @@ import type { ReservationWithDetails } from "@/app/admin/reservations/components
 import { calculateReservationTaxAmount } from "@/lib/reservations/calculate-financials";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PermissionGate } from "@/components/admin/permission-gate";
+import { resolveBookingGroup } from "@/lib/reservations/resolve-booking-group";
 import {
   isActiveReservationStatus,
   resolveAggregateStatus,
@@ -51,23 +52,36 @@ export default function ReservationDetailsPage() {
     }
   }, [reservationIdFromParams, loadBookingDetails]);
 
+  const resolvedBookingGroup = React.useMemo(
+    () =>
+      resolveBookingGroup({
+        reservationId: reservationIdFromParams,
+        activeBookingReservations: isolatedBookingReservations,
+        reservations,
+        bookings,
+      }),
+    [bookings, isolatedBookingReservations, reservationIdFromParams, reservations]
+  );
 
-  const reservation = React.useMemo(() => {
-    const found = isolatedBookingReservations.find((r) => r.id === reservationIdFromParams) ||
-                  reservations.find((r) => r.id === reservationIdFromParams) ||
-                  bookings.flatMap((b) => b.subRows).find((r) => r.id === reservationIdFromParams);
-    console.log(`[Page] Finding reservation for ${reservationIdFromParams}: ${found ? 'Found' : 'Not Found'}`);
-    return found;
-  }, [reservations, isolatedBookingReservations, bookings, reservationIdFromParams]);
+  const reservation = resolvedBookingGroup.selectedReservation;
+  const lookupState = reservationIdFromParams
+    ? lookupStatus[reservationIdFromParams]
+    : undefined;
+  const isBookingLookupPending =
+    Boolean(reservationIdFromParams) &&
+    (isBookingLookupLoading || !lookupState || lookupState === "pending");
+  const isBaseDataLoading =
+    isLoading || isSessionLoading || isReservationsInitialLoading;
+  const shouldWaitForCompleteGroup =
+    Boolean(reservation) &&
+    !resolvedBookingGroup.hasCompleteGroup &&
+    (isBaseDataLoading || isBookingLookupPending);
 
-  const isActuallyLoading = 
-    isLoading || 
-    isSessionLoading || 
-    isReservationsInitialLoading || 
-    isBookingLookupLoading ||
-    (reservationIdFromParams && (!lookupStatus[reservationIdFromParams] || lookupStatus[reservationIdFromParams] === 'pending'));
+  const isActuallyLoading = isBaseDataLoading || isBookingLookupPending;
 
-  console.log(`[Page] Render state: id=${reservationIdFromParams}, loading=${isActuallyLoading}, res=${!!reservation}, status=${reservationIdFromParams ? lookupStatus[reservationIdFromParams] : 'none'}`);
+  console.log(
+    `[Page] Render state: id=${reservationIdFromParams}, loading=${isActuallyLoading}, res=${!!reservation}, status=${lookupState ?? "none"}, source=${resolvedBookingGroup.source}, completeGroup=${resolvedBookingGroup.hasCompleteGroup}`
+  );
 
   if (!reservationIdFromParams) {
     if (isActuallyLoading) {
@@ -81,6 +95,14 @@ export default function ReservationDetailsPage() {
   }
 
   if (isActuallyLoading && !reservation) {
+    return (
+      <PermissionGate feature="reservations">
+        <ReservationDetailsSkeleton />
+      </PermissionGate>
+    );
+  }
+
+  if (shouldWaitForCompleteGroup) {
     return (
       <PermissionGate feature="reservations">
         <ReservationDetailsSkeleton />
@@ -113,44 +135,58 @@ export default function ReservationDetailsPage() {
 
   const guest = guests.find((g) => g.id === reservation.guestId);
 
-  const bookingReservationsWithDetails: ReservationWithDetails[] = (isolatedBookingReservations.length > 0 ? isolatedBookingReservations : reservations)
-    .filter((entry) => entry.bookingId === reservation.bookingId)
-    .map((entry) => {
+  const resolvedBookingReservations =
+    resolvedBookingGroup.hasCompleteGroup &&
+    resolvedBookingGroup.bookingReservations.length > 0
+      ? resolvedBookingGroup.bookingReservations
+      : [reservation];
+
+  const bookingReservationsWithDetails: ReservationWithDetails[] =
+    resolvedBookingReservations.map((entry) => {
       const entryGuest = guests.find((g) => g.id === entry.guestId);
       const entryRoomNumber =
-        rooms.find((room) => room.id === entry.roomId)?.roomNumber || "N/A";
+        rooms.find((room) => room.id === entry.roomId)?.roomNumber;
+      const existingGuestName =
+        "guestName" in entry && typeof entry.guestName === "string"
+          ? entry.guestName
+          : undefined;
+      const existingRoomNumber =
+        "roomNumber" in entry && typeof entry.roomNumber === "string"
+          ? entry.roomNumber
+          : undefined;
+      const existingNights =
+        "nights" in entry && typeof entry.nights === "number"
+          ? entry.nights
+          : undefined;
+
       return {
         ...entry,
         guestName: entryGuest
           ? `${entryGuest.firstName} ${entryGuest.lastName}`
-          : "N/A",
-        roomNumber: entryRoomNumber,
-        nights: differenceInDays(
-          parseISO(entry.checkOutDate),
-          parseISO(entry.checkInDate)
-        ),
-      } as ReservationWithDetails;
+          : existingGuestName ?? "N/A",
+        roomNumber: entryRoomNumber ?? existingRoomNumber ?? "N/A",
+        nights:
+          existingNights ??
+          differenceInDays(
+            parseISO(entry.checkOutDate),
+            parseISO(entry.checkInDate)
+          ),
+      };
     });
-
-  const fallbackReservationDetails: ReservationWithDetails = {
-    ...reservation,
-    guestName: guest ? `${guest.firstName} ${guest.lastName}` : "N/A",
-    roomNumber:
-      rooms.find((r) => r.id === reservation.roomId)?.roomNumber || "N/A",
-    nights: differenceInDays(
-      parseISO(reservation.checkOutDate),
-      parseISO(reservation.checkInDate)
-    ),
-  };
 
   const reservationWithDetails =
     bookingReservationsWithDetails.find((entry) => entry.id === reservation.id) ??
-    fallbackReservationDetails;
+    bookingReservationsWithDetails[0];
 
-  const allBookingReservations =
-    bookingReservationsWithDetails.length > 0
-      ? bookingReservationsWithDetails
-      : [reservationWithDetails];
+  if (!reservationWithDetails) {
+    return (
+      <PermissionGate feature="reservations">
+        <ReservationDetailsSkeleton />
+      </PermissionGate>
+    );
+  }
+
+  const allBookingReservations = bookingReservationsWithDetails;
 
   const retainedBookingReservations = allBookingReservations.filter(
     (entry) => !isReservationRemovedDuringEdit(entry)
@@ -238,6 +274,7 @@ export default function ReservationDetailsPage() {
         <ReservationHeader
           reservation={reservationWithDetails}
           bookingStatus={bookingAggregateStatus}
+          bookingReservations={displayBookingReservations}
         />
         <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(300px,360px)_minmax(0,1fr)]">
           <div className="min-w-0 space-y-6">
