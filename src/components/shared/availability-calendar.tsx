@@ -235,6 +235,7 @@ export function AvailabilityCalendar() {
                 size="icon"
                 className="h-9 w-9 rounded-xl flex-shrink-0"
                 onClick={() => setCurrentMonth((prev) => subMonths(prev, 1))}
+                aria-label="Previous month"
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
@@ -258,6 +259,7 @@ export function AvailabilityCalendar() {
                 size="icon"
                 className="h-9 w-9 rounded-xl flex-shrink-0"
                 onClick={() => setCurrentMonth((prev) => addMonths(prev, 1))}
+                aria-label="Next month"
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>
@@ -392,11 +394,19 @@ export function AvailabilityCalendar() {
                       <DragScrollContainer
                         ariaLabel={`Availability grid for ${monthLabel}`}
                         className="max-h-[calc(100vh-280px)] overflow-auto scrollbar-hide"
+                        initialScrollDate={
+                          headerDays.some((day) => day.iso === todayIso)
+                            ? todayIso
+                            : undefined
+                        }
                       >
                         <Table className="min-w-max border-separate border-spacing-0" baseWrapper={false}>
                           <TableHeader className="sticky top-0 z-30 bg-card/95 backdrop-blur shadow-sm">
                             <TableRow>
-                              <TableHead className="sticky left-0 z-40 w-56 border-r border-b border-border/40 bg-card/95 backdrop-blur px-4 py-3 text-left text-xs font-semibold text-muted-foreground">
+                              <TableHead
+                                className="sticky left-0 z-40 w-56 border-r border-b border-border/40 bg-card/95 backdrop-blur px-4 py-3 text-left text-xs font-semibold text-muted-foreground"
+                                data-calendar-sticky-column
+                              >
                                 <div>
                                   <p className="text-[11px]">Month</p>
                                   <p className="text-base font-semibold text-foreground">
@@ -415,6 +425,7 @@ export function AvailabilityCalendar() {
                                         ? "bg-primary text-white shadow-[0_4px_20px_rgba(16,185,129,0.2)]"
                                         : "bg-card/95 backdrop-blur text-foreground"
                                     )}
+                                    data-calendar-date={day.iso}
                                   >
                                     <div>{format(day.date, "EEE")}</div>
                                     <div>{format(day.date, "d")}</div>
@@ -469,12 +480,14 @@ type DragScrollContainerProps = {
   children: React.ReactNode;
   ariaLabel: string;
   className?: string;
+  initialScrollDate?: string;
 };
 
 function DragScrollContainer({
   children,
   ariaLabel,
   className,
+  initialScrollDate,
 }: DragScrollContainerProps) {
   const containerRef = React.useRef<HTMLDivElement>(null);
   const dragState = React.useRef({
@@ -486,6 +499,32 @@ function DragScrollContainer({
     shouldPreventClick: false,
     hasCapture: false,
   });
+
+  React.useLayoutEffect(() => {
+    if (!initialScrollDate) {
+      return;
+    }
+
+    const container = containerRef.current;
+    if (!container) {
+      return;
+    }
+
+    const stickyColumn = container.querySelector<HTMLElement>(
+      "[data-calendar-sticky-column]"
+    );
+    const initialDateHeader = container.querySelector<HTMLElement>(
+      `[data-calendar-date="${initialScrollDate}"]`
+    );
+    if (!stickyColumn || !initialDateHeader) {
+      return;
+    }
+
+    container.scrollLeft = Math.max(
+      initialDateHeader.offsetLeft - stickyColumn.offsetWidth,
+      0
+    );
+  }, [initialScrollDate]);
 
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) {
