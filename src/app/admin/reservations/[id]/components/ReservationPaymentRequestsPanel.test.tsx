@@ -51,6 +51,7 @@ describe("ReservationPaymentRequestsPanel", () => {
     mockedUseDataContext.mockReturnValue({
       refreshReservations: vi.fn().mockResolvedValue(undefined),
       loadBookingDetails: vi.fn().mockResolvedValue(undefined),
+      notifyReservationsChanged: vi.fn(),
     } as unknown as ReturnType<typeof useDataContext>);
   });
 
@@ -74,9 +75,11 @@ describe("ReservationPaymentRequestsPanel", () => {
     const user = userEvent.setup();
     const refreshReservations = vi.fn().mockResolvedValue(undefined);
     const loadBookingDetails = vi.fn().mockResolvedValue(undefined);
+    const notifyReservationsChanged = vi.fn();
     mockedUseDataContext.mockReturnValue({
       refreshReservations,
       loadBookingDetails,
+      notifyReservationsChanged,
     } as unknown as ReturnType<typeof useDataContext>);
     mockedUseAuthContext.mockReturnValue({
       hasPermission: (permission: Permission) => permission === "update:payment",
@@ -114,6 +117,9 @@ describe("ReservationPaymentRequestsPanel", () => {
     });
     expect(refreshReservations).toHaveBeenCalled();
     expect(loadBookingDetails).toHaveBeenCalledWith("reservation-1");
+    expect(notifyReservationsChanged).toHaveBeenCalledWith({
+      reservationId: "reservation-1",
+    });
     expect(mockedRevalidateReservationsCache).toHaveBeenCalled();
   });
 
@@ -161,6 +167,7 @@ describe("ReservationPaymentRequestsPanel", () => {
     const user = userEvent.setup();
     const refreshReservations = vi.fn().mockResolvedValue(undefined);
     const loadBookingDetails = vi.fn().mockResolvedValue(undefined);
+    const notifyReservationsChanged = vi.fn();
     const pendingRequest = buildPendingRequest(1);
     const paidRequest = {
       ...pendingRequest,
@@ -175,6 +182,7 @@ describe("ReservationPaymentRequestsPanel", () => {
     mockedUseDataContext.mockReturnValue({
       refreshReservations,
       loadBookingDetails,
+      notifyReservationsChanged,
     } as unknown as ReturnType<typeof useDataContext>);
     mockedUseAuthContext.mockReturnValue({
       hasPermission: () => false,
@@ -197,6 +205,9 @@ describe("ReservationPaymentRequestsPanel", () => {
     });
     expect(refreshReservations).toHaveBeenCalled();
     expect(loadBookingDetails).toHaveBeenCalledWith("reservation-1");
+    expect(notifyReservationsChanged).toHaveBeenCalledWith({
+      reservationId: "reservation-1",
+    });
   });
 
   it("does not refresh reservation data when paid requests are unchanged", async () => {
@@ -208,6 +219,7 @@ describe("ReservationPaymentRequestsPanel", () => {
     mockedUseDataContext.mockReturnValue({
       refreshReservations,
       loadBookingDetails,
+      notifyReservationsChanged: vi.fn(),
     } as unknown as ReturnType<typeof useDataContext>);
     mockedUseAuthContext.mockReturnValue({
       hasPermission: () => false,
@@ -237,6 +249,7 @@ describe("ReservationPaymentRequestsPanel", () => {
     const user = userEvent.setup();
     const refreshReservations = vi.fn().mockResolvedValue(undefined);
     const loadBookingDetails = vi.fn().mockResolvedValue(undefined);
+    const notifyReservationsChanged = vi.fn();
     const paidWithoutFolio = {
       ...buildPaidRequest(),
       folioItemId: null,
@@ -249,6 +262,7 @@ describe("ReservationPaymentRequestsPanel", () => {
     mockedUseDataContext.mockReturnValue({
       refreshReservations,
       loadBookingDetails,
+      notifyReservationsChanged,
     } as unknown as ReturnType<typeof useDataContext>);
     mockedUseAuthContext.mockReturnValue({
       hasPermission: () => false,
@@ -271,6 +285,9 @@ describe("ReservationPaymentRequestsPanel", () => {
     });
     expect(refreshReservations).toHaveBeenCalled();
     expect(loadBookingDetails).toHaveBeenCalledWith("reservation-1");
+    expect(notifyReservationsChanged).toHaveBeenCalledWith({
+      reservationId: "reservation-1",
+    });
   });
 });
 

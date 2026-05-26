@@ -63,6 +63,7 @@ export function RecordPaymentDialog({
   const {
     loadBookingDetails,
     refreshReservations,
+    notifyReservationsChanged,
     reservations,
     property,
   } = useDataContext();
@@ -205,6 +206,7 @@ export function RecordPaymentDialog({
 
       await refreshReservations();
       await loadBookingDetails(reservationId);
+      notifyReservationsChanged({ reservationId });
       toast.success("Cash payment recorded successfully.");
       form.reset({
         amount: 0,

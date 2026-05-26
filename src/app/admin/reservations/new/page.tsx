@@ -132,6 +132,7 @@ export default function CreateReservationPage() {
     addReservation,
     isLoading,
     property,
+    notifyReservationsChanged,
   } = useDataContext();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -611,6 +612,7 @@ export default function CreateReservationPage() {
         }
 
         const primaryReservationId = readCreatedReservationId(body);
+        notifyReservationsChanged({ reservationId: primaryReservationId });
         toast.success("Cash reservation and payment recorded.");
         router.replace(`/admin/reservations/${primaryReservationId}?createdBooking=1`);
         return;

@@ -42,12 +42,14 @@ describe("RecordPaymentDialog", () => {
     });
     const refreshReservations = vi.fn().mockResolvedValue(undefined);
     const loadBookingDetails = vi.fn().mockResolvedValue(undefined);
+    const notifyReservationsChanged = vi.fn();
 
     mockedUseDataContext.mockReturnValue({
       reservations: [reservation],
       property: { tax_enabled: false, tax_percentage: 0 },
       refreshReservations,
       loadBookingDetails,
+      notifyReservationsChanged,
     } as unknown as ReturnType<typeof useDataContext>);
 
     render(
@@ -72,5 +74,8 @@ describe("RecordPaymentDialog", () => {
     });
     expect(refreshReservations).toHaveBeenCalled();
     expect(loadBookingDetails).toHaveBeenCalledWith("reservation-1");
+    expect(notifyReservationsChanged).toHaveBeenCalledWith({
+      reservationId: "reservation-1",
+    });
   });
 });

@@ -69,7 +69,11 @@ export function ReservationPaymentRequestsPanel({
   currency,
   logoUrl,
 }: ReservationPaymentRequestsPanelProps) {
-  const { refreshReservations, loadBookingDetails } = useDataContext();
+  const {
+    refreshReservations,
+    loadBookingDetails,
+    notifyReservationsChanged,
+  } = useDataContext();
   const { hasPermission } = useAuthContext();
   const [amount, setAmount] = React.useState("");
   const [overrideAmount, setOverrideAmount] = React.useState("");
@@ -149,6 +153,7 @@ export function ReservationPaymentRequestsPanel({
           await revalidateReservationsCache();
           await loadBookingDetails(reservationId);
           void refreshReservations();
+          notifyReservationsChanged({ reservationId });
         }
       } catch (loadError) {
         setError(
@@ -161,7 +166,7 @@ export function ReservationPaymentRequestsPanel({
         setIsRefreshing(false);
       }
     },
-    [loadBookingDetails, refreshReservations, reservationId]
+    [loadBookingDetails, notifyReservationsChanged, refreshReservations, reservationId]
   );
 
   React.useEffect(() => {
@@ -368,6 +373,7 @@ export function ReservationPaymentRequestsPanel({
       await revalidateReservationsCache();
       await loadBookingDetails(reservationId);
       void refreshReservations();
+      notifyReservationsChanged({ reservationId });
       await loadRequests(true);
       toast.success("Payment override recorded and booking confirmed.");
     } catch (overrideError) {

@@ -255,6 +255,10 @@ interface DataContextType {
     bookingId?: string
   ) => Promise<BookingValidationResult>;
   refreshReservations: () => Promise<void>;
+  notifyReservationsChanged: (hint?: {
+    reservationId?: string;
+    bookingId?: string;
+  }) => void;
   loadReservationsPage: (params: {
     limit: number;
     offset: number;

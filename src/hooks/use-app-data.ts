@@ -1,12 +1,32 @@
 "use client";
 
 import * as React from "react";
+import type {
+  RealtimeChannel,
+  RealtimePostgresChangesPayload,
+} from "@supabase/supabase-js";
 import { useSessionContext } from "@/context/session-context";
 import { useActivityLogger } from "@/hooks/use-activity-logger";
+import { supabase } from "@/integrations/supabase/client";
 import * as api from "@/lib/api";
 import { extractChangedFields } from "@/lib/activity/change-detector";
 import { authorizedFetch } from "@/lib/auth/client-session";
 import { revalidateReservationsCache } from "@/lib/reservations/cache-client";
+import {
+  createReservationSyncMessage,
+  createReservationSyncSourceId,
+  getFolioItemRealtimeHint,
+  getReservationRealtimeHint,
+  parseReservationSyncMessage,
+  parseReservationSyncStorageValue,
+  RESERVATION_SYNC_CHANNEL,
+  RESERVATION_SYNC_MESSAGE_TYPE,
+  RESERVATION_SYNC_STORAGE_KEY,
+  type FolioItemRealtimeRow,
+  type ReservationRealtimeRow,
+  type ReservationSyncHint,
+  type ReservationSyncMessage,
+} from "@/lib/reservations/realtime-sync";
 import { sortReservationsByBookingDate } from "@/lib/reservations/sort";
 import { isReservationUuid } from "@/lib/reservations/identifiers";
 import {
@@ -254,6 +274,15 @@ const fetchReservationsFromApi = async (
   return (await response.json()) as ReservationsApiPayload;
 };
 
+const readRealtimeString = (row: unknown, key: string): string | undefined => {
+  if (typeof row !== "object" || row === null) {
+    return undefined;
+  }
+
+  const value = (row as Record<string, unknown>)[key];
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+};
+
 export function useAppData() {
   const { session, isLoading: isSessionLoading } = useSessionContext();
   const { logActivity } = useActivityLogger();
@@ -293,6 +322,22 @@ export function useAppData() {
   const [stickyNotes, setStickyNotes] = React.useState<StickyNote[]>([]);
   const [housekeepingAssignments, setHousekeepingAssignments] = React.useState<HousekeepingAssignment[]>([]);
   const [dashboardLayout, setDashboardLayout] = React.useState<DashboardComponentId[]>(['stats', 'tables', 'calendar', 'notes']);
+  const activeBookingReservationsRef = React.useRef<Reservation[]>([]);
+  const lastReservationsPageParamsRef = React.useRef<{
+    limit: number;
+    offset: number;
+    query?: string;
+  } | null>(null);
+  const reservationSyncSourceIdRef = React.useRef(createReservationSyncSourceId());
+  const reservationSyncRevisionRef = React.useRef(0);
+  const reservationSyncTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingReservationSyncHintRef = React.useRef<ReservationSyncHint>({});
+  const reservationBroadcastRef = React.useRef<BroadcastChannel | null>(null);
+  const supabaseReservationSyncChannelRef = React.useRef<RealtimeChannel | null>(null);
+
+  React.useEffect(() => {
+    activeBookingReservationsRef.current = activeBookingReservations;
+  }, [activeBookingReservations]);
 
   const loadBookingDetails = React.useCallback(
     async (id: string) => {
@@ -364,6 +409,7 @@ export function useAppData() {
 
   const loadReservationsPage = React.useCallback(
     async (params: { limit: number; offset: number; query?: string }) => {
+      lastReservationsPageParamsRef.current = params;
       setIsReservationsInitialLoading(true);
       try {
         const response = await fetchReservationsFromApi({
@@ -529,11 +575,283 @@ export function useAppData() {
     return () => { cancelled = true; };
   }, [isLoading, isSessionLoading, userId]);
 
-  const refreshReservations = React.useCallback(() => fetchData({ keepExisting: true }), [fetchData]);
+  const reloadCurrentReservationsPage = React.useCallback(async () => {
+    const params = lastReservationsPageParamsRef.current;
+    if (!params) {
+      return;
+    }
 
-  const triggerReservationsCacheRevalidation = React.useCallback(() => {
-    void revalidateReservationsCache();
+    try {
+      const response = await fetchReservationsFromApi({
+        ...params,
+        includeCount: true,
+      });
+      setBookings(response.data || []);
+      setReservationsTotalCount(response.count ?? 0);
+    } catch (error) {
+      console.error("[AppData] Failed to reload reservations page:", error);
+    }
   }, []);
+
+  const refreshOpenBookingDetails = React.useCallback(
+    async (hint: ReservationSyncHint = {}) => {
+      const activeReservations = activeBookingReservationsRef.current;
+      const activeBookingId = activeReservations[0]?.bookingId;
+      if (!activeBookingId) {
+        return;
+      }
+
+      let bookingId = hint.bookingId;
+      if (!bookingId && hint.reservationId) {
+        const { data } = await api.getReservationById(hint.reservationId);
+        bookingId = data?.bookingId;
+      }
+
+      if (bookingId && bookingId !== activeBookingId) {
+        return;
+      }
+
+      const { data, error } = await api.getReservationsByBookingId(activeBookingId);
+      if (error) {
+        console.error("[AppData] Failed to reload active booking:", error);
+        return;
+      }
+
+      if (data.length > 0) {
+        setActiveBookingReservations(data);
+      }
+    },
+    []
+  );
+
+  const syncReservationsFromServer = React.useCallback(
+    async (hint: ReservationSyncHint = {}) => {
+      if (isSessionLoading || !userId) {
+        return;
+      }
+
+      await revalidateReservationsCache();
+      await fetchData({ keepExisting: true });
+      await reloadCurrentReservationsPage();
+      await refreshOpenBookingDetails(hint);
+    },
+    [
+      fetchData,
+      isSessionLoading,
+      refreshOpenBookingDetails,
+      reloadCurrentReservationsPage,
+      userId,
+    ]
+  );
+
+  const scheduleReservationsSync = React.useCallback(
+    (hint: ReservationSyncHint = {}) => {
+      pendingReservationSyncHintRef.current = {
+        ...pendingReservationSyncHintRef.current,
+        ...hint,
+      };
+
+      if (reservationSyncTimerRef.current) {
+        clearTimeout(reservationSyncTimerRef.current);
+      }
+
+      reservationSyncTimerRef.current = setTimeout(() => {
+        const nextHint = pendingReservationSyncHintRef.current;
+        pendingReservationSyncHintRef.current = {};
+        reservationSyncTimerRef.current = null;
+        void syncReservationsFromServer(nextHint).catch((error) => {
+          console.error("[AppData] Failed to sync reservations:", error);
+        });
+      }, 150);
+    },
+    [syncReservationsFromServer]
+  );
+
+  const publishReservationSyncMessage = React.useCallback(
+    (hint: ReservationSyncHint = {}) => {
+      if (typeof window === "undefined") {
+        return;
+      }
+
+      reservationSyncRevisionRef.current += 1;
+      const message = createReservationSyncMessage({
+        ...hint,
+        sourceId: reservationSyncSourceIdRef.current,
+        revision: reservationSyncRevisionRef.current,
+      });
+
+      reservationBroadcastRef.current?.postMessage(message);
+
+      const supabaseChannel = supabaseReservationSyncChannelRef.current;
+      if (supabaseChannel) {
+        void supabaseChannel
+          .send({
+            type: "broadcast",
+            event: RESERVATION_SYNC_MESSAGE_TYPE,
+            payload: message,
+          })
+          .catch((error) => {
+            console.error("[AppData] Failed to broadcast reservation sync:", error);
+          });
+      }
+
+      try {
+        window.localStorage.setItem(
+          RESERVATION_SYNC_STORAGE_KEY,
+          JSON.stringify(message)
+        );
+      } catch {
+        // Storage can be unavailable in private browsing; BroadcastChannel still covers modern browsers.
+      }
+    },
+    []
+  );
+
+  const notifyReservationsChanged = React.useCallback(
+    (hint: ReservationSyncHint = {}) => {
+      publishReservationSyncMessage(hint);
+      scheduleReservationsSync(hint);
+    },
+    [publishReservationSyncMessage, scheduleReservationsSync]
+  );
+
+  const refreshReservations = React.useCallback(
+    () => syncReservationsFromServer(),
+    [syncReservationsFromServer]
+  );
+
+  React.useEffect(() => {
+    return () => {
+      if (reservationSyncTimerRef.current) {
+        clearTimeout(reservationSyncTimerRef.current);
+      }
+    };
+  }, []);
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const channel =
+      typeof BroadcastChannel !== "undefined"
+        ? new BroadcastChannel(RESERVATION_SYNC_CHANNEL)
+        : null;
+
+    reservationBroadcastRef.current = channel;
+
+    const handleSyncMessage = (message: ReservationSyncMessage) => {
+      if (message.sourceId === reservationSyncSourceIdRef.current) {
+        return;
+      }
+
+      scheduleReservationsSync({
+        reservationId: message.reservationId,
+        bookingId: message.bookingId,
+      });
+    };
+
+    const handleBroadcastMessage = (event: MessageEvent<unknown>) => {
+      const message = parseReservationSyncMessage(event.data);
+      if (message) {
+        handleSyncMessage(message);
+      }
+    };
+
+    const handleStorageMessage = (event: StorageEvent) => {
+      if (event.key !== RESERVATION_SYNC_STORAGE_KEY) {
+        return;
+      }
+
+      const message = parseReservationSyncStorageValue(event.newValue);
+      if (message) {
+        handleSyncMessage(message);
+      }
+    };
+
+    channel?.addEventListener("message", handleBroadcastMessage);
+    window.addEventListener("storage", handleStorageMessage);
+
+    return () => {
+      channel?.removeEventListener("message", handleBroadcastMessage);
+      channel?.close();
+      if (reservationBroadcastRef.current === channel) {
+        reservationBroadcastRef.current = null;
+      }
+      window.removeEventListener("storage", handleStorageMessage);
+    };
+  }, [scheduleReservationsSync]);
+
+  React.useEffect(() => {
+    if (isSessionLoading || !userId) {
+      return;
+    }
+
+    const readReservationHint = (
+      payload: RealtimePostgresChangesPayload<ReservationRealtimeRow>
+    ) =>
+      getReservationRealtimeHint({
+        id: readRealtimeString(payload.new, "id") ?? readRealtimeString(payload.old, "id"),
+        booking_id:
+          readRealtimeString(payload.new, "booking_id") ??
+          readRealtimeString(payload.old, "booking_id"),
+      });
+
+    const readFolioItemHint = (
+      payload: RealtimePostgresChangesPayload<FolioItemRealtimeRow>
+    ) =>
+      getFolioItemRealtimeHint({
+        reservation_id:
+          readRealtimeString(payload.new, "reservation_id") ??
+          readRealtimeString(payload.old, "reservation_id"),
+      });
+
+    const channel = supabase
+      .channel(`admin-reservations-sync:${userId}`)
+      .on(
+        "broadcast",
+        { event: RESERVATION_SYNC_MESSAGE_TYPE },
+        (payload: { payload: unknown }) => {
+          const message = parseReservationSyncMessage(payload.payload);
+          if (!message || message.sourceId === reservationSyncSourceIdRef.current) {
+            return;
+          }
+
+          scheduleReservationsSync({
+            reservationId: message.reservationId,
+            bookingId: message.bookingId,
+          });
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "reservations" },
+        (payload: RealtimePostgresChangesPayload<ReservationRealtimeRow>) => {
+          scheduleReservationsSync(readReservationHint(payload));
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "folio_items" },
+        (payload: RealtimePostgresChangesPayload<FolioItemRealtimeRow>) => {
+          scheduleReservationsSync(readFolioItemHint(payload));
+        }
+      )
+      .subscribe((status) => {
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          console.warn(`[AppData] Reservation realtime channel ${status}`);
+        }
+      });
+
+    supabaseReservationSyncChannelRef.current = channel;
+
+    return () => {
+      if (supabaseReservationSyncChannelRef.current === channel) {
+        supabaseReservationSyncChannelRef.current = null;
+      }
+      void supabase.removeChannel(channel);
+    };
+  }, [isSessionLoading, scheduleReservationsSync, userId]);
 
   const updateProperty = async (updatedData: Partial<Omit<Property, "id">>) => {
     const changedFields = extractChangedFields(property, updatedData);
@@ -665,9 +983,12 @@ export function useAppData() {
     setReservations((prev) =>
       sortReservationsByBookingDate([...prev, ...reservationsWithEmptyFolio])
     );
-    triggerReservationsCacheRevalidation();
     const primaryReservation = reservationsWithEmptyFolio[0];
     const assignedBookingId = primaryReservation?.bookingId ?? null;
+    notifyReservationsChanged({
+      reservationId: primaryReservation?.id,
+      bookingId: assignedBookingId ?? undefined,
+    });
     const guest = guests.find((g) => g.id === reservationDetails.guestId);
     const label = guest
       ? formatName(guest.firstName, guest.lastName) || guest.email
@@ -737,7 +1058,10 @@ export function useAppData() {
     setReservations((prev) =>
       sortReservationsByBookingDate([...(prev ?? []), ...createdReservations])
     );
-    triggerReservationsCacheRevalidation();
+    notifyReservationsChanged({
+      reservationId: createdReservations[0]?.id,
+      bookingId: payload.bookingId,
+    });
 
     return createdReservations;
   };
@@ -747,7 +1071,10 @@ export function useAppData() {
     const { data, error } = await api.updateReservation(reservationId, updatedData);
     if (error) throw error;
     setReservations(prev => prev.map(r => r.id === reservationId ? { ...r, ...data } : r));
-    triggerReservationsCacheRevalidation();
+    notifyReservationsChanged({
+      reservationId,
+      bookingId: data.bookingId,
+    });
     const changedFields = extractChangedFields(previousReservation, updatedData);
     recordActivity({
       section: "reservations",
@@ -764,7 +1091,7 @@ export function useAppData() {
     const { error } = await api.updateReservationStatus(reservationId, status);
     if (error) throw error;
     setReservations(prev => prev.map(r => r.id === reservationId ? { ...r, status } : r));
-    triggerReservationsCacheRevalidation();
+    notifyReservationsChanged({ reservationId });
     recordActivity({
       section: "reservations",
       entityType: "reservation",
@@ -803,7 +1130,10 @@ export function useAppData() {
         };
       })
     );
-    triggerReservationsCacheRevalidation();
+    notifyReservationsChanged({
+      reservationId: data[0]?.id,
+      bookingId,
+    });
 
     data.forEach((updatedReservation) => {
       recordActivity({
@@ -909,7 +1239,7 @@ export function useAppData() {
       )
     );
 
-    triggerReservationsCacheRevalidation();
+    notifyReservationsChanged({ reservationId });
     recordActivity({
       section: "reservations",
       entityType: "reservation",
@@ -1576,6 +1906,7 @@ export function useAppData() {
     updateDashboardLayout: updateDashboardLayoutState,
     validateBookingRequest,
     refreshReservations,
+    notifyReservationsChanged,
     loadReservationsPage,
     loadBookingDetails,
     logActivity: recordActivity,
