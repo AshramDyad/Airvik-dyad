@@ -32,6 +32,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { isBookableRoom, ROOM_STATUS_LABELS } from "@/lib/rooms";
+import { getNewRoomReservationStatusForPayment } from "@/lib/payments/reservation-payment-policy";
 import {
   calculateMultipleRoomPricing,
   calculateRoomPricing,
@@ -841,6 +842,8 @@ export function ReservationEditForm({
         const hasCustomTotals = customTotalsForNewRooms.some(
           (total) => typeof total === "number" && total > 0
         );
+        const paymentMethod =
+          (reservation.paymentMethod as Reservation["paymentMethod"]) ?? "Not specified";
 
         await addRoomsToBooking({
           bookingId: reservation.bookingId,
@@ -852,12 +855,14 @@ export function ReservationEditForm({
           numberOfGuests: totalGuestsSelected,
           adultCount,
           childCount,
-          status: reservation.status,
+          status: getNewRoomReservationStatusForPayment({
+            paymentMethod,
+            currentStatus: reservation.status,
+          }),
           notes: baseReservationPayload.notes,
           bookingDate: reservation.bookingDate,
           source: reservation.source,
-          paymentMethod:
-            (reservation.paymentMethod as Reservation["paymentMethod"]) ?? "Not specified",
+          paymentMethod,
           taxEnabledSnapshot,
           taxRateSnapshot,
           roomOccupancies: newRoomOccupancies,

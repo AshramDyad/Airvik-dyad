@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  getNewRoomReservationStatusForPayment,
   getRequiredReservationStatusForPayment,
   isCashPaymentMethod,
   isGatewayPaymentMethod,
@@ -19,6 +20,36 @@ describe("reservation payment policy", () => {
   it("derives the required status from payment method", () => {
     expect(getRequiredReservationStatusForPayment("UPI Gateway")).toBe("Room Hold");
     expect(getRequiredReservationStatusForPayment("Cash")).toBe("Confirmed");
+  });
+
+  it("starts newly added UPI Gateway rooms as room holds", () => {
+    expect(
+      getNewRoomReservationStatusForPayment({
+        paymentMethod: "UPI Gateway",
+        currentStatus: "Confirmed",
+      })
+    ).toBe("Room Hold");
+    expect(
+      getNewRoomReservationStatusForPayment({
+        paymentMethod: "UPI Gateway",
+        currentStatus: "Room Hold",
+      })
+    ).toBe("Room Hold");
+  });
+
+  it("keeps the current status for newly added non-gateway rooms", () => {
+    expect(
+      getNewRoomReservationStatusForPayment({
+        paymentMethod: "Cash",
+        currentStatus: "Confirmed",
+      })
+    ).toBe("Confirmed");
+    expect(
+      getNewRoomReservationStatusForPayment({
+        paymentMethod: "Not specified",
+        currentStatus: "Standby",
+      })
+    ).toBe("Standby");
   });
 
   it("recognizes official accounting methods", () => {
