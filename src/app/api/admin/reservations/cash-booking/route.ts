@@ -4,6 +4,10 @@ import { z } from "zod";
 import { createServerSupabaseClient } from "@/integrations/supabase/server";
 import { HttpError, requirePermissions } from "@/lib/server/auth";
 import type { Permission } from "@/data/types";
+import {
+  buildRoomOccupancyAssignments,
+  type RoomOccupancyAssignment,
+} from "@/lib/reservations/guest-allocation";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,12 +27,37 @@ const CashBookingSchema = z.object({
   taxEnabledSnapshot: z.boolean().default(false),
   taxRateSnapshot: z.coerce.number().min(0).default(0),
   customRoomTotals: z.array(z.number().positive().nullable()).optional().nullable(),
+  roomOccupancies: z
+    .array(
+      z.object({
+        roomId: z.string().uuid().optional(),
+        adults: z.coerce.number().int().min(0),
+        children: z.coerce.number().int().min(0),
+      })
+    )
+    .optional(),
   cashAmount: z.coerce.number().positive(),
 });
 
 type DbCashBookingReservation = {
   id: string;
   booking_id: string;
+  room_id?: string | null;
+};
+
+type ReservationUpdateClient = {
+  from: (table: "reservations") => {
+    update: (values: {
+      adult_count: number;
+      child_count: number;
+      number_of_guests: number;
+    }) => {
+      eq: (
+        column: "id",
+        value: string
+      ) => PromiseLike<{ error: { message: string } | null }>;
+    };
+  };
 };
 
 export async function POST(request: Request) {
@@ -75,11 +104,20 @@ export async function POST(request: Request) {
       throw new Error(error.message);
     }
 
-    const reservations = ((data ?? []) as unknown as DbCashBookingReservation[])
-      .map((reservation) => ({
-        id: reservation.id,
-        bookingId: reservation.booking_id,
-      }));
+    const createdReservations = (data ?? []) as unknown as DbCashBookingReservation[];
+    await applyMultiRoomOccupancies({
+      supabase,
+      reservations: createdReservations,
+      roomIds: payload.roomIds,
+      adultCount: payload.adultCount,
+      childCount: payload.childCount,
+      roomOccupancies: payload.roomOccupancies,
+    });
+
+    const reservations = createdReservations.map((reservation) => ({
+      id: reservation.id,
+      bookingId: reservation.booking_id,
+    }));
 
     return noStoreJson({ reservations }, { status: 201 });
   } catch (error) {
@@ -98,6 +136,100 @@ function hasAllPermissions(
 
 function roundMoney(value: number): number {
   return Math.round(value * 100) / 100;
+}
+
+async function applyMultiRoomOccupancies({
+  supabase,
+  reservations,
+  roomIds,
+  adultCount,
+  childCount,
+  roomOccupancies,
+}: {
+  supabase: ReservationUpdateClient;
+  reservations: DbCashBookingReservation[];
+  roomIds: string[];
+  adultCount: number;
+  childCount: number;
+  roomOccupancies?: RoomOccupancyAssignment[];
+}): Promise<void> {
+  if (roomIds.length <= 1 || reservations.length <= 1) {
+    return;
+  }
+
+  const assignments = normalizeRoomOccupancies(
+    roomIds,
+    adultCount,
+    childCount,
+    roomOccupancies
+  );
+  if (!assignments.length) {
+    return;
+  }
+
+  const byRoomId = new Map<string, RoomOccupancyAssignment>();
+  assignments.forEach((assignment) => {
+    if (assignment.roomId) {
+      byRoomId.set(assignment.roomId, assignment);
+    }
+  });
+
+  await Promise.all(
+    reservations.map(async (reservation, index) => {
+      const assignment = reservation.room_id
+        ? byRoomId.get(reservation.room_id) ?? assignments[index]
+        : assignments[index];
+
+      if (!assignment) {
+        return;
+      }
+
+      const adults = Math.max(assignment.adults, 0);
+      const children = Math.max(assignment.children, 0);
+      const { error } = await supabase
+        .from("reservations")
+        .update({
+          adult_count: adults,
+          child_count: children,
+          number_of_guests: adults + children,
+        })
+        .eq("id", reservation.id);
+
+      if (error) {
+        throw new Error(error.message);
+      }
+    })
+  );
+}
+
+function normalizeRoomOccupancies(
+  roomIds: string[],
+  totalAdults: number,
+  totalChildren: number,
+  explicit?: RoomOccupancyAssignment[]
+): RoomOccupancyAssignment[] {
+  if (!explicit?.length) {
+    return buildRoomOccupancyAssignments(roomIds, totalAdults, totalChildren);
+  }
+
+  const fallback = buildRoomOccupancyAssignments(roomIds, totalAdults, totalChildren);
+  const byRoomId = new Map<string, RoomOccupancyAssignment>();
+
+  explicit.forEach((entry, index) => {
+    const roomId = entry.roomId ?? roomIds[index];
+    if (!roomId) {
+      return;
+    }
+    byRoomId.set(roomId, {
+      roomId,
+      adults: Math.max(entry.adults, 0),
+      children: Math.max(entry.children, 0),
+    });
+  });
+
+  return roomIds.map((roomId, index) => {
+    return byRoomId.get(roomId) ?? fallback[index];
+  });
 }
 
 function handleApiError(error: unknown): NextResponse {

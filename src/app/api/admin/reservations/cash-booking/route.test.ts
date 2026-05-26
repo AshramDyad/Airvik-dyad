@@ -134,4 +134,144 @@ describe("cash booking route", () => {
       reservations: [{ id: "reservation-1", bookingId: "booking-1" }],
     });
   });
+
+  it("applies per-room guest counts for multi-room cash bookings", async () => {
+    const rpc = vi.fn(async () => ({
+      data: [
+        {
+          id: "reservation-1",
+          booking_id: "booking-1",
+          room_id: "22222222-2222-4222-8222-222222222222",
+        },
+        {
+          id: "reservation-2",
+          booking_id: "booking-1",
+          room_id: "44444444-4444-4444-8444-444444444444",
+        },
+      ],
+      error: null,
+    }));
+    const eq = vi.fn(async () => ({ error: null }));
+    const update = vi.fn(() => ({ eq }));
+    const from = vi.fn(() => ({ update }));
+    mockedCreateServerSupabaseClient.mockReturnValue({
+      rpc,
+      from,
+    } as unknown as ReturnType<typeof createServerSupabaseClient>);
+
+    const response = await POST(
+      new Request("http://localhost/api/admin/reservations/cash-booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          guestId: "11111111-1111-4111-8111-111111111111",
+          roomIds: [
+            "22222222-2222-4222-8222-222222222222",
+            "44444444-4444-4444-8444-444444444444",
+          ],
+          ratePlanId: "33333333-3333-4333-8333-333333333333",
+          checkInDate: "2026-06-28",
+          checkOutDate: "2026-06-29",
+          numberOfGuests: 4,
+          adultCount: 4,
+          childCount: 0,
+          bookingDate: "2026-05-26T08:00:00.000Z",
+          cashAmount: 3000,
+          roomOccupancies: [
+            {
+              roomId: "22222222-2222-4222-8222-222222222222",
+              adults: 2,
+              children: 0,
+            },
+            {
+              roomId: "44444444-4444-4444-8444-444444444444",
+              adults: 2,
+              children: 0,
+            },
+          ],
+        }),
+      })
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(201);
+    expect(from).toHaveBeenCalledWith("reservations");
+    expect(update).toHaveBeenNthCalledWith(1, {
+      adult_count: 2,
+      child_count: 0,
+      number_of_guests: 2,
+    });
+    expect(update).toHaveBeenNthCalledWith(2, {
+      adult_count: 2,
+      child_count: 0,
+      number_of_guests: 2,
+    });
+    expect(eq).toHaveBeenNthCalledWith(1, "id", "reservation-1");
+    expect(eq).toHaveBeenNthCalledWith(2, "id", "reservation-2");
+    expect(body).toEqual({
+      reservations: [
+        { id: "reservation-1", bookingId: "booking-1" },
+        { id: "reservation-2", bookingId: "booking-1" },
+      ],
+    });
+  });
+
+  it("distributes guests across rooms when room occupancies are omitted", async () => {
+    const rpc = vi.fn(async () => ({
+      data: [
+        {
+          id: "reservation-1",
+          booking_id: "booking-1",
+          room_id: "22222222-2222-4222-8222-222222222222",
+        },
+        {
+          id: "reservation-2",
+          booking_id: "booking-1",
+          room_id: "44444444-4444-4444-8444-444444444444",
+        },
+      ],
+      error: null,
+    }));
+    const eq = vi.fn(async () => ({ error: null }));
+    const update = vi.fn(() => ({ eq }));
+    const from = vi.fn(() => ({ update }));
+    mockedCreateServerSupabaseClient.mockReturnValue({
+      rpc,
+      from,
+    } as unknown as ReturnType<typeof createServerSupabaseClient>);
+
+    const response = await POST(
+      new Request("http://localhost/api/admin/reservations/cash-booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          guestId: "11111111-1111-4111-8111-111111111111",
+          roomIds: [
+            "22222222-2222-4222-8222-222222222222",
+            "44444444-4444-4444-8444-444444444444",
+          ],
+          ratePlanId: "33333333-3333-4333-8333-333333333333",
+          checkInDate: "2026-06-28",
+          checkOutDate: "2026-06-29",
+          numberOfGuests: 5,
+          adultCount: 5,
+          childCount: 0,
+          bookingDate: "2026-05-26T08:00:00.000Z",
+          cashAmount: 3000,
+        }),
+      })
+    );
+
+    expect(response.status).toBe(201);
+    expect(update).toHaveBeenNthCalledWith(1, {
+      adult_count: 3,
+      child_count: 0,
+      number_of_guests: 3,
+    });
+    expect(update).toHaveBeenNthCalledWith(2, {
+      adult_count: 2,
+      child_count: 0,
+      number_of_guests: 2,
+    });
+  });
 });

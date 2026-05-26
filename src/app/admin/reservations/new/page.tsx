@@ -602,6 +602,7 @@ export default function CreateReservationPage() {
             taxEnabledSnapshot: taxConfig.enabled,
             taxRateSnapshot: taxConfig.enabled ? taxConfig.percentage : 0,
             customRoomTotals: hasCustomTotals ? customTotals : null,
+            roomOccupancies,
             cashAmount: paymentAmount,
           }),
         });
