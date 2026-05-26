@@ -47,7 +47,7 @@ import type { PaymentRequest, PaymentRequestStatus } from "@/data/types";
 import { authorizedFetch } from "@/lib/auth/client-session";
 import {
   buildUpiPaymentUri,
-  getPaymentRequestCode,
+  getPaymentRequestDisplayCode,
   PAYMENT_MERCHANT_NAME,
 } from "@/lib/payments/payment-request-matching";
 import { cn } from "@/lib/utils";
@@ -55,7 +55,8 @@ import { cn } from "@/lib/utils";
 const AUTO_REFRESH_MS = 60_000;
 const EMPTY_REQUESTS: PaymentRequest[] = [];
 const SHARE_IMAGE_WIDTH = 760;
-const SHARE_IMAGE_HEIGHT = 1020;
+const SHARE_IMAGE_HEIGHT = 1060;
+const QR_IMAGE_SIZE = 540;
 
 export function CreatePaymentClient() {
   const { property } = useDataContext();
@@ -219,7 +220,7 @@ export function CreatePaymentClient() {
           <CardHeader>
             <CardTitle className="text-lg">Create Payment</CardTitle>
             <CardDescription>
-              Generate a UPI QR with a unique 5-character identifier.
+              Generate a UPI QR with a unique statement code.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -299,7 +300,7 @@ export function CreatePaymentClient() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Payment ID</TableHead>
+                  <TableHead>Payment Code</TableHead>
                   <TableHead>Amount</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Created</TableHead>
@@ -319,7 +320,7 @@ export function CreatePaymentClient() {
                     }}
                   >
                     <TableCell className="font-mono font-semibold">
-                      {getPaymentRequestCode(request.identifier)}
+                      {getPaymentRequestDisplayCode(request)}
                     </TableCell>
                     <TableCell>{formatCurrency(request.amount, currency)}</TableCell>
                     <TableCell>
@@ -383,7 +384,7 @@ export function CreatePaymentClient() {
             {qrPreviewDataUrl ? (
               <div
                 role="img"
-                aria-label="Payment QR with amount, identifier, expiry, and UPI details"
+                aria-label="Payment QR with amount, payment code, expiry, and UPI details"
                 className="h-[70vh] max-h-[660px] w-full max-w-[492px] rounded-lg border bg-white bg-contain bg-center bg-no-repeat"
                 style={{ backgroundImage: `url("${qrPreviewDataUrl}")` }}
               />
@@ -448,8 +449,8 @@ function PaymentQrCard({
       <CardContent className="space-y-4">
         <div className="grid gap-3 sm:grid-cols-2">
           <InfoBlock
-            label="Payment ID"
-            value={getPaymentRequestCode(request.identifier)}
+            label="Payment Code"
+            value={getPaymentRequestDisplayCode(request)}
             mono
           />
           <InfoBlock label="Status" value={request.status} />
@@ -555,6 +556,7 @@ function isPaymentRequest(value: unknown): value is PaymentRequest {
     isRecord(value) &&
     typeof value.id === "string" &&
     typeof value.identifier === "string" &&
+    (typeof value.statementCode === "string" || value.statementCode === null) &&
     typeof value.amount === "number" &&
     typeof value.status === "string" &&
     typeof value.upiUri === "string"
@@ -598,16 +600,17 @@ async function createShareableQrImage({
 }): Promise<string> {
   const upiUri = buildUpiPaymentUri({
     identifier: request.identifier,
+    statementCode: request.statementCode,
     amount: request.amount,
     upiId: request.upiId,
     merchantName: request.upiMerchantName,
   });
   const qrDataUrl = await QRCode.toDataURL(upiUri, {
     errorCorrectionLevel: "H",
-    margin: 2,
-    width: 470,
+    margin: 4,
+    width: QR_IMAGE_SIZE,
     color: {
-      dark: "#111827",
+      dark: "#000000",
       light: "#ffffff",
     },
   });
@@ -652,8 +655,8 @@ function drawQrShareCard(
   context.fillStyle = "#f8fafc";
   context.fillRect(0, 0, SHARE_IMAGE_WIDTH, SHARE_IMAGE_HEIGHT);
 
-  drawRoundedRect(context, 46, 36, 668, 948, 26, "#ffffff");
-  drawRoundedRect(context, 46, 36, 668, 948, 26, "transparent", "#dbe3ea");
+  drawRoundedRect(context, 46, 36, 668, 988, 26, "#ffffff");
+  drawRoundedRect(context, 46, 36, 668, 988, 26, "transparent", "#dbe3ea");
 
   context.fillStyle = "#eef2f6";
   context.fillRect(47, 37, 666, 120);
@@ -679,14 +682,14 @@ function drawQrShareCard(
 
   drawPaymentAppLabels(context, 98, 222);
 
-  context.drawImage(qrImage, 145, 280, 470, 470);
+  context.drawImage(qrImage, 110, 260, QR_IMAGE_SIZE, QR_IMAGE_SIZE);
 
-  drawText(context, "Amount", 380, 790, {
+  drawText(context, "Amount", 380, 835, {
     font: "600 20px system-ui, sans-serif",
     color: "#64748b",
     align: "center",
   });
-  drawText(context, formatCurrency(request.amount, currency), 380, 836, {
+  drawText(context, formatCurrency(request.amount, currency), 380, 880, {
     font: "800 44px system-ui, sans-serif",
     color: "#0f172a",
     align: "center",
@@ -694,9 +697,9 @@ function drawQrShareCard(
 
   drawText(
     context,
-    `Payment ID: ${getPaymentRequestCode(request.identifier)}`,
+    `Payment Code: ${getPaymentRequestDisplayCode(request)}`,
     380,
-    884,
+    928,
     {
       font: "600 18px ui-monospace, SFMono-Regular, Menlo, monospace",
       color: "#94a3b8",
@@ -704,12 +707,18 @@ function drawQrShareCard(
     }
   );
 
-  drawText(context, `Valid for 3 hours, until ${formatDateTime(request.expiresAt)}`, 380, 928, {
-    font: "700 20px system-ui, sans-serif",
-    color: "#b45309",
-    align: "center",
-  });
-  drawText(context, `UPI: ${request.upiId}`, 380, 960, {
+  drawText(
+    context,
+    `Valid for 3 hours, until ${formatDateTime(request.expiresAt)}`,
+    380,
+    964,
+    {
+      font: "700 20px system-ui, sans-serif",
+      color: "#b45309",
+      align: "center",
+    }
+  );
+  drawText(context, `UPI: ${request.upiId}`, 380, 996, {
     font: "600 18px system-ui, sans-serif",
     color: "#475569",
     align: "center",

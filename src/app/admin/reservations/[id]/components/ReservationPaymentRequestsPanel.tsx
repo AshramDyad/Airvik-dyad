@@ -42,7 +42,7 @@ import { useAuthContext } from "@/context/auth-context";
 import type { Guest, PaymentRequest, PaymentRequestStatus } from "@/data/types";
 import { authorizedFetch } from "@/lib/auth/client-session";
 import { validateReservationPaymentAmount } from "@/lib/payments/reservation-payment-policy";
-import { getPaymentRequestCode } from "@/lib/payments/payment-request-matching";
+import { getPaymentRequestDisplayCode } from "@/lib/payments/payment-request-matching";
 import { revalidateReservationsCache } from "@/lib/reservations/cache-client";
 import {
   createPaymentQrBlob,
@@ -301,7 +301,10 @@ export function ReservationPaymentRequestsPanel({
       formData.append("image", blob, `payment-${request.identifier}.png`);
       formData.append(
         "caption",
-        `Payment QR ${getPaymentRequestCode(request.identifier)} for ${formatCurrency(request.amount, currency)}.`
+        `Payment QR ${getPaymentRequestDisplayCode(request)} for ${formatCurrency(
+          request.amount,
+          currency
+        )}.`
       );
 
       const response = await authorizedFetch("/api/admin/send-payment-qr-whatsapp", {
@@ -474,7 +477,7 @@ export function ReservationPaymentRequestsPanel({
             <TableHeader>
               <TableRow>
                 <TableHead className="w-[150px] whitespace-nowrap">
-                  Payment ID
+                  Payment Code
                 </TableHead>
                 <TableHead className="w-[130px] whitespace-nowrap">Amount</TableHead>
                 <TableHead className="w-[120px] whitespace-nowrap">Status</TableHead>
@@ -489,7 +492,7 @@ export function ReservationPaymentRequestsPanel({
               {requests.map((request) => (
                 <TableRow key={request.id}>
                   <TableCell className="whitespace-nowrap font-mono text-xs font-semibold">
-                    {getPaymentRequestCode(request.identifier)}
+                    {getPaymentRequestDisplayCode(request)}
                   </TableCell>
                   <TableCell className="whitespace-nowrap tabular-nums">
                     {formatCurrency(request.amount, currency)}
@@ -562,7 +565,7 @@ export function ReservationPaymentRequestsPanel({
             {qrPreviewDataUrl ? (
               <div
                 role="img"
-                aria-label="Payment QR with amount, identifier, expiry, and UPI details"
+                aria-label="Payment QR with amount, payment code, expiry, and UPI details"
                 className="h-[60vh] min-h-[320px] w-full max-w-[492px] rounded-lg border bg-white bg-contain bg-center bg-no-repeat sm:h-[70vh] sm:max-h-[660px]"
                 style={{ backgroundImage: `url("${qrPreviewDataUrl}")` }}
               />
@@ -734,6 +737,7 @@ function isPaymentRequest(value: unknown): value is PaymentRequest {
     isRecord(value) &&
     typeof value.id === "string" &&
     typeof value.identifier === "string" &&
+    (typeof value.statementCode === "string" || value.statementCode === null) &&
     (typeof value.reservationId === "string" || value.reservationId === null) &&
     (typeof value.folioItemId === "string" || value.folioItemId === null) &&
     typeof value.amount === "number" &&

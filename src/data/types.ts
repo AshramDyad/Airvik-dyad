@@ -55,6 +55,7 @@ export type PaymentRequestStatus = "pending" | "paid" | "expired" | "cancelled";
 export interface PaymentRequest {
   id: string;
   identifier: string;
+  statementCode: string | null;
   reservationId: string | null;
   folioItemId: string | null;
   amount: number;

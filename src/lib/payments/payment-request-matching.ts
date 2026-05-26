@@ -5,6 +5,7 @@ export const PAYMENT_UPI_ID = "biz.sahajana959@fbl";
 export const PAYMENT_MERCHANT_NAME = "Sahajanand Wellness";
 export const PAYMENT_IDENTIFIER_LENGTH = 5;
 export const PAYMENT_IDENTIFIER_PREFIX = "SW";
+export const PAYMENT_STATEMENT_CODE_LENGTH = 4;
 
 const CREDITED_STATUS_PATTERN =
   /\b(credit|credited|success|successful|paid|received|complete|completed|captured|settled)\b/i;
@@ -14,7 +15,9 @@ const EXCLUDED_STATUS_PATTERN =
 export type PendingPaymentRequestMatch = {
   id: string;
   identifier: string;
+  statementCode: string | null;
   amount: number;
+  requestedAt: string;
   expiresAt: string;
 };
 
@@ -25,6 +28,7 @@ export type MatchedPaymentTransaction = {
 
 export function buildUpiPaymentUri(args: {
   identifier: string;
+  statementCode?: string | null;
   amount: number;
   upiId?: string;
   merchantName?: string;
@@ -32,15 +36,16 @@ export function buildUpiPaymentUri(args: {
   const upiId = args.upiId ?? PAYMENT_UPI_ID;
   const merchantName = args.merchantName ?? PAYMENT_MERCHANT_NAME;
   const amount = formatUpiAmount(args.amount);
-  const paymentCode = getPaymentRequestCode(args.identifier);
-  const note = getPaymentRequestNote(args.identifier, merchantName);
+  const statementCode = normalizeStatementCode(args.statementCode);
+  const reference = statementCode ?? getPaymentRequestCode(args.identifier);
+  const note = statementCode ?? getPaymentRequestNote(args.identifier, merchantName);
   const params = new URLSearchParams({
     pa: upiId,
     pn: merchantName,
     am: amount,
     cu: "INR",
-    tr: paymentCode,
     tn: note,
+    tr: reference,
   });
 
   return `upi://pay?${params.toString()}`;
@@ -57,16 +62,48 @@ export function getPaymentRequestNote(
   return `${getPaymentRequestCode(identifier)} ${merchantName}`;
 }
 
+export function getPaymentRequestDisplayCode(request: {
+  identifier: string;
+  statementCode?: string | null;
+  upiUri?: string | null;
+}): string {
+  return (
+    normalizeStatementCode(request.statementCode) ??
+    getStatementCodeFromUpiUri(request.upiUri) ??
+    getPaymentRequestCode(request.identifier)
+  );
+}
+
+export function getStatementCodeFromUpiUri(
+  upiUri: string | null | undefined
+): string | null {
+  const query = upiUri?.split("?")[1];
+  if (!query) {
+    return null;
+  }
+
+  const params = new URLSearchParams(query);
+  return (
+    normalizeStatementCode(params.get("tn")) ??
+    normalizeStatementCode(params.get("tr"))
+  );
+}
+
 export function findPaymentRequestMatches(
   requests: PendingPaymentRequestMatch[],
   transactions: GoogleSheetTransaction[],
   now: Date = new Date()
 ): MatchedPaymentTransaction[] {
+  const activeRequests = requests.filter(
+    (request) => !isExpired(request.expiresAt, now)
+  );
   const usedRowNumbers = new Set<number>();
+  const matchedRequestIds = new Set<string>();
   const matches: MatchedPaymentTransaction[] = [];
 
-  for (const request of requests) {
-    if (isExpired(request.expiresAt, now)) {
+  for (const request of activeRequests) {
+    const statementCode = normalizeStatementCode(request.statementCode);
+    if (!statementCode) {
       continue;
     }
 
@@ -75,21 +112,66 @@ export function findPaymentRequestMatches(
         return false;
       }
 
-      return doesTransactionMatchRequest(row, request);
+      return (
+        isCreditedSheetTransaction(row) &&
+        isSameMoneyAmount(row.amount, request.amount) &&
+        hasStatementCodeToken(getTransactionMatchText(row), statementCode)
+      );
     });
 
     if (transaction) {
       usedRowNumbers.add(transaction.rowNumber);
+      matchedRequestIds.add(request.id);
       matches.push({ request, transaction });
     }
   }
+
+  for (const request of activeRequests) {
+    if (matchedRequestIds.has(request.id) || request.statementCode) {
+      continue;
+    }
+
+    const transaction = transactions.find((row) => {
+      if (usedRowNumbers.has(row.rowNumber)) {
+        return false;
+      }
+
+      return doesLegacyTransactionMatchRequest(row, request);
+    });
+
+    if (transaction) {
+      usedRowNumbers.add(transaction.rowNumber);
+      matchedRequestIds.add(request.id);
+      matches.push({ request, transaction });
+    }
+  }
+
+  matchByStatementCodePrefix({
+    activeRequests,
+    transactions,
+    usedRowNumbers,
+    matchedRequestIds,
+    matches,
+    prefixLength: 2,
+  });
+  matchByStatementCodePrefix({
+    activeRequests,
+    transactions,
+    usedRowNumbers,
+    matchedRequestIds,
+    matches,
+    prefixLength: 1,
+  });
 
   return matches;
 }
 
 export function doesTransactionMatchRequest(
   transaction: GoogleSheetTransaction,
-  request: Pick<PendingPaymentRequestMatch, "identifier" | "amount">
+  request: Pick<
+    PendingPaymentRequestMatch,
+    "identifier" | "statementCode" | "amount"
+  >
 ): boolean {
   if (!isCreditedSheetTransaction(transaction)) {
     return false;
@@ -100,10 +182,12 @@ export function doesTransactionMatchRequest(
   }
 
   const matchText = getTransactionMatchText(transaction);
-  const rawIdentifier = request.identifier.toUpperCase();
-  const paymentCode = getPaymentRequestCode(request.identifier).toUpperCase();
+  const statementCode = normalizeStatementCode(request.statementCode);
+  if (statementCode) {
+    return hasStatementCodeToken(matchText, statementCode);
+  }
 
-  return matchText.includes(paymentCode) || matchText.includes(rawIdentifier);
+  return doesLegacyMatchTextContainIdentifier(matchText, request.identifier);
 }
 
 export function isCreditedSheetTransaction(row: GoogleSheetTransaction): boolean {
@@ -142,6 +226,111 @@ function isSameMoneyAmount(left: number | null, right: number): boolean {
   }
 
   return Math.round(left * 100) === Math.round(right * 100);
+}
+
+function doesLegacyTransactionMatchRequest(
+  transaction: GoogleSheetTransaction,
+  request: Pick<PendingPaymentRequestMatch, "identifier" | "amount">
+): boolean {
+  if (!isCreditedSheetTransaction(transaction)) {
+    return false;
+  }
+
+  if (!isSameMoneyAmount(transaction.amount, request.amount)) {
+    return false;
+  }
+
+  return doesLegacyMatchTextContainIdentifier(
+    getTransactionMatchText(transaction),
+    request.identifier
+  );
+}
+
+function doesLegacyMatchTextContainIdentifier(
+  matchText: string,
+  identifier: string
+): boolean {
+  const rawIdentifier = identifier.toUpperCase();
+  const paymentCode = getPaymentRequestCode(identifier).toUpperCase();
+
+  return matchText.includes(paymentCode) || matchText.includes(rawIdentifier);
+}
+
+function matchByStatementCodePrefix({
+  activeRequests,
+  transactions,
+  usedRowNumbers,
+  matchedRequestIds,
+  matches,
+  prefixLength,
+}: {
+  activeRequests: PendingPaymentRequestMatch[];
+  transactions: GoogleSheetTransaction[];
+  usedRowNumbers: Set<number>;
+  matchedRequestIds: Set<string>;
+  matches: MatchedPaymentTransaction[];
+  prefixLength: 1 | 2;
+}) {
+  for (const transaction of transactions) {
+    if (usedRowNumbers.has(transaction.rowNumber)) {
+      continue;
+    }
+
+    if (!isCreditedSheetTransaction(transaction)) {
+      continue;
+    }
+
+    const matchText = getTransactionMatchText(transaction);
+    const candidates = activeRequests.filter((request) => {
+      if (
+        matchedRequestIds.has(request.id) ||
+        !isSameMoneyAmount(transaction.amount, request.amount)
+      ) {
+        return false;
+      }
+
+      const statementCode = normalizeStatementCode(request.statementCode);
+      if (!statementCode) {
+        return false;
+      }
+
+      return hasStatementCodeToken(
+        matchText,
+        statementCode.slice(0, prefixLength)
+      );
+    });
+
+    if (candidates.length !== 1) {
+      continue;
+    }
+
+    usedRowNumbers.add(transaction.rowNumber);
+    matchedRequestIds.add(candidates[0].id);
+    matches.push({ request: candidates[0], transaction });
+  }
+}
+
+function hasStatementCodeToken(matchText: string, code: string): boolean {
+  const normalizedCode = code.toUpperCase();
+  const pattern = new RegExp(
+    `(^|[^A-Z0-9])${escapeRegExp(normalizedCode)}([^A-Z0-9]|$)`
+  );
+  return pattern.test(matchText);
+}
+
+function normalizeStatementCode(
+  statementCode: string | null | undefined
+): string | null {
+  if (!statementCode) {
+    return null;
+  }
+
+  const normalized = statementCode.trim().toUpperCase();
+  return /^[A-Z]{4}$/.test(normalized) ? normalized : null;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function isCreditRow(row: GoogleSheetTransaction): boolean {
