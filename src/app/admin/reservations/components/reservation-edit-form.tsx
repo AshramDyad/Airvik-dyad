@@ -35,10 +35,10 @@ import { isBookableRoom, ROOM_STATUS_LABELS } from "@/lib/rooms";
 import {
   calculateMultipleRoomPricing,
   calculateRoomPricing,
-  getSeasonalPrice,
   resolveRoomNightlyRate,
   type RoomPricingOverrides,
 } from "@/lib/pricing-calculator";
+import { deriveSavedCustomNightlyRates } from "@/lib/reservations/custom-pricing";
 import { resolveReservationTaxConfig } from "@/lib/reservations/calculate-financials";
 import { buildRoomOccupancyAssignments } from "@/lib/reservations/guest-allocation";
 import {
@@ -211,24 +211,45 @@ export function ReservationEditForm({
   const roomMap = React.useMemo(() => new Map(rooms.map((room) => [room.id, room])), [rooms]);
   const roomTypeMap = React.useMemo(() => new Map(roomTypes.map((type) => [type.id, type])), [roomTypes]);
 
-  const derivedCustomRates = React.useMemo(() => {
-    if (!initialStayNights) {
-      return {};
+  const getDefaultRatePlan = React.useMemo(() => {
+    // Look for "Standard Rate" first, then fall back to first available rate plan
+    return ratePlans.find((plan) => plan.name === "Standard Rate") || ratePlans[0];
+  }, [ratePlans]);
+
+  const ratePlan = React.useMemo(() => {
+    if (!ratePlans.length) {
+      return undefined;
     }
-    const entries = new Map<string, number>();
-    activeGroupReservations.forEach((entry) => {
-      const room = roomMap.get(entry.roomId);
-      if (!room) return;
-      const roomType = roomTypeMap.get(room.roomTypeId);
-      if (!roomType) return;
-      if (!entry.totalAmount || entry.totalAmount <= 0) return;
-      const nightly = entry.totalAmount / initialStayNights;
-      if (nightly > 0) {
-        entries.set(roomType.id, nightly);
-      }
+
+    // If reservation has a rate plan, use it
+    if (reservation.ratePlanId) {
+      return ratePlans.find((plan) => plan.id === reservation.ratePlanId);
+    }
+
+    // For imported reservations without rate plan, use default
+    return getDefaultRatePlan;
+  }, [ratePlans, reservation.ratePlanId, getDefaultRatePlan]);
+  const ratePlanUnavailable = !ratePlan;
+
+  const derivedCustomRates = React.useMemo(() => {
+    return deriveSavedCustomNightlyRates({
+      reservations: activeGroupReservations,
+      rooms,
+      roomTypes,
+      ratePlan,
+      seasonalPrices,
+      stayNights: initialStayNights,
+      checkInDate: reservation.checkInDate,
     });
-    return Object.fromEntries(entries);
-  }, [activeGroupReservations, initialStayNights, roomMap, roomTypeMap]);
+  }, [
+    activeGroupReservations,
+    initialStayNights,
+    ratePlan,
+    reservation.checkInDate,
+    rooms,
+    roomTypes,
+    seasonalPrices,
+  ]);
 
   const resolveCapacity = React.useCallback(
     (roomIds: string[]) =>
@@ -401,26 +422,6 @@ export function ReservationEditForm({
     return entries.sort((a, b) => order[a.kind] - order[b.kind]);
   }, [activeGroupReservations, roomMap, roomTypeMap, selectedRoomIds]);
 
-  const getDefaultRatePlan = React.useMemo(() => {
-    // Look for "Standard Rate" first, then fall back to first available rate plan
-    return ratePlans.find((plan) => plan.name === "Standard Rate") || ratePlans[0];
-  }, [ratePlans]);
-
-  const ratePlan = React.useMemo(() => {
-    if (!ratePlans.length) {
-      return undefined;
-    }
-
-    // If reservation has a rate plan, use it
-    if (reservation.ratePlanId) {
-      return ratePlans.find((plan) => plan.id === reservation.ratePlanId);
-    }
-
-    // For imported reservations without rate plan, use default
-    return getDefaultRatePlan;
-  }, [ratePlans, reservation.ratePlanId, getDefaultRatePlan]);
-  const ratePlanUnavailable = !ratePlan;
-
   const selectedRoomsCapacity = React.useMemo(
     () => resolveCapacity(selectedRoomIds),
     [resolveCapacity, selectedRoomIds]
@@ -572,46 +573,6 @@ export function ReservationEditForm({
   const editCheckInDate = watchedDateRange?.from
     ? formatISO(watchedDateRange.from, { representation: "date" })
     : undefined;
-
-  // When the check-in date changes, clear auto-filled custom rates that no longer match
-  // the correct price for the new date. "Auto-filled" means the value was derived from
-  // the saved totalAmount and equals derivedCustomRates[roomTypeId]. If the user typed a
-  // different value, it won't match and will be left untouched.
-  React.useEffect(() => {
-    if (!editCheckInDate) return;
-
-    const currentRates = form.getValues("customRates") ?? {};
-    let changed = false;
-    const nextRates: Record<string, number> = { ...currentRates };
-
-    uniqueSelectedRoomTypes.forEach((roomType) => {
-      const currentOverride = currentRates[roomType.id];
-      if (typeof currentOverride !== "number" || currentOverride <= 0) return;
-
-      // Only clear if this rate matches the auto-filled derived value (not a manual override).
-      const autoFilledRate = derivedCustomRates[roomType.id];
-      if (autoFilledRate !== currentOverride) return;
-
-      // Compute the correct rate for the new check-in date.
-      const seasonalRate = getSeasonalPrice(roomType.id, editCheckInDate, seasonalPrices);
-      const defaultRate = roomType.price > 0 ? roomType.price : (ratePlan?.price ?? 0);
-      const correctRate = seasonalRate ?? defaultRate;
-
-      // If the stored rate is wrong for these dates, remove the override so the
-      // pricing engine recalculates with the seasonal or default price.
-      if (currentOverride !== correctRate) {
-        delete nextRates[roomType.id];
-        changed = true;
-      }
-    });
-
-    if (changed) {
-      form.setValue("customRates", nextRates, { shouldDirty: true, shouldValidate: true });
-    }
-    // We intentionally depend only on editCheckInDate so this runs exactly when the date
-    // changes, not on every re-render. The other values are read inside and are stable refs.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editCheckInDate]);
 
   const pricing = React.useMemo(() => {
     if (!selectedRoomTypes.length || nights <= 0 || !ratePlan) return null;

@@ -2,11 +2,13 @@ import type {
   Amenity,
   FolioItem,
   Guest,
+  RatePlan,
   Reservation,
   Role,
   Room,
   RoomStatus,
   RoomType,
+  SeasonalPrice,
   StickyNote,
   User,
 } from "@/data/types";
@@ -15,8 +17,10 @@ import { allPermissions } from "@/data/types";
 let roleSequence = 1;
 let userSequence = 1;
 let propertySequence = 1;
+let ratePlanSequence = 1;
 let roomTypeSequence = 1;
 let roomSequence = 1;
+let seasonalPriceSequence = 1;
 let reservationSequence = 1;
 let guestSequence = 1;
 let folioSequence = 1;
@@ -26,8 +30,10 @@ export const resetBuilderSequences = () => {
   roleSequence = 1;
   userSequence = 1;
   propertySequence = 1;
+  ratePlanSequence = 1;
   roomTypeSequence = 1;
   roomSequence = 1;
+  seasonalPriceSequence = 1;
   reservationSequence = 1;
   guestSequence = 1;
   folioSequence = 1;
@@ -94,6 +100,22 @@ export const buildProperty = () => {
   return property;
 };
 
+export const buildRatePlan = (overrides: Partial<RatePlan> = {}): RatePlan => {
+  const base: RatePlan = {
+    id: overrides.id ?? `rate-plan-${ratePlanSequence}`,
+    name: overrides.name ?? `Rate Plan ${ratePlanSequence}`,
+    price: overrides.price ?? 3000,
+    rules: overrides.rules ?? {
+      minStay: 1,
+      cancellationPolicy: "Free cancellation up to 24 hours before check-in",
+    },
+  };
+
+  ratePlanSequence += 1;
+
+  return { ...base, ...overrides };
+};
+
 export const buildRoomType = (overrides: Partial<RoomType> = {}): RoomType => {
   const base: RoomType = {
     id: overrides.id ?? `room-type-${roomTypeSequence}`,
@@ -125,6 +147,23 @@ export const buildRoom = (overrides: Partial<Room> = {}): Room => {
   };
 
   roomSequence += 1;
+
+  return { ...base, ...overrides };
+};
+
+export const buildSeasonalPrice = (
+  overrides: Partial<SeasonalPrice> = {}
+): SeasonalPrice => {
+  const base: SeasonalPrice = {
+    id: overrides.id ?? `seasonal-price-${seasonalPriceSequence}`,
+    roomTypeId: overrides.roomTypeId ?? buildRoomType().id,
+    name: overrides.name ?? `Season ${seasonalPriceSequence}`,
+    price: overrides.price ?? 3500,
+    startDate: overrides.startDate ?? "2026-04-01",
+    endDate: overrides.endDate ?? "2026-06-30",
+  };
+
+  seasonalPriceSequence += 1;
 
   return { ...base, ...overrides };
 };
