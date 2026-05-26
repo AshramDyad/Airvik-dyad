@@ -24,10 +24,10 @@ const availabilityStatusClasses: Record<AvailabilityCellStatus, string> = {
 };
 
 const bookedPillClasses =
-  "relative flex h-11 w-full items-center justify-center rounded-xl border border-indigo-300 bg-indigo-300 px-4 text-xs font-semibold text-indigo-900 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2";
+  "relative flex h-11 min-w-0 w-full items-center justify-center overflow-hidden rounded-xl border border-indigo-300 bg-indigo-300 px-2 text-xs font-semibold text-indigo-900 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2";
 
 const cellBaseClasses =
-  "relative flex min-h-[60px] w-full items-center justify-center rounded-none px-6 text-lg font-semibold transition focus-visible:outline-none";
+  "relative flex min-h-[60px] min-w-0 w-full items-center justify-center rounded-none px-2 text-lg font-semibold transition focus-visible:outline-none";
 
 interface RoomTypeRowProps {
   data: RoomTypeAvailability;
@@ -114,7 +114,7 @@ export function RoomTypeRow({
     <>
       {/* Aggregated Room Type Row */}
       <TableRow className="bg-transparent text-sm hover:bg-transparent data-[state=selected]:bg-transparent">
-        <TableCell className="sticky left-0 z-20 border-r border-b border-border/50 bg-card">
+        <TableCell className="sticky left-0 z-20 w-56 min-w-[14rem] max-w-[14rem] border-r border-b border-border/50 bg-card">
           <div className="flex items-center gap-3">
             <button
               type="button"
@@ -221,18 +221,19 @@ export function RoomTypeRow({
           );
 
           return (
-            <TableCell key={day.date} className="p-0">
+            <TableCell key={day.date} className="w-16 min-w-[4rem] max-w-[4rem] overflow-hidden p-0">
               {cellContent}
             </TableCell>
           );
         })}
+        <TableCell aria-hidden="true" className="border-b border-border/50 p-0" />
       </TableRow>
 
       {/* Expanded: Individual Room Number Rows */}
       {isExpanded &&
         roomType.rooms.map((room) => (
           <TableRow key={room.id} className="text-sm hover:bg-transparent data-[state=selected]:bg-transparent">
-            <TableCell className="sticky left-0 z-20 border-r border-b border-border/40 bg-card">
+            <TableCell className="sticky left-0 z-20 w-56 min-w-[14rem] max-w-[14rem] border-r border-b border-border/40 bg-card">
               <div className="flex items-center gap-2 pl-8 text-muted-foreground">
                 <span>→</span>
                 <span className="font-semibold text-foreground">
@@ -267,7 +268,7 @@ export function RoomTypeRow({
                   dayCells.push(
                     <TableCell
                       key={`${room.id}-${entry.reservationId}-${day.date}`}
-                      className="p-0"
+                      className="overflow-hidden p-0"
                       colSpan={span}
                     >
                       <ReservationHoverCard
@@ -307,7 +308,7 @@ export function RoomTypeRow({
 
                 const roomStatus: AvailabilityCellStatus = isClosed ? "closed" : "free";
                 dayCells.push(
-                  <TableCell key={`${room.id}-${day.date}`} className="p-0">
+                  <TableCell key={`${room.id}-${day.date}`} className="w-16 min-w-[4rem] max-w-[4rem] overflow-hidden p-0">
                     <div
                       className={cn(
                         cellBaseClasses,
@@ -323,6 +324,13 @@ export function RoomTypeRow({
                   </TableCell>
                 );
               }
+              dayCells.push(
+                <TableCell
+                  key={`${room.id}-trailing-scroll-space`}
+                  aria-hidden="true"
+                  className="border-b border-border/40 p-0"
+                />
+              );
               return dayCells;
             })()}
           </TableRow>
