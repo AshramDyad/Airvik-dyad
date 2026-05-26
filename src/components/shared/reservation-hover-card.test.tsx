@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -51,6 +51,17 @@ function reservationsByBookingIdResponse(
     status: 200,
     statusText: "OK",
   };
+}
+
+function createDeferred<T>() {
+  let resolve: (value: T | PromiseLike<T>) => void = () => undefined;
+  let reject: (reason?: unknown) => void = () => undefined;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+
+  return { promise, resolve, reject };
 }
 
 function mockDataContext(overrides: Partial<DataContextValue>) {
@@ -176,9 +187,8 @@ describe("ReservationHoverCard", () => {
     expect(mockedGetReservationById).not.toHaveBeenCalled();
   });
 
-  it("opens from hover only after the hover delay", () => {
-    vi.useFakeTimers();
-
+  it("does not open from hover and opens from click", async () => {
+    const user = userEvent.setup();
     const { guest, reservation, room, roomType } = buildReservationFixture();
 
     mockDataContext({
@@ -203,15 +213,10 @@ describe("ReservationHoverCard", () => {
 
     fireEvent.mouseEnter(trigger);
 
-    act(() => {
-      vi.advanceTimersByTime(179);
-    });
-
     expect(screen.queryByText("Alex Morgan")).not.toBeInTheDocument();
+    expect(screen.queryByText("Booking ID: ABCDEFG")).not.toBeInTheDocument();
 
-    act(() => {
-      vi.advanceTimersByTime(1);
-    });
+    await user.click(trigger);
 
     expect(screen.getByText("Alex Morgan")).toBeInTheDocument();
     expect(screen.getByText("Booking ID: ABCDEFG")).toBeInTheDocument();
@@ -235,9 +240,10 @@ describe("ReservationHoverCard", () => {
       rooms: [room, secondRoom],
       roomTypes: [roomType],
     });
-    mockedGetReservationById.mockResolvedValue(
-      reservationByIdResponse(reservation)
-    );
+    const reservationRequest = createDeferred<
+      Awaited<ReturnType<typeof getReservationById>>
+    >();
+    mockedGetReservationById.mockReturnValue(reservationRequest.promise);
     mockedGetReservationsByBookingId.mockResolvedValue(
       reservationsByBookingIdResponse([reservation, siblingReservation])
     );
@@ -254,6 +260,16 @@ describe("ReservationHoverCard", () => {
     await user.click(
       screen.getByRole("button", { name: "Open fetched booking" })
     );
+
+    expect(
+      screen.getByText("Loading reservation details...")
+    ).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveAttribute("aria-busy", "true");
+    expect(
+      screen.getByText("Fetching the booking linked to this calendar cell.")
+    ).toBeInTheDocument();
+
+    reservationRequest.resolve(reservationByIdResponse(reservation));
 
     await waitFor(() => {
       expect(mockedGetReservationById).toHaveBeenCalledWith(reservation.id);

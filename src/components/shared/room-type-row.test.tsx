@@ -1,5 +1,5 @@
 import * as React from "react";
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -139,12 +139,6 @@ function renderControlledRoomTypeRow(
   );
 }
 
-function advanceHoverDelay() {
-  act(() => {
-    vi.advanceTimersByTime(180);
-  });
-}
-
 describe("RoomTypeRow", () => {
   beforeEach(() => {
     vi.useRealTimers();
@@ -281,9 +275,8 @@ describe("RoomTypeRow", () => {
     expect(screen.getByText("Room 101")).toBeInTheDocument();
   });
 
-  it("opens an expanded room reservation pill after the hover delay", () => {
-    vi.useFakeTimers();
-
+  it("opens an expanded room reservation pill on click", async () => {
+    const user = userEvent.setup();
     const { guest, reservation, room, roomType, rowData } =
       buildReservationRowFixture();
 
@@ -301,7 +294,7 @@ describe("RoomTypeRow", () => {
       todayIso: "2026-05-25",
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Expand" }));
+    await user.click(screen.getByRole("button", { name: "Expand" }));
 
     const reservationPill = screen.getByRole("button", {
       name: "View booking details for Alex Morgan in Room 101 on May 20, 2026",
@@ -309,23 +302,16 @@ describe("RoomTypeRow", () => {
 
     fireEvent.mouseEnter(reservationPill);
 
-    act(() => {
-      vi.advanceTimersByTime(179);
-    });
-
     expect(screen.queryByText("Booking ID: ABCDEFG")).not.toBeInTheDocument();
 
-    act(() => {
-      vi.advanceTimersByTime(1);
-    });
+    await user.click(reservationPill);
 
     expect(screen.getByText("Booking ID: ABCDEFG")).toBeInTheDocument();
     expect(mockedGetReservationById).not.toHaveBeenCalled();
   });
 
-  it("keeps only one expanded reservation popup open when moving across pills", () => {
-    vi.useFakeTimers();
-
+  it("keeps only one expanded reservation popup open when clicking across pills", async () => {
+    const user = userEvent.setup();
     const roomType = buildRoomType({
       id: "room-type-deluxe",
       name: "Deluxe Suite",
@@ -422,7 +408,7 @@ describe("RoomTypeRow", () => {
       todayIso: "2026-05-25",
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Expand" }));
+    await user.click(screen.getByRole("button", { name: "Expand" }));
 
     const firstPill = screen.getByRole("button", {
       name: "View booking details for Alex Morgan in Room 101 on May 20, 2026",
@@ -431,15 +417,12 @@ describe("RoomTypeRow", () => {
       name: "View booking details for Jordan Lee in Room 102 on May 20, 2026",
     });
 
-    fireEvent.mouseEnter(firstPill);
-    advanceHoverDelay();
+    await user.click(firstPill);
 
     expect(screen.getAllByRole("dialog")).toHaveLength(1);
     expect(within(screen.getByRole("dialog")).getByText("Alex Morgan")).toBeInTheDocument();
 
-    fireEvent.mouseLeave(firstPill);
-    fireEvent.mouseEnter(secondPill);
-    advanceHoverDelay();
+    await user.click(secondPill);
 
     expect(screen.getAllByRole("dialog")).toHaveLength(1);
     expect(
