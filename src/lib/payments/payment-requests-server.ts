@@ -12,17 +12,22 @@ import { fetchGoogleSheetTransactions } from "@/lib/google-sheets/transactions";
 import {
   buildUpiPaymentUri,
   findPaymentRequestMatches,
+  getStatementCodeFromUpiUri,
   PAYMENT_IDENTIFIER_LENGTH,
+  PAYMENT_IDENTIFIER_PREFIX,
   PAYMENT_MERCHANT_NAME,
   PAYMENT_REQUEST_EXPIRY_HOURS,
+  PAYMENT_STATEMENT_CODE_LENGTH,
   PAYMENT_UPI_ID,
   type PendingPaymentRequestMatch,
 } from "@/lib/payments/payment-request-matching";
 
 const IDENTIFIER_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
+const STATEMENT_CODE_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 const PAYMENT_REQUEST_SELECT = [
   "id",
   "identifier",
+  "statement_code",
   "reservation_id",
   "folio_item_id",
   "amount",
@@ -45,6 +50,7 @@ const PAYMENT_REQUEST_SELECT = [
 type DbPaymentRequest = {
   id: string;
   identifier: string;
+  statement_code: string | null;
   reservation_id: string | null;
   folio_item_id: string | null;
   amount: number | string;
@@ -66,6 +72,7 @@ type DbPaymentRequest = {
 
 type PaymentRequestInsert = {
   identifier: string;
+  statement_code: string;
   reservation_id?: string | null;
   amount: number;
   upi_id: string;
@@ -106,14 +113,17 @@ export async function createPaymentRequest(args: {
   reservationId?: string | null;
 }): Promise<PaymentRequest> {
   const { supabase, amount, createdBy, reservationId } = args;
+  await markExpiredPaymentRequests(supabase);
   const identifier = await createUniqueIdentifier(supabase);
-  const upiUri = buildUpiPaymentUri({ identifier, amount });
+  const statementCode = await createUniqueStatementCode(supabase, amount);
+  const upiUri = buildUpiPaymentUri({ identifier, statementCode, amount });
   const expiresAt = new Date(
     Date.now() + PAYMENT_REQUEST_EXPIRY_HOURS * 60 * 60 * 1000
   ).toISOString();
 
   const payload: PaymentRequestInsert = {
     identifier,
+    statement_code: statementCode,
     reservation_id: reservationId ?? null,
     amount,
     upi_id: PAYMENT_UPI_ID,
@@ -144,7 +154,9 @@ export async function reconcilePaymentRequests(
 
   let query = supabase
     .from("payment_requests")
-    .select("id, identifier, amount, expires_at")
+    .select(
+      "id, identifier, statement_code, upi_uri, amount, requested_at, expires_at"
+    )
     .eq("status", "pending")
     .order("created_at", { ascending: true });
 
@@ -161,12 +173,18 @@ export async function reconcilePaymentRequests(
   const pendingRequests = ((data ?? []) as unknown as Array<{
     id: string;
     identifier: string;
+    statement_code: string | null;
+    upi_uri: string;
     amount: number | string;
+    requested_at: string;
     expires_at: string;
   }>).map<PendingPaymentRequestMatch>((row) => ({
     id: row.id,
     identifier: row.identifier,
+    statementCode:
+      row.statement_code ?? getStatementCodeFromUpiUri(row.upi_uri),
     amount: readMoney(row.amount),
+    requestedAt: row.requested_at,
     expiresAt: row.expires_at,
   }));
 
@@ -200,6 +218,8 @@ function toPaymentRequest(row: DbPaymentRequest): PaymentRequest {
   return {
     id: row.id,
     identifier: row.identifier,
+    statementCode:
+      row.statement_code ?? getStatementCodeFromUpiUri(row.upi_uri),
     reservationId: row.reservation_id,
     folioItemId: row.folio_item_id,
     amount: readMoney(row.amount),
@@ -243,6 +263,67 @@ async function createUniqueIdentifier(
   throw new Error("Unable to create a unique payment identifier.");
 }
 
+async function createUniqueStatementCode(
+  supabase: SupabaseClient,
+  amount: number
+): Promise<string> {
+  const { data, error } = await supabase
+    .from("payment_requests")
+    .select("amount, statement_code")
+    .eq("status", "pending")
+    .gt("expires_at", new Date().toISOString())
+    .not("statement_code", "is", null);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const activeCodes = ((data ?? []) as unknown as Array<{
+    amount: number | string;
+    statement_code: string | null;
+  }>).reduce(
+    (accumulator, row) => {
+      if (!row.statement_code) {
+        return accumulator;
+      }
+
+      const code = row.statement_code.toUpperCase();
+      accumulator.codes.add(code);
+
+      if (isSameMoneyAmount(readMoney(row.amount), amount)) {
+        accumulator.initialsForAmount.add(code.slice(0, 1));
+      }
+
+      return accumulator;
+    },
+    {
+      codes: new Set<string>(),
+      initialsForAmount: new Set<string>(),
+    }
+  );
+  const availableInitials = [...STATEMENT_CODE_ALPHABET].filter(
+    (letter) => !activeCodes.initialsForAmount.has(letter)
+  );
+
+  if (availableInitials.length === 0) {
+    throw new Error(
+      "Unable to create a payment statement code because all first-letter codes are in use for this amount."
+    );
+  }
+
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    const initial = availableInitials[randomInt(availableInitials.length)];
+    const statementCode = createStatementCode(initial);
+    if (activeCodes.codes.has(statementCode)) {
+      continue;
+    }
+
+    return statementCode;
+  }
+
+  throw new Error("Unable to create a unique payment statement code.");
+}
+
 function createIdentifier(): string {
   let identifier = "";
   for (let index = 0; index < PAYMENT_IDENTIFIER_LENGTH; index += 1) {
@@ -250,6 +331,20 @@ function createIdentifier(): string {
   }
 
   return identifier;
+}
+
+function createStatementCode(initial: string): string {
+  let statementCode = initial;
+  for (let index = 1; index < PAYMENT_STATEMENT_CODE_LENGTH; index += 1) {
+    statementCode +=
+      STATEMENT_CODE_ALPHABET[randomInt(STATEMENT_CODE_ALPHABET.length)];
+  }
+
+  if (statementCode.startsWith(PAYMENT_IDENTIFIER_PREFIX)) {
+    return createStatementCode(initial);
+  }
+
+  return statementCode;
 }
 
 async function markExpiredPaymentRequests(
@@ -296,4 +391,8 @@ function readMoney(value: number | string): number {
 
   const parsed = Number.parseFloat(value);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function isSameMoneyAmount(left: number, right: number): boolean {
+  return Math.round(left * 100) === Math.round(right * 100);
 }

@@ -5,12 +5,13 @@ import QRCode from "qrcode";
 import type { PaymentRequest } from "@/data/types";
 import {
   buildUpiPaymentUri,
-  getPaymentRequestCode,
+  getPaymentRequestDisplayCode,
   PAYMENT_MERCHANT_NAME,
 } from "@/lib/payments/payment-request-matching";
 
 const SHARE_IMAGE_WIDTH = 760;
-const SHARE_IMAGE_HEIGHT = 1020;
+const SHARE_IMAGE_HEIGHT = 1060;
+const QR_IMAGE_SIZE = 540;
 
 export async function createShareablePaymentQrImage({
   request,
@@ -25,16 +26,17 @@ export async function createShareablePaymentQrImage({
 }): Promise<string> {
   const upiUri = buildUpiPaymentUri({
     identifier: request.identifier,
+    statementCode: request.statementCode,
     amount: request.amount,
     upiId: request.upiId,
     merchantName: request.upiMerchantName,
   });
   const qrDataUrl = await QRCode.toDataURL(upiUri, {
     errorCorrectionLevel: "H",
-    margin: 2,
-    width: 470,
+    margin: 4,
+    width: QR_IMAGE_SIZE,
     color: {
-      dark: "#111827",
+      dark: "#000000",
       light: "#ffffff",
     },
   });
@@ -99,8 +101,8 @@ function drawQrShareCard(
   context.fillStyle = "#f8fafc";
   context.fillRect(0, 0, SHARE_IMAGE_WIDTH, SHARE_IMAGE_HEIGHT);
 
-  drawRoundedRect(context, 46, 36, 668, 948, 26, "#ffffff");
-  drawRoundedRect(context, 46, 36, 668, 948, 26, "transparent", "#dbe3ea");
+  drawRoundedRect(context, 46, 36, 668, 988, 26, "#ffffff");
+  drawRoundedRect(context, 46, 36, 668, 988, 26, "transparent", "#dbe3ea");
 
   context.fillStyle = "#eef2f6";
   context.fillRect(47, 37, 666, 120);
@@ -126,14 +128,14 @@ function drawQrShareCard(
 
   drawPaymentAppLabels(context, 98, 222);
 
-  context.drawImage(qrImage, 145, 280, 470, 470);
+  context.drawImage(qrImage, 110, 260, QR_IMAGE_SIZE, QR_IMAGE_SIZE);
 
-  drawText(context, "Amount", 380, 790, {
+  drawText(context, "Amount", 380, 835, {
     font: "600 20px system-ui, sans-serif",
     color: "#64748b",
     align: "center",
   });
-  drawText(context, formatCurrency(request.amount, currency), 380, 836, {
+  drawText(context, formatCurrency(request.amount, currency), 380, 880, {
     font: "800 44px system-ui, sans-serif",
     color: "#0f172a",
     align: "center",
@@ -141,9 +143,9 @@ function drawQrShareCard(
 
   drawText(
     context,
-    `Payment ID: ${getPaymentRequestCode(request.identifier)}`,
+    `Payment Code: ${getPaymentRequestDisplayCode(request)}`,
     380,
-    884,
+    928,
     {
       font: "600 18px ui-monospace, SFMono-Regular, Menlo, monospace",
       color: "#94a3b8",
@@ -155,14 +157,14 @@ function drawQrShareCard(
     context,
     `Valid until ${formatDateTime(request.expiresAt)}`,
     380,
-    928,
+    964,
     {
       font: "700 20px system-ui, sans-serif",
       color: "#b45309",
       align: "center",
     }
   );
-  drawText(context, `UPI: ${request.upiId}`, 380, 960, {
+  drawText(context, `UPI: ${request.upiId}`, 380, 996, {
     font: "600 18px system-ui, sans-serif",
     color: "#475569",
     align: "center",

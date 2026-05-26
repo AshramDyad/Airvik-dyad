@@ -152,6 +152,7 @@ function buildPaymentRequest(): PaymentRequest {
   return {
     id: "payment-request-1",
     identifier: "ABCDE",
+    statementCode: "KJRM",
     reservationId: RESERVATION_ID,
     folioItemId: null,
     amount: 500,

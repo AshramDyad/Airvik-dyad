@@ -197,7 +197,7 @@ describe("ReservationPaymentRequestsPanel", () => {
 
     renderPanel();
 
-    await screen.findByText("SW-XAL6S");
+    await screen.findByText("XALP");
     await user.click(screen.getByRole("button", { name: /refresh/i }));
 
     await waitFor(() => {
@@ -314,6 +314,7 @@ function buildPaidRequest(): PaymentRequest {
   return {
     id: "payment-request-1",
     identifier: "ABCDE",
+    statementCode: "KJRM",
     reservationId: "reservation-1",
     folioItemId: "folio-override-1",
     amount: 1500,
@@ -339,6 +340,7 @@ function buildPendingRequest(amount: number): PaymentRequest {
     ...buildPaidRequest(),
     id: "payment-request-pending",
     identifier: "XAL6S",
+    statementCode: "XALP",
     folioItemId: null,
     amount,
     paidAmount: 0,

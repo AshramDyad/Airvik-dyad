@@ -5,12 +5,16 @@ import {
   buildUpiPaymentUri,
   doesTransactionMatchRequest,
   findPaymentRequestMatches,
+  getPaymentRequestDisplayCode,
+  getStatementCodeFromUpiUri,
+  type PendingPaymentRequestMatch,
 } from "@/lib/payments/payment-request-matching";
 
 describe("payment request matching", () => {
-  it("builds a UPI payment URI with amount and identifier", () => {
+  it("builds a UPI payment URI with the statement code as note and reference", () => {
     const uri = buildUpiPaymentUri({
       identifier: "AB123",
+      statementCode: "ABCD",
       amount: 1500,
     });
 
@@ -19,8 +23,39 @@ describe("payment request matching", () => {
     expect(uri).toContain("pn=Sahajanand+Wellness");
     expect(uri).toContain("am=1500.00");
     expect(uri).toContain("cu=INR");
+    expect(uri).toContain("tr=ABCD");
+    expect(uri).toContain("tn=ABCD");
+    expect(uri).not.toContain("tn=SW-");
+  });
+
+  it("keeps legacy UPI payment URI notes when no statement code exists", () => {
+    const uri = buildUpiPaymentUri({
+      identifier: "AB123",
+      amount: 1500,
+    });
+
     expect(uri).toContain("tr=SW-AB123");
     expect(uri).toContain("tn=SW-AB123+Sahajanand+Wellness");
+  });
+
+  it("reads a statement code from saved UPI URI tn or tr fields", () => {
+    const uriWithNote = buildUpiPaymentUri({
+      identifier: "AB123",
+      statementCode: "EFXG",
+      amount: 1,
+    });
+    const uriWithReferenceOnly =
+      "upi://pay?pa=merchant%40upi&pn=Ashram&am=1.00&cu=INR&tn=pay&tr=ZABC";
+
+    expect(getStatementCodeFromUpiUri(uriWithNote)).toBe("EFXG");
+    expect(getStatementCodeFromUpiUri(uriWithReferenceOnly)).toBe("ZABC");
+    expect(
+      getPaymentRequestDisplayCode({
+        identifier: "AB123",
+        statementCode: null,
+        upiUri: uriWithNote,
+      })
+    ).toBe("EFXG");
   });
 
   it("matches only credited transactions with the exact amount and identifier", () => {
@@ -33,6 +68,7 @@ describe("payment request matching", () => {
     expect(
       doesTransactionMatchRequest(transaction, {
         identifier: "XYZ91",
+        statementCode: null,
         amount: 1200,
       })
     ).toBe(true);
@@ -48,9 +84,176 @@ describe("payment request matching", () => {
     expect(
       doesTransactionMatchRequest(transaction, {
         identifier: "XYZ91",
+        statementCode: null,
         amount: 1200,
       })
     ).toBe(true);
+  });
+
+  it("matches a full statement code with the exact amount", () => {
+    const matches = findPaymentRequestMatches(
+      [
+        createRequest({
+          id: "request-1",
+          identifier: "XYZ91",
+          statementCode: "ABCD",
+          amount: 1200,
+        }),
+      ],
+      [
+        createTransaction({
+          amount: 1200,
+          description: "UPI IN/ABCD/9537566009@ptsbi/Sahajanand Wellness",
+          raw: { credit: "1,200.00", debit: "" },
+        }),
+      ],
+      new Date("2026-05-19T10:00:00.000Z")
+    );
+
+    expect(matches).toHaveLength(1);
+    expect(matches[0].request.id).toBe("request-1");
+  });
+
+  it("matches a two-letter statement prefix only when unambiguous for the amount", () => {
+    const matches = findPaymentRequestMatches(
+      [
+        createRequest({
+          id: "request-1",
+          identifier: "XYZ91",
+          statementCode: "ABCD",
+          amount: 1200,
+        }),
+        createRequest({
+          id: "request-2",
+          identifier: "MNO82",
+          statementCode: "KJRM",
+          amount: 1200,
+        }),
+      ],
+      [
+        createTransaction({
+          amount: 1200,
+          description: "UPI IN/AB/9537566009@ptsbi/Sahajanand Wellness",
+          raw: { credit: "1,200.00", debit: "" },
+        }),
+      ],
+      new Date("2026-05-19T10:00:00.000Z")
+    );
+
+    expect(matches).toHaveLength(1);
+    expect(matches[0].request.id).toBe("request-1");
+  });
+
+  it("matches a one-letter statement prefix only when unambiguous for the amount", () => {
+    const matches = findPaymentRequestMatches(
+      [
+        createRequest({
+          id: "request-1",
+          identifier: "XYZ91",
+          statementCode: "ZABC",
+          amount: 1,
+        }),
+        createRequest({
+          id: "request-2",
+          identifier: "MNO82",
+          statementCode: "EFXG",
+          amount: 1,
+        }),
+      ],
+      [
+        createTransaction({
+          amount: 1,
+          description: "UPI IN/614657278099/kartavyapatel86@okaxis/Z/0000",
+          raw: { credit: "1.00", debit: "" },
+        }),
+      ],
+      new Date("2026-05-19T10:00:00.000Z")
+    );
+
+    expect(matches).toHaveLength(1);
+    expect(matches[0].request.id).toBe("request-1");
+  });
+
+  it("does not auto-match an ambiguous two-letter statement prefix", () => {
+    const matches = findPaymentRequestMatches(
+      [
+        createRequest({
+          id: "request-1",
+          identifier: "XYZ91",
+          statementCode: "ABCD",
+          amount: 1200,
+        }),
+        createRequest({
+          id: "request-2",
+          identifier: "MNO82",
+          statementCode: "ABYZ",
+          amount: 1200,
+        }),
+      ],
+      [
+        createTransaction({
+          amount: 1200,
+          description: "UPI IN/AB/9537566009@ptsbi/Sahajanand Wellness",
+          raw: { credit: "1,200.00", debit: "" },
+        }),
+      ],
+      new Date("2026-05-19T10:00:00.000Z")
+    );
+
+    expect(matches).toEqual([]);
+  });
+
+  it("does not auto-match an ambiguous one-letter statement prefix", () => {
+    const matches = findPaymentRequestMatches(
+      [
+        createRequest({
+          id: "request-1",
+          identifier: "XYZ91",
+          statementCode: "ZABC",
+          amount: 1,
+        }),
+        createRequest({
+          id: "request-2",
+          identifier: "MNO82",
+          statementCode: "ZFXG",
+          amount: 1,
+        }),
+      ],
+      [
+        createTransaction({
+          amount: 1,
+          description: "UPI IN/614657278099/kartavyapatel86@okaxis/Z/0000",
+          raw: { credit: "1.00", debit: "" },
+        }),
+      ],
+      new Date("2026-05-19T10:00:00.000Z")
+    );
+
+    expect(matches).toEqual([]);
+  });
+
+  it("keeps matching legacy SW payment codes for existing pending requests", () => {
+    const matches = findPaymentRequestMatches(
+      [
+        createRequest({
+          id: "request-1",
+          identifier: "ABC23",
+          statementCode: null,
+          amount: 1200,
+        }),
+      ],
+      [
+        createTransaction({
+          amount: 1200,
+          description: "UPI IN/SW-ABC23/9537566009@ptsbi/Sahajanand Wellness",
+          raw: { credit: "1,200.00", debit: "" },
+        }),
+      ],
+      new Date("2026-05-19T10:00:00.000Z")
+    );
+
+    expect(matches).toHaveLength(1);
+    expect(matches[0].request.id).toBe("request-1");
   });
 
   it("does not match debits, amount mismatches, or missing identifiers", () => {
@@ -61,7 +264,7 @@ describe("payment request matching", () => {
           description: "UPI payment XYZ91",
           raw: { credit: "", debit: "1,200.00" },
         }),
-        { identifier: "XYZ91", amount: 1200 }
+        { identifier: "XYZ91", statementCode: null, amount: 1200 }
       )
     ).toBe(false);
 
@@ -72,7 +275,7 @@ describe("payment request matching", () => {
           description: "UPI payment XYZ91",
           raw: { credit: "1,201.00", debit: "" },
         }),
-        { identifier: "XYZ91", amount: 1200 }
+        { identifier: "XYZ91", statementCode: null, amount: 1200 }
       )
     ).toBe(false);
 
@@ -83,7 +286,7 @@ describe("payment request matching", () => {
           description: "UPI payment",
           raw: { credit: "1,200.00", debit: "" },
         }),
-        { identifier: "XYZ91", amount: 1200 }
+        { identifier: "XYZ91", statementCode: null, amount: 1200 }
       )
     ).toBe(false);
   });
@@ -94,7 +297,9 @@ describe("payment request matching", () => {
         {
           id: "request-1",
           identifier: "XYZ91",
+          statementCode: "ABCD",
           amount: 1200,
+          requestedAt: "2026-05-19T08:00:00.000Z",
           expiresAt: "2026-05-19T09:00:00.000Z",
         },
       ],
@@ -128,6 +333,20 @@ function createTransaction(
     status: null,
     raw: {},
     cells: [],
+    ...overrides,
+  };
+}
+
+function createRequest(
+  overrides: Partial<PendingPaymentRequestMatch>
+): PendingPaymentRequestMatch {
+  return {
+    id: "request-1",
+    identifier: "XYZ91",
+    statementCode: "ABCD",
+    amount: 1200,
+    requestedAt: "2026-05-19T08:00:00.000Z",
+    expiresAt: "2026-05-19T11:00:00.000Z",
     ...overrides,
   };
 }

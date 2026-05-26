@@ -117,6 +117,12 @@ const legendStatuses: Array<{ key: AvailabilityCellStatus; label: string }> = [
   { key: "closed", label: "Closed" },
 ];
 
+const roomLabelColumnRem = 14;
+const dayColumnRem = 4;
+const roomLabelColumnPx = roomLabelColumnRem * 16;
+const dayColumnPx = dayColumnRem * 16;
+const trailingScrollSpace = "var(--availability-scroll-tail-width, 0px)";
+
 export function AvailabilityCalendar() {
   const { property } = useDataContext();
   const [currentMonth, setCurrentMonth] = React.useState(
@@ -384,6 +390,13 @@ export function AvailabilityCalendar() {
                     : monthAvailability;
                 const headerDays = buildHeaderDays(headerSource, monthDate);
                 const monthLabel = format(monthDate, "MMMM yyyy");
+                const tableWidthRem =
+                  roomLabelColumnRem + headerDays.length * dayColumnRem;
+                const initialScrollDate = headerDays.some(
+                  (day) => day.iso === todayIso
+                )
+                  ? todayIso
+                  : undefined;
 
                 return (
                   <section
@@ -394,19 +407,26 @@ export function AvailabilityCalendar() {
                       <DragScrollContainer
                         ariaLabel={`Availability grid for ${monthLabel}`}
                         className="max-h-[calc(100vh-280px)] overflow-auto scrollbar-hide"
-                        initialScrollDate={
-                          headerDays.some((day) => day.iso === todayIso)
-                            ? todayIso
-                            : undefined
-                        }
+                        initialScrollDate={initialScrollDate}
                       >
-                        <Table className="min-w-max border-separate border-spacing-0" baseWrapper={false}>
+                        <Table
+                          className="table-fixed border-separate border-spacing-0"
+                          style={{
+                            width: `calc(${tableWidthRem}rem + ${trailingScrollSpace})`,
+                            minWidth: `calc(${tableWidthRem}rem + ${trailingScrollSpace})`,
+                          }}
+                          baseWrapper={false}
+                        >
+                          <colgroup>
+                            <col style={{ width: `${roomLabelColumnRem}rem` }} />
+                            {headerDays.map((day) => (
+                              <col key={day.iso} style={{ width: `${dayColumnRem}rem` }} />
+                            ))}
+                            <col style={{ width: trailingScrollSpace }} />
+                          </colgroup>
                           <TableHeader className="sticky top-0 z-30 bg-card/95 backdrop-blur shadow-sm">
                             <TableRow>
-                              <TableHead
-                                className="sticky left-0 z-40 w-56 border-r border-b border-border/40 bg-card/95 backdrop-blur px-4 py-3 text-left text-xs font-semibold text-muted-foreground"
-                                data-calendar-sticky-column
-                              >
+                              <TableHead className="sticky left-0 z-40 w-56 min-w-[14rem] max-w-[14rem] border-r border-b border-border/40 bg-card/95 backdrop-blur px-4 py-3 text-left text-xs font-semibold text-muted-foreground">
                                 <div>
                                   <p className="text-[11px]">Month</p>
                                   <p className="text-base font-semibold text-foreground">
@@ -419,8 +439,9 @@ export function AvailabilityCalendar() {
                                 return (
                                   <TableHead
                                     key={day.iso}
+                                    data-availability-date={day.iso}
                                     className={cn(
-                                      "min-w-[3.5rem] border-l border-b border-border/60 px-2 py-3 text-center text-[11px] font-semibold uppercase tracking-wide",
+                                      "w-16 min-w-[4rem] max-w-[4rem] border-l border-b border-border/60 px-2 py-3 text-center text-[11px] font-semibold uppercase tracking-wide",
                                       isTodayColumn
                                         ? "bg-primary text-white shadow-[0_4px_20px_rgba(16,185,129,0.2)]"
                                         : "bg-card/95 backdrop-blur text-foreground"
@@ -432,6 +453,14 @@ export function AvailabilityCalendar() {
                                   </TableHead>
                                 );
                               })}
+                              <TableHead
+                                aria-hidden="true"
+                                className="border-b border-border/60 bg-card/95 p-0"
+                                style={{
+                                  width: trailingScrollSpace,
+                                  minWidth: trailingScrollSpace,
+                                }}
+                              />
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -500,30 +529,62 @@ function DragScrollContainer({
     hasCapture: false,
   });
 
-  React.useLayoutEffect(() => {
-    if (!initialScrollDate) {
-      return;
-    }
-
+  React.useEffect(() => {
     const container = containerRef.current;
-    if (!container) {
-      return;
-    }
+    if (!container) return;
 
-    const stickyColumn = container.querySelector<HTMLElement>(
-      "[data-calendar-sticky-column]"
-    );
-    const initialDateHeader = container.querySelector<HTMLElement>(
-      `[data-calendar-date="${initialScrollDate}"]`
-    );
-    if (!stickyColumn || !initialDateHeader) {
-      return;
-    }
+    const updateTrailingScrollSpace = () => {
+      const tailWidth = Math.max(
+        0,
+        container.clientWidth - roomLabelColumnPx - dayColumnPx
+      );
+      container.style.setProperty(
+        "--availability-scroll-tail-width",
+        `${tailWidth}px`
+      );
+    };
 
-    container.scrollLeft = Math.max(
-      initialDateHeader.offsetLeft - stickyColumn.offsetWidth,
-      0
-    );
+    updateTrailingScrollSpace();
+
+    const resizeObserver = new ResizeObserver(updateTrailingScrollSpace);
+    resizeObserver.observe(container);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, []);
+
+  React.useEffect(() => {
+    const container = containerRef.current;
+    if (!container || !initialScrollDate) return;
+
+    let firstFrame = 0;
+    let secondFrame = 0;
+
+    firstFrame = window.requestAnimationFrame(() => {
+      secondFrame = window.requestAnimationFrame(() => {
+        const dateHeaders = Array.from(
+          container.querySelectorAll<HTMLElement>("[data-availability-date]")
+        );
+        const firstDateHeader = dateHeaders[0];
+        const targetDateHeader = dateHeaders.find(
+          (element) =>
+            element.dataset.availabilityDate === initialScrollDate
+        );
+
+        if (!firstDateHeader || !targetDateHeader) return;
+
+        container.scrollLeft = Math.max(
+          0,
+          targetDateHeader.offsetLeft - firstDateHeader.offsetLeft
+        );
+      });
+    });
+
+    return () => {
+      window.cancelAnimationFrame(firstFrame);
+      window.cancelAnimationFrame(secondFrame);
+    };
   }, [initialScrollDate]);
 
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
