@@ -13,12 +13,14 @@ import {
   buildUpiPaymentUri,
   findPaymentRequestMatches,
   getStatementCodeFromUpiUri,
+  PAYMENT_AMOUNT_SUFFIX_PAISE,
   PAYMENT_IDENTIFIER_LENGTH,
   PAYMENT_IDENTIFIER_PREFIX,
   PAYMENT_MERCHANT_NAME,
   PAYMENT_REQUEST_EXPIRY_HOURS,
   PAYMENT_STATEMENT_CODE_LENGTH,
   PAYMENT_UPI_ID,
+  pickAvailablePaymentRequestAmount,
   type PendingPaymentRequestMatch,
 } from "@/lib/payments/payment-request-matching";
 
@@ -115,8 +117,13 @@ export async function createPaymentRequest(args: {
   const { supabase, amount, createdBy, reservationId } = args;
   await markExpiredPaymentRequests(supabase);
   const identifier = await createUniqueIdentifier(supabase);
-  const statementCode = await createUniqueStatementCode(supabase, amount);
-  const upiUri = buildUpiPaymentUri({ identifier, statementCode, amount });
+  const paymentAmount = await createUniquePaymentAmount(supabase, amount);
+  const statementCode = await createUniqueStatementCode(supabase, paymentAmount);
+  const upiUri = buildUpiPaymentUri({
+    identifier,
+    statementCode,
+    amount: paymentAmount,
+  });
   const expiresAt = new Date(
     Date.now() + PAYMENT_REQUEST_EXPIRY_HOURS * 60 * 60 * 1000
   ).toISOString();
@@ -125,7 +132,7 @@ export async function createPaymentRequest(args: {
     identifier,
     statement_code: statementCode,
     reservation_id: reservationId ?? null,
-    amount,
+    amount: paymentAmount,
     upi_id: PAYMENT_UPI_ID,
     upi_merchant_name: PAYMENT_MERCHANT_NAME,
     upi_uri: upiUri,
@@ -263,6 +270,31 @@ async function createUniqueIdentifier(
   throw new Error("Unable to create a unique payment identifier.");
 }
 
+async function createUniquePaymentAmount(
+  supabase: SupabaseClient,
+  amount: number
+): Promise<number> {
+  const { data, error } = await supabase
+    .from("payment_requests")
+    .select("amount")
+    .eq("status", "pending")
+    .gt("expires_at", new Date().toISOString());
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const activeAmounts = ((data ?? []) as unknown as Array<{
+    amount: number | string;
+  }>).map((row) => readMoney(row.amount));
+
+  return pickAvailablePaymentRequestAmount({
+    amount,
+    activeAmounts,
+    suffixes: createRandomPaymentAmountSuffixes(),
+  });
+}
+
 async function createUniqueStatementCode(
   supabase: SupabaseClient,
   amount: number
@@ -331,6 +363,19 @@ function createIdentifier(): string {
   }
 
   return identifier;
+}
+
+function createRandomPaymentAmountSuffixes(): number[] {
+  const suffixes = [...PAYMENT_AMOUNT_SUFFIX_PAISE];
+
+  for (let index = suffixes.length - 1; index > 0; index -= 1) {
+    const swapIndex = randomInt(index + 1);
+    const current = suffixes[index];
+    suffixes[index] = suffixes[swapIndex];
+    suffixes[swapIndex] = current;
+  }
+
+  return suffixes;
 }
 
 function createStatementCode(initial: string): string {

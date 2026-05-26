@@ -2,11 +2,14 @@ import { describe, expect, it } from "vitest";
 
 import type { GoogleSheetTransaction } from "@/data/types";
 import {
+  PAYMENT_AMOUNT_SUFFIX_PAISE,
   buildUpiPaymentUri,
   doesTransactionMatchRequest,
   findPaymentRequestMatches,
+  getPaymentRequestAmountWithSuffix,
   getPaymentRequestDisplayCode,
   getStatementCodeFromUpiUri,
+  pickAvailablePaymentRequestAmount,
   type PendingPaymentRequestMatch,
 } from "@/lib/payments/payment-request-matching";
 
@@ -36,6 +39,32 @@ describe("payment request matching", () => {
 
     expect(uri).toContain("tr=SW-AB123");
     expect(uri).toContain("tn=SW-AB123+Sahajanand+Wellness");
+  });
+
+  it("adds a small paise suffix to the requested amount", () => {
+    expect(getPaymentRequestAmountWithSuffix(5000, 4)).toBe(5000.04);
+    expect(getPaymentRequestAmountWithSuffix(3400, 8)).toBe(3400.08);
+  });
+
+  it("picks an unused suffixed amount from active pending amounts", () => {
+    expect(
+      pickAvailablePaymentRequestAmount({
+        amount: 5000,
+        activeAmounts: [5000.04],
+        suffixes: [4, 8],
+      })
+    ).toBe(5000.08);
+  });
+
+  it("fails when all paise suffixes are already active", () => {
+    expect(() =>
+      pickAvailablePaymentRequestAmount({
+        amount: 5000,
+        activeAmounts: PAYMENT_AMOUNT_SUFFIX_PAISE.map((suffix) =>
+          getPaymentRequestAmountWithSuffix(5000, suffix)
+        ),
+      })
+    ).toThrow("all paise suffixes are already in use");
   });
 
   it("reads a statement code from saved UPI URI tn or tr fields", () => {
@@ -112,6 +141,88 @@ describe("payment request matching", () => {
 
     expect(matches).toHaveLength(1);
     expect(matches[0].request.id).toBe("request-1");
+  });
+
+  it("matches a missing-code transaction by unique exact suffixed amount", () => {
+    const matches = findPaymentRequestMatches(
+      [
+        createRequest({
+          id: "request-1",
+          identifier: "XYZ91",
+          statementCode: "ABCD",
+          amount: 1200.04,
+        }),
+        createRequest({
+          id: "request-2",
+          identifier: "MNO82",
+          statementCode: "KJRM",
+          amount: 1200.08,
+        }),
+      ],
+      [
+        createTransaction({
+          amount: 1200.04,
+          description: "UPI IN/9537566009@ptsbi/Sahajanand Wellness",
+          raw: { credit: "1,200.04", debit: "" },
+        }),
+      ],
+      new Date("2026-05-19T10:00:00.000Z")
+    );
+
+    expect(matches).toHaveLength(1);
+    expect(matches[0].request.id).toBe("request-1");
+  });
+
+  it("does not auto-match a missing-code transaction when the amount is ambiguous", () => {
+    const matches = findPaymentRequestMatches(
+      [
+        createRequest({
+          id: "request-1",
+          identifier: "XYZ91",
+          statementCode: "ABCD",
+          amount: 1200.04,
+        }),
+        createRequest({
+          id: "request-2",
+          identifier: "MNO82",
+          statementCode: "KJRM",
+          amount: 1200.04,
+        }),
+      ],
+      [
+        createTransaction({
+          amount: 1200.04,
+          description: "UPI IN/9537566009@ptsbi/Sahajanand Wellness",
+          raw: { credit: "1,200.04", debit: "" },
+        }),
+      ],
+      new Date("2026-05-19T10:00:00.000Z")
+    );
+
+    expect(matches).toEqual([]);
+  });
+
+  it("does not auto-match a whole-rupee missing-code transaction by amount only", () => {
+    const matches = findPaymentRequestMatches(
+      [
+        createRequest({
+          id: "request-1",
+          identifier: "XYZ91",
+          statementCode: "ABCD",
+          amount: 1200,
+        }),
+      ],
+      [
+        createTransaction({
+          amount: 1200,
+          description: "UPI IN/9537566009@ptsbi/Sahajanand Wellness",
+          raw: { credit: "1,200.00", debit: "" },
+        }),
+      ],
+      new Date("2026-05-19T10:00:00.000Z")
+    );
+
+    expect(matches).toEqual([]);
   });
 
   it("matches a two-letter statement prefix only when unambiguous for the amount", () => {

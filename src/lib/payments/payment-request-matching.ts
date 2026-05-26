@@ -6,6 +6,17 @@ export const PAYMENT_MERCHANT_NAME = "Sahajanand Wellness";
 export const PAYMENT_IDENTIFIER_LENGTH = 5;
 export const PAYMENT_IDENTIFIER_PREFIX = "SW";
 export const PAYMENT_STATEMENT_CODE_LENGTH = 4;
+export const PAYMENT_AMOUNT_SUFFIX_PAISE = [
+  1,
+  2,
+  3,
+  4,
+  5,
+  6,
+  7,
+  8,
+  9,
+] as const;
 
 const CREDITED_STATUS_PATTERN =
   /\b(credit|credited|success|successful|paid|received|complete|completed|captured|settled)\b/i;
@@ -162,6 +173,13 @@ export function findPaymentRequestMatches(
     matches,
     prefixLength: 1,
   });
+  matchByUniquePaymentAmount({
+    activeRequests,
+    transactions,
+    usedRowNumbers,
+    matchedRequestIds,
+    matches,
+  });
 
   return matches;
 }
@@ -211,6 +229,46 @@ export function formatUpiAmount(amount: number): string {
   return amount.toFixed(2);
 }
 
+export function getPaymentRequestAmountWithSuffix(
+  amount: number,
+  suffixPaise: number
+): number {
+  if (
+    !Number.isInteger(suffixPaise) ||
+    suffixPaise < PAYMENT_AMOUNT_SUFFIX_PAISE[0] ||
+    suffixPaise >
+      PAYMENT_AMOUNT_SUFFIX_PAISE[PAYMENT_AMOUNT_SUFFIX_PAISE.length - 1]
+  ) {
+    throw new Error("Payment amount suffix must be between 1 and 9 paise.");
+  }
+
+  return fromPaise(toPaise(amount) + suffixPaise);
+}
+
+export function pickAvailablePaymentRequestAmount(args: {
+  amount: number;
+  activeAmounts: readonly number[];
+  suffixes?: readonly number[];
+}): number {
+  const activeAmountPaise = new Set(args.activeAmounts.map(toPaise));
+  const suffixes = args.suffixes ?? PAYMENT_AMOUNT_SUFFIX_PAISE;
+
+  for (const suffixPaise of suffixes) {
+    const candidate = getPaymentRequestAmountWithSuffix(
+      args.amount,
+      suffixPaise
+    );
+
+    if (!activeAmountPaise.has(toPaise(candidate))) {
+      return candidate;
+    }
+  }
+
+  throw new Error(
+    "Unable to create a unique payment amount because all paise suffixes are already in use. Refresh or clear old pending payment requests and try again."
+  );
+}
+
 function isExpired(expiresAt: string, now: Date): boolean {
   const expiry = new Date(expiresAt);
   if (Number.isNaN(expiry.getTime())) {
@@ -225,7 +283,7 @@ function isSameMoneyAmount(left: number | null, right: number): boolean {
     return false;
   }
 
-  return Math.round(left * 100) === Math.round(right * 100);
+  return toPaise(left) === toPaise(right);
 }
 
 function doesLegacyTransactionMatchRequest(
@@ -299,6 +357,45 @@ function matchByStatementCodePrefix({
         statementCode.slice(0, prefixLength)
       );
     });
+
+    if (candidates.length !== 1) {
+      continue;
+    }
+
+    usedRowNumbers.add(transaction.rowNumber);
+    matchedRequestIds.add(candidates[0].id);
+    matches.push({ request: candidates[0], transaction });
+  }
+}
+
+function matchByUniquePaymentAmount({
+  activeRequests,
+  transactions,
+  usedRowNumbers,
+  matchedRequestIds,
+  matches,
+}: {
+  activeRequests: PendingPaymentRequestMatch[];
+  transactions: GoogleSheetTransaction[];
+  usedRowNumbers: Set<number>;
+  matchedRequestIds: Set<string>;
+  matches: MatchedPaymentTransaction[];
+}) {
+  for (const transaction of transactions) {
+    if (usedRowNumbers.has(transaction.rowNumber)) {
+      continue;
+    }
+
+    if (!isCreditedSheetTransaction(transaction)) {
+      continue;
+    }
+
+    const candidates = activeRequests.filter(
+      (request) =>
+        !matchedRequestIds.has(request.id) &&
+        hasPaiseSuffix(request.amount) &&
+        isSameMoneyAmount(transaction.amount, request.amount)
+    );
 
     if (candidates.length !== 1) {
       continue;
@@ -393,4 +490,16 @@ function getTransactionMatchText(row: GoogleSheetTransaction): string {
 
 function normalizeLabel(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function hasPaiseSuffix(amount: number): boolean {
+  return toPaise(amount) % 100 !== 0;
+}
+
+function toPaise(amount: number): number {
+  return Math.round(amount * 100);
+}
+
+function fromPaise(amountPaise: number): number {
+  return amountPaise / 100;
 }
