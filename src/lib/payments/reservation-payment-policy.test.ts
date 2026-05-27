@@ -6,6 +6,7 @@ import {
   isCashPaymentMethod,
   isGatewayPaymentMethod,
   isNewReservationPaymentMethod,
+  shouldConfirmNewRoomsAfterGatewayEdit,
   validateReservationPaymentAmount,
 } from "@/lib/payments/reservation-payment-policy";
 
@@ -50,6 +51,27 @@ describe("reservation payment policy", () => {
         currentStatus: "Standby",
       })
     ).toBe("Standby");
+  });
+
+  it("promotes newly added rooms only after editing a confirmed gateway booking", () => {
+    expect(
+      shouldConfirmNewRoomsAfterGatewayEdit({
+        paymentMethod: "UPI Gateway",
+        currentStatus: "Confirmed",
+      })
+    ).toBe(true);
+    expect(
+      shouldConfirmNewRoomsAfterGatewayEdit({
+        paymentMethod: "UPI Gateway",
+        currentStatus: "Room Hold",
+      })
+    ).toBe(false);
+    expect(
+      shouldConfirmNewRoomsAfterGatewayEdit({
+        paymentMethod: "Cash",
+        currentStatus: "Confirmed",
+      })
+    ).toBe(false);
   });
 
   it("recognizes official accounting methods", () => {

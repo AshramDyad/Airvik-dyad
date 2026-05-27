@@ -32,7 +32,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { isBookableRoom, ROOM_STATUS_LABELS } from "@/lib/rooms";
-import { getNewRoomReservationStatusForPayment } from "@/lib/payments/reservation-payment-policy";
+import {
+  getNewRoomReservationStatusForPayment,
+  shouldConfirmNewRoomsAfterGatewayEdit,
+} from "@/lib/payments/reservation-payment-policy";
 import {
   calculateMultipleRoomPricing,
   calculateRoomPricing,
@@ -845,7 +848,7 @@ export function ReservationEditForm({
         const paymentMethod =
           (reservation.paymentMethod as Reservation["paymentMethod"]) ?? "Not specified";
 
-        await addRoomsToBooking({
+        const createdReservations = await addRoomsToBooking({
           bookingId: reservation.bookingId,
           roomIds: roomsToCreate,
           guestId: reservation.guestId,
@@ -868,6 +871,35 @@ export function ReservationEditForm({
           roomOccupancies: newRoomOccupancies,
           customRoomTotals: hasCustomTotals ? customTotalsForNewRooms : undefined,
         });
+
+        if (createdReservations.length) {
+          revertStack.push(() =>
+            Promise.all(
+              createdReservations.map((createdReservation) =>
+                updateReservation(createdReservation.id, {
+                  status: "Cancelled",
+                  externalMetadata: markReservationAsRemoved(
+                    createdReservation.externalMetadata
+                  ),
+                })
+              )
+            )
+          );
+        }
+
+        if (
+          shouldConfirmNewRoomsAfterGatewayEdit({
+            paymentMethod,
+            currentStatus: reservation.status,
+          })
+        ) {
+          for (const createdReservation of createdReservations) {
+            await updateReservation(createdReservation.id, {
+              status: "Confirmed",
+              holdExpiresAt: null,
+            });
+          }
+        }
       }
 
       await refreshReservations();

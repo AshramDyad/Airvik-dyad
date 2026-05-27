@@ -34,6 +34,13 @@ export function getNewRoomReservationStatusForPayment(args: {
   return args.paymentMethod === "UPI Gateway" ? "Room Hold" : args.currentStatus;
 }
 
+export function shouldConfirmNewRoomsAfterGatewayEdit(args: {
+  paymentMethod: ReservationPaymentMethod;
+  currentStatus: ReservationStatus;
+}): boolean {
+  return args.paymentMethod === "UPI Gateway" && args.currentStatus === "Confirmed";
+}
+
 export function isCashPaymentMethod(
   method: string | null | undefined
 ): method is "Cash" {
