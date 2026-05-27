@@ -11,12 +11,6 @@ const CashPaymentSchema = z.object({
   amount: z.coerce.number().positive(),
 });
 
-type DbReservationPaymentGuard = {
-  id: string;
-  status: string;
-  payment_method: string | null;
-};
-
 type DbCashFolioItem = {
   id: string;
   reservation_id: string | null;
@@ -42,52 +36,15 @@ export async function POST(
     const payload = CashPaymentSchema.parse(await request.json());
     const supabase = createServerSupabaseClient();
 
-    const { data: reservation, error: reservationError } = await supabase
-      .from("reservations")
-      .select("id, status, payment_method")
-      .eq("id", id)
-      .maybeSingle();
-
-    if (reservationError) {
-      throw new Error(reservationError.message);
-    }
-
-    if (!reservation) {
-      return noStoreJson({ message: "Reservation not found." }, { status: 404 });
-    }
-
-    const guardedReservation = reservation as unknown as DbReservationPaymentGuard;
-    if (guardedReservation.payment_method === "UPI Gateway") {
-      return noStoreJson(
-        {
-          message:
-            "UPI Gateway reservations must be paid through the linked QR or admin override.",
-        },
-        { status: 409 }
-      );
-    }
-
-    const reference = `cash-${crypto.randomUUID()}`;
     const { data, error } = await supabase
-      .from("folio_items")
-      .insert({
-        reservation_id: id,
-        description: "Payment - Cash",
-        amount: -roundMoney(payload.amount),
-        payment_method: "Cash",
-        external_source: "cash_payment",
-        external_reference: reference,
-        external_metadata: { actorUserId: profile.userId },
-        received_by: profile.userId,
-        received_at: new Date().toISOString(),
-      })
-      .select(
-        "id, reservation_id, description, amount, timestamp, payment_method, transaction_id, external_source, external_reference, external_metadata, received_by, received_at"
-      )
-      .single();
+      .rpc("record_cash_payment_with_balance_guard", {
+        p_reservation_id: id,
+        p_paid_amount: roundMoney(payload.amount),
+        p_actor_user_id: profile.userId,
+      });
 
     if (error) {
-      throw new Error(error.message);
+      return handleCashPaymentError(error);
     }
 
     return noStoreJson({ folioItem: mapCashFolio(data as unknown as DbCashFolioItem) }, { status: 201 });
@@ -143,6 +100,43 @@ function handleApiError(error: unknown): NextResponse {
   }
 
   return noStoreJson({ message: "Unable to record cash payment." }, { status: 500 });
+}
+
+function handleCashPaymentError(error: unknown): NextResponse {
+  const message = readErrorMessage(error) ?? "Unable to record cash payment.";
+
+  if (message === "Reservation not found.") {
+    return noStoreJson({ message }, { status: 404 });
+  }
+
+  if (
+    message ===
+      "UPI Gateway reservations must be paid through the linked QR or admin override." ||
+    message === "This reservation is already fully paid." ||
+    message === "Amount exceeds the outstanding balance."
+  ) {
+    return noStoreJson({ message }, { status: 409 });
+  }
+
+  return noStoreJson({ message }, { status: 500 });
+}
+
+function readErrorMessage(error: unknown): string | null {
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "message" in error &&
+    typeof error.message === "string" &&
+    error.message.trim()
+  ) {
+    return error.message;
+  }
+
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+
+  return null;
 }
 
 function noStoreJson(body: unknown, init: ResponseInit = {}): NextResponse {

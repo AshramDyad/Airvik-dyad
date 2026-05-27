@@ -101,6 +101,7 @@ export function RecordPaymentDialog({
 
   const entryMode = form.watch("entryMode");
   const percentageValue = form.watch("percentage");
+  const isSubmitting = form.formState.isSubmitting;
   const isPercentageMode = entryMode === "percentage";
   const normalizedPercentage = React.useMemo(() => {
     if (percentageValue === undefined || percentageValue === null) {
@@ -249,7 +250,7 @@ export function RecordPaymentDialog({
                       value={field.value}
                       onValueChange={(value) => value && field.onChange(value)}
                       className="gap-2"
-                      disabled={outstandingBalance <= 0}
+                      disabled={isSubmitting || outstandingBalance <= 0}
                     >
                       <ToggleGroupItem value="amount">Amount</ToggleGroupItem>
                       <ToggleGroupItem value="percentage">
@@ -273,7 +274,7 @@ export function RecordPaymentDialog({
                       min={0}
                       max={100}
                       placeholder="Enter percentage"
-                      disabled={!isPercentageMode || outstandingBalance <= 0}
+                      disabled={!isPercentageMode || isSubmitting || outstandingBalance <= 0}
                       {...field}
                       value={field.value ?? ""}
                       onChange={(event) => {
@@ -309,6 +310,7 @@ export function RecordPaymentDialog({
                       type="number"
                       step="0.01"
                       readOnly={isPercentageMode}
+                      disabled={isSubmitting}
                       aria-readonly={isPercentageMode}
                       className={isPercentageMode ? "cursor-not-allowed bg-muted" : undefined}
                       {...field}
@@ -327,8 +329,12 @@ export function RecordPaymentDialog({
               Payment method: <span className="font-medium">Cash</span>
             </div>
             <DialogFooter className="border-t border-border/40 pt-4 sm:justify-end">
-              <Button type="submit" disabled={outstandingBalance <= 0}>
-                {outstandingBalance <= 0 ? "Fully Paid" : "Record Cash"}
+              <Button type="submit" disabled={isSubmitting || outstandingBalance <= 0}>
+                {isSubmitting
+                  ? "Recording..."
+                  : outstandingBalance <= 0
+                    ? "Fully Paid"
+                    : "Record Cash"}
               </Button>
             </DialogFooter>
           </form>
