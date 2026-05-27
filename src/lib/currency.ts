@@ -55,6 +55,30 @@ export function formatCurrency(
   }).format(Number.isFinite(amount) ? amount : 0);
 }
 
+export function formatWholeCurrency(
+  amount: number,
+  currency: string = DEFAULT_CURRENCY
+) {
+  const locale = currencyLocaleMap[currency] ?? "en-IN";
+  const roundedAmount = normalizeWholeCurrencyAmount(amount);
+
+  return new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency: currency || DEFAULT_CURRENCY,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(roundedAmount);
+}
+
+function normalizeWholeCurrencyAmount(amount: number): number {
+  if (!Number.isFinite(amount)) {
+    return 0;
+  }
+
+  const rounded = Math.round(amount);
+  return Object.is(rounded, -0) ? 0 : rounded;
+}
+
 export const currencyOptions = SUPPORTED_CURRENCIES.map((currency) => ({
   value: currency.value,
   label: currency.label,

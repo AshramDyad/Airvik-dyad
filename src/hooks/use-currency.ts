@@ -2,7 +2,11 @@
 
 import * as React from "react";
 import { useDataContext } from "@/context/data-context";
-import { DEFAULT_CURRENCY, formatCurrency as formatCurrencyUtil } from "@/lib/currency";
+import {
+  DEFAULT_CURRENCY,
+  formatCurrency as formatCurrencyUtil,
+  formatWholeCurrency,
+} from "@/lib/currency";
 
 export function useCurrencyFormatter(options?: Intl.NumberFormatOptions) {
   const { property } = useDataContext();
@@ -21,4 +25,14 @@ export function useCurrencyFormatter(options?: Intl.NumberFormatOptions) {
 export function useCurrencyCode() {
   const { property } = useDataContext();
   return property?.currency ?? DEFAULT_CURRENCY;
+}
+
+export function useWholeCurrencyFormatter() {
+  const { property } = useDataContext();
+
+  return React.useCallback(
+    (amount: number) =>
+      formatWholeCurrency(amount, property?.currency ?? DEFAULT_CURRENCY),
+    [property?.currency]
+  );
 }

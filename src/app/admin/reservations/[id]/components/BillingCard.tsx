@@ -26,7 +26,7 @@ import {
   calculateReservationFinancials,
   resolveReservationTaxConfig,
 } from "@/lib/reservations/calculate-financials";
-import { useCurrencyFormatter } from "@/hooks/use-currency";
+import { useWholeCurrencyFormatter } from "@/hooks/use-currency";
 import { useDataContext } from "@/context/data-context";
 
 interface BillingCardProps {
@@ -44,7 +44,7 @@ interface BillingCardProps {
 
 export function BillingCard({ reservation, groupSummary }: BillingCardProps) {
   const { guests, property } = useDataContext();
-  const formatCurrency = useCurrencyFormatter();
+  const formatCurrency = useWholeCurrencyFormatter();
   const guest = guests.find((entry) => entry.id === reservation.guestId);
   const baseTaxConfig = resolveReservationTaxConfig(reservation, property);
   const hasGroupData = groupSummary.roomCount > 0;

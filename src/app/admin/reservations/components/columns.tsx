@@ -51,7 +51,7 @@ import type {
 } from "@/data/types";
 import { useDataContext } from "@/context/data-context";
 import type { InvoiceData } from "@/lib/invoice/generate-invoice";
-import { useCurrencyFormatter } from "@/hooks/use-currency";
+import { useWholeCurrencyFormatter } from "@/hooks/use-currency";
 import { formatBookingCode } from "@/lib/reservations/formatting";
 import { cn } from "@/lib/utils";
 import { getReservationStatusLabel } from "@/lib/reservations/status";
@@ -267,7 +267,7 @@ function ReservationActions({
 }
 
 function AmountCell({ row }: CellContext<ReservationWithDetails, unknown>) {
-  const formatCurrency = useCurrencyFormatter();
+  const formatCurrency = useWholeCurrencyFormatter();
   const rawValue = row.getValue("totalAmount");
   const normalizedTotal =
     typeof rawValue === "number"
@@ -281,7 +281,7 @@ function AmountCell({ row }: CellContext<ReservationWithDetails, unknown>) {
 }
 
 function PaidAmountCell({ row }: CellContext<ReservationWithDetails, unknown>) {
-  const formatCurrency = useCurrencyFormatter();
+  const formatCurrency = useWholeCurrencyFormatter();
   if (row.depth > 0) return null;
   const paid = row.original.paidAmount ?? 0;
   return (
@@ -294,7 +294,7 @@ function PaidAmountCell({ row }: CellContext<ReservationWithDetails, unknown>) {
 function RemainingBalanceCell({
   row,
 }: CellContext<ReservationWithDetails, unknown>) {
-  const formatCurrency = useCurrencyFormatter();
+  const formatCurrency = useWholeCurrencyFormatter();
   if (row.depth > 0) return null;
   const balance = row.original.remainingBalance ?? 0;
   return (
