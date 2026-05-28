@@ -13,6 +13,7 @@ import {
   buildUpiPaymentUri,
   findPaymentRequestMatches,
   getStatementCodeFromUpiUri,
+  normalizePaymentReference,
   PAYMENT_AMOUNT_SUFFIX_PAISE,
   PAYMENT_IDENTIFIER_LENGTH,
   PAYMENT_IDENTIFIER_PREFIX,
@@ -200,7 +201,10 @@ export async function reconcilePaymentRequests(
   }
 
   const payload = await fetchGoogleSheetTransactions();
-  const matches = findPaymentRequestMatches(pendingRequests, payload.rows);
+  const usedPaymentReferences = await listUsedPaymentReferences(supabase);
+  const matches = findPaymentRequestMatches(pendingRequests, payload.rows, {
+    usedPaymentReferences,
+  });
 
   for (const match of matches) {
     const { error: updateError } = await supabase.rpc(
@@ -219,6 +223,33 @@ export async function reconcilePaymentRequests(
   }
 
   return { matched: matches.length, expired };
+}
+
+async function listUsedPaymentReferences(
+  supabase: SupabaseClient
+): Promise<ReadonlySet<string>> {
+  const { data, error } = await supabase
+    .from("payment_requests")
+    .select("payment_reference")
+    .eq("status", "paid")
+    .not("payment_reference", "is", null);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const references = ((data ?? []) as unknown as Array<{
+    payment_reference: string | null;
+  }>).reduce<Set<string>>((accumulator, row) => {
+    const reference = normalizePaymentReference(row.payment_reference);
+    if (reference) {
+      accumulator.add(reference);
+    }
+
+    return accumulator;
+  }, new Set<string>());
+
+  return references;
 }
 
 function toPaymentRequest(row: DbPaymentRequest): PaymentRequest {

@@ -143,7 +143,7 @@ describe("payment request matching", () => {
     expect(matches[0].request.id).toBe("request-1");
   });
 
-  it("matches a missing-code transaction by unique exact suffixed amount", () => {
+  it("does not match a statement-code request by amount only", () => {
     const matches = findPaymentRequestMatches(
       [
         createRequest({
@@ -169,8 +169,7 @@ describe("payment request matching", () => {
       new Date("2026-05-19T10:00:00.000Z")
     );
 
-    expect(matches).toHaveLength(1);
-    expect(matches[0].request.id).toBe("request-1");
+    expect(matches).toEqual([]);
   });
 
   it("does not auto-match a missing-code transaction when the amount is ambiguous", () => {
@@ -225,7 +224,7 @@ describe("payment request matching", () => {
     expect(matches).toEqual([]);
   });
 
-  it("matches a two-letter statement prefix only when unambiguous for the amount", () => {
+  it("does not match a two-letter statement prefix", () => {
     const matches = findPaymentRequestMatches(
       [
         createRequest({
@@ -251,11 +250,10 @@ describe("payment request matching", () => {
       new Date("2026-05-19T10:00:00.000Z")
     );
 
-    expect(matches).toHaveLength(1);
-    expect(matches[0].request.id).toBe("request-1");
+    expect(matches).toEqual([]);
   });
 
-  it("matches a one-letter statement prefix only when unambiguous for the amount", () => {
+  it("does not match a one-letter statement prefix", () => {
     const matches = findPaymentRequestMatches(
       [
         createRequest({
@@ -281,8 +279,7 @@ describe("payment request matching", () => {
       new Date("2026-05-19T10:00:00.000Z")
     );
 
-    expect(matches).toHaveLength(1);
-    expect(matches[0].request.id).toBe("request-1");
+    expect(matches).toEqual([]);
   });
 
   it("does not auto-match an ambiguous two-letter statement prefix", () => {
@@ -365,6 +362,82 @@ describe("payment request matching", () => {
 
     expect(matches).toHaveLength(1);
     expect(matches[0].request.id).toBe("request-1");
+  });
+
+  it("does not match a different full statement code with the same amount", () => {
+    const matches = findPaymentRequestMatches(
+      [
+        createRequest({
+          id: "request-1",
+          identifier: "XYZ91",
+          statementCode: "ERTA",
+          amount: 1.08,
+        }),
+      ],
+      [
+        createTransaction({
+          amount: 1.08,
+          description: "UPI IN/OJYX/9537566009@ptsbi/Sahajanand Wellness",
+          reference: "S17272840",
+          raw: { credit: "1.08", debit: "" },
+        }),
+      ],
+      new Date("2026-05-19T10:00:00.000Z")
+    );
+
+    expect(matches).toEqual([]);
+  });
+
+  it("does not match a transaction fetched before the payment request", () => {
+    const matches = findPaymentRequestMatches(
+      [
+        createRequest({
+          id: "request-1",
+          identifier: "XYZ91",
+          statementCode: "ABCD",
+          amount: 1200,
+          requestedAt: "2026-05-19T10:08:00.000Z",
+        }),
+      ],
+      [
+        createTransaction({
+          amount: 1200,
+          fetchedAt: "2026-05-19T04:05:00.000Z",
+          description: "UPI IN/ABCD/9537566009@ptsbi/Sahajanand Wellness",
+          raw: { credit: "1,200.00", debit: "" },
+        }),
+      ],
+      new Date("2026-05-19T11:00:00.000Z")
+    );
+
+    expect(matches).toEqual([]);
+  });
+
+  it("does not reuse a previously used transaction reference", () => {
+    const matches = findPaymentRequestMatches(
+      [
+        createRequest({
+          id: "request-1",
+          identifier: "XYZ91",
+          statementCode: "ABCD",
+          amount: 1200,
+        }),
+      ],
+      [
+        createTransaction({
+          amount: 1200,
+          description: "UPI IN/ABCD/9537566009@ptsbi/Sahajanand Wellness",
+          reference: "S17272840",
+          raw: { credit: "1,200.00", debit: "" },
+        }),
+      ],
+      {
+        now: new Date("2026-05-19T10:00:00.000Z"),
+        usedPaymentReferences: new Set(["S17272840"]),
+      }
+    );
+
+    expect(matches).toEqual([]);
   });
 
   it("does not match debits, amount mismatches, or missing identifiers", () => {
