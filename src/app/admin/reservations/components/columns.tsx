@@ -537,7 +537,17 @@ export const columns: ColumnDef<ReservationWithDetails>[] = [
             : status.value === "Cancelled"
               ? "destructive"
               : "outline";
-      return <Badge variant={variant}>{status.label}</Badge>;
+      return (
+        <Badge
+          variant={variant}
+          className={cn(
+            status.value === "Room Hold" &&
+              "border-amber-200 bg-amber-50 text-amber-900 hover:bg-amber-50"
+          )}
+        >
+          {status.label}
+        </Badge>
+      );
     },
   },
   {

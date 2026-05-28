@@ -1493,14 +1493,7 @@ export const validateBookingRequest = async (
 
   const blockingConflicts = (conflicts ?? []).filter((conflict) =>
     conflict.status !== "Cancelled" &&
-    conflict.status !== "No-show" &&
-    (
-      conflict.status !== "Room Hold" ||
-      (
-        typeof conflict.hold_expires_at === "string" &&
-        new Date(conflict.hold_expires_at).getTime() > Date.now()
-      )
-    )
+    conflict.status !== "No-show"
   );
 
   if (blockingConflicts.length) {

@@ -141,6 +141,7 @@ export interface RoomDayReservation {
   guestId: string;
   checkInDate: string;
   checkOutDate: string;
+  status?: ReservationStatus;
 }
 
 export interface AvailabilityDay {

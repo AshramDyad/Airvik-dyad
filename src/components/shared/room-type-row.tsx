@@ -26,6 +26,8 @@ const availabilityStatusClasses: Record<AvailabilityCellStatus, string> = {
 const bookedPillClasses =
   "relative flex h-11 min-w-0 w-full items-center justify-center overflow-hidden rounded-xl border border-indigo-300 bg-indigo-300 px-2 text-xs font-semibold text-indigo-900 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2";
 
+const roomHoldPillClasses = "border-amber-300 bg-amber-200 text-amber-950";
+
 const cellBaseClasses =
   "relative flex min-h-[60px] min-w-0 w-full items-center justify-center rounded-none px-2 text-lg font-semibold transition focus-visible:outline-none";
 
@@ -265,6 +267,10 @@ export function RoomTypeRow({
 
                   const guestName = getGuestName(entry.guestId);
                   const reservationCardId = `${roomType.id}:${room.id}:${entry.reservationId}:${day.date}`;
+                  const pillTextClass =
+                    entry.status === "Room Hold"
+                      ? "text-amber-950"
+                      : columnTextClass;
                   dayCells.push(
                     <TableCell
                       key={`${room.id}-${entry.reservationId}-${day.date}`}
@@ -282,9 +288,12 @@ export function RoomTypeRow({
                           type="button"
                           className={cn(
                             bookedPillClasses,
-                            columnTextClass,
+                            entry.status === "Room Hold" && roomHoldPillClasses,
+                            pillTextClass,
                             "cursor-pointer",
-                            isTodayColumn && "bg-primary border-primary text-white shadow-[0_0_0_2px_rgba(15,118,110,0.15)]"
+                            isTodayColumn &&
+                              entry.status !== "Room Hold" &&
+                              "bg-primary border-primary text-white shadow-[0_0_0_2px_rgba(15,118,110,0.15)]"
                           )}
                           aria-label={`View booking details for ${guestName} in Room ${
                             room.roomNumber
@@ -293,7 +302,7 @@ export function RoomTypeRow({
                           <span
                             className={cn(
                               "max-w-full truncate text-sm font-semibold",
-                              columnTextClass
+                              pillTextClass
                             )}
                           >
                             {guestName}

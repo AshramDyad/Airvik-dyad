@@ -2,7 +2,6 @@ import type { Reservation, ReservationStatus } from "@/data/types";
 
 export const ROOM_HOLD_STATUS: ReservationStatus = "Room Hold";
 export const ROOM_HOLD_LABEL = "(Pending) Room Hold";
-export const ROOM_HOLD_DURATION_MINUTES = 30;
 
 export const ACTIVE_RESERVATION_STATUSES: readonly ReservationStatus[] = [
   ROOM_HOLD_STATUS,
@@ -49,34 +48,21 @@ export function getReservationStatusLabel(status: ReservationStatus): string {
   return status === ROOM_HOLD_STATUS ? ROOM_HOLD_LABEL : status;
 }
 
-export function getRoomHoldExpiresAt(now: Date = new Date()): string {
-  return new Date(
-    now.getTime() + ROOM_HOLD_DURATION_MINUTES * 60 * 1000
-  ).toISOString();
-}
-
 export function isActiveRoomHold(
-  reservation: ReservationAvailabilityShape,
-  now: Date = new Date()
+  reservation: ReservationAvailabilityShape
 ): boolean {
-  if (reservation.status !== ROOM_HOLD_STATUS || !reservation.holdExpiresAt) {
-    return false;
-  }
-
-  const expiresAt = new Date(reservation.holdExpiresAt).getTime();
-  return Number.isFinite(expiresAt) && expiresAt > now.getTime();
+  return reservation.status === ROOM_HOLD_STATUS;
 }
 
 export function doesReservationBlockAvailability(
-  reservation: ReservationAvailabilityShape,
-  now: Date = new Date()
+  reservation: ReservationAvailabilityShape
 ): boolean {
   if (reservation.status === "Cancelled" || reservation.status === "No-show") {
     return false;
   }
 
   if (reservation.status === ROOM_HOLD_STATUS) {
-    return isActiveRoomHold(reservation, now);
+    return isActiveRoomHold(reservation);
   }
 
   return true;
@@ -84,15 +70,14 @@ export function doesReservationBlockAvailability(
 
 export function getActiveHoldRoomIdsForDateRange(
   reservations: ReservationDateRangeShape[],
-  dateRange: DateRangeShape,
-  now: Date = new Date()
+  dateRange: DateRangeShape
 ): Set<string> {
   const heldRoomIds = new Set<string>();
   const rangeStart = dateRange.from.getTime();
   const rangeEnd = dateRange.to.getTime();
 
   reservations.forEach((reservation) => {
-    if (!isActiveRoomHold(reservation, now)) {
+    if (!isActiveRoomHold(reservation)) {
       return;
     }
 

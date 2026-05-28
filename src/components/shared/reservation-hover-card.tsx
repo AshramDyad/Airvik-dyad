@@ -24,8 +24,8 @@ const reservationStatusStyles: Record<
   { ribbon: string; dot: string }
 > = {
   "Room Hold": {
-    ribbon: "border border-secondary/50 bg-secondary/30 text-secondary-foreground",
-    dot: "bg-secondary/80",
+    ribbon: "border border-amber-200 bg-amber-50 text-amber-900",
+    dot: "bg-amber-500",
   },
   Standby: {
     ribbon: "border border-amber-400/60 bg-amber-100 text-amber-900",
