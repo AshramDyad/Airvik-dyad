@@ -2,26 +2,76 @@ BEGIN;
 
 SET search_path TO public;
 
+-- ---------------------------------------------------------------------------
+-- Guard against the UPI auto-match bug where a single bank transaction
+-- reference was reused to confirm several paid payment requests.
+--
+-- IMPORTANT scoping decision (from production data review on 2026-06-03):
+-- The invariant is "a bank transaction reference belongs to at most one paid
+-- payment request" -- but this is true ONLY for AUTO-MATCHED payments. Manual
+-- admin entries legitimately share sentinel references (e.g. two distinct
+-- manual payments both stored with payment_reference = 'manual-admin-update'),
+-- so they must NOT be constrained. The distinguishing column is
+-- matched_transaction: NOT NULL => auto-matched bank payment; NULL => manual.
+-- A blanket unique index on payment_reference would wrongly conflate the
+-- manual entries, so every check below is scoped to matched_transaction IS NOT NULL.
+-- ---------------------------------------------------------------------------
+
+-- 1. Remediate existing duplicates among AUTO-MATCHED references.
+--    For each reused bank reference keep the earliest paid request (the
+--    legitimate owner of that bank transaction) and clear the reference on the
+--    later phantom rows, leaving an audit note. The bank reference therefore
+--    stays "claimed" by exactly one request, so it can never be reused again,
+--    while the duplicate is neutralised without deleting any row or folio item.
+WITH "ranked" AS (
+  SELECT
+    "id",
+    "payment_reference",
+    row_number() OVER (
+      PARTITION BY lower(btrim("payment_reference"))
+      ORDER BY "paid_at" ASC, "created_at" ASC, "id" ASC
+    ) AS "rn"
+  FROM "public"."payment_requests"
+  WHERE "status" = 'paid'
+    AND "matched_transaction" IS NOT NULL
+    AND nullif(btrim(coalesce("payment_reference", '')), '') IS NOT NULL
+)
+UPDATE "public"."payment_requests" AS "pr"
+SET
+  "payment_reference" = NULL,
+  "notes" = btrim(
+    coalesce("pr"."notes", '')
+    || ' [auto-match cleanup ' || to_char(now(), 'YYYY-MM-DD')
+    || ': cleared duplicate bank reference ' || "pr"."payment_reference" || ']'
+  )
+FROM "ranked"
+WHERE "pr"."id" = "ranked"."id"
+  AND "ranked"."rn" > 1;
+
+-- 2. Safety assertion: after cleanup, no auto-matched reference may repeat.
+--    (Manual / NULL-matched references are intentionally excluded.)
 DO $$
 BEGIN
   IF EXISTS (
     SELECT 1
-    FROM (
-      SELECT lower(btrim("payment_reference")) AS "normalized_reference"
-      FROM "public"."payment_requests"
-      WHERE "status" = 'paid'
-        AND nullif(btrim(coalesce("payment_reference", '')), '') IS NOT NULL
-      GROUP BY lower(btrim("payment_reference"))
-      HAVING count(*) > 1
-    ) "duplicates"
+    FROM "public"."payment_requests"
+    WHERE "status" = 'paid'
+      AND "matched_transaction" IS NOT NULL
+      AND nullif(btrim(coalesce("payment_reference", '')), '') IS NOT NULL
+    GROUP BY lower(btrim("payment_reference"))
+    HAVING count(*) > 1
   ) THEN
-    RAISE EXCEPTION 'Cannot add paid payment reference guard while duplicate paid payment references exist.';
+    RAISE EXCEPTION 'Duplicate auto-matched payment references remain after cleanup.';
   END IF;
 END $$;
 
+-- 3. Partial unique index -- enforces uniqueness for AUTO-MATCHED bank
+--    references only. Manual entries (matched_transaction IS NULL) and blank
+--    references are excluded, so legitimate manual duplicates are unaffected.
 CREATE UNIQUE INDEX IF NOT EXISTS "payment_requests_paid_reference_unique_idx"
   ON "public"."payment_requests" USING btree (lower(btrim("payment_reference")))
   WHERE "status" = 'paid'
+    AND "matched_transaction" IS NOT NULL
     AND nullif(btrim(coalesce("payment_reference", '')), '') IS NOT NULL;
 
 CREATE OR REPLACE FUNCTION "public"."mark_payment_request_paid"(
@@ -77,12 +127,17 @@ BEGIN
 
   v_reference := nullif(trim(coalesce("p_payment_reference", '')), '');
 
-  IF v_reference IS NOT NULL
+  -- Reuse guard: only for AUTO-MATCHED bank references. The incoming call is an
+  -- auto-match when p_matched_transaction is provided; we compare only against
+  -- other auto-matched paid requests so manual sentinel references are ignored.
+  IF "p_matched_transaction" IS NOT NULL
+    AND v_reference IS NOT NULL
     AND EXISTS (
       SELECT 1
       FROM "public"."payment_requests" "existing"
       WHERE "existing"."status" = 'paid'
         AND "existing"."id" <> v_request."id"
+        AND "existing"."matched_transaction" IS NOT NULL
         AND lower(btrim("existing"."payment_reference")) = lower(btrim(v_reference))
     ) THEN
     RAISE EXCEPTION 'Payment reference has already been used for another paid payment request.'
@@ -170,3 +225,5 @@ COMMIT;
 -- ROLLBACK:
 -- DROP INDEX IF EXISTS "public"."payment_requests_paid_reference_unique_idx";
 -- RECREATE "public"."mark_payment_request_paid"(uuid, numeric, text, jsonb) FROM THE PREVIOUS MIGRATION IF NEEDED.
+-- NOTE: step 1 clears payment_reference on phantom duplicate rows; restoring
+--       those exact values requires the pre-push data backup.
