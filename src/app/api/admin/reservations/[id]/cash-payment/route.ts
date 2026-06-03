@@ -9,6 +9,7 @@ export const dynamic = "force-dynamic";
 
 const CashPaymentSchema = z.object({
   amount: z.coerce.number().positive(),
+  notes: z.string().trim().max(500).optional(),
 });
 
 type DbCashFolioItem = {
@@ -41,6 +42,7 @@ export async function POST(
         p_reservation_id: id,
         p_paid_amount: roundMoney(payload.amount),
         p_actor_user_id: profile.userId,
+        p_notes: payload.notes ?? null,
       });
 
     if (error) {
@@ -110,8 +112,6 @@ function handleCashPaymentError(error: unknown): NextResponse {
   }
 
   if (
-    message ===
-      "UPI Gateway reservations must be paid through the linked QR or admin override." ||
     message === "This reservation is already fully paid." ||
     message === "Amount exceeds the outstanding balance."
   ) {

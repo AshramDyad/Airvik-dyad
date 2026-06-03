@@ -22,13 +22,7 @@ vi.mock("@/lib/server/auth", () => {
   };
 });
 
-type ReservationRow = {
-  id: string;
-  status: string;
-  payment_method: string | null;
-};
-
-type FolioRow = {
+type CashFolioRow = {
   id: string;
   reservation_id: string;
   description: string;
@@ -56,60 +50,43 @@ describe("cash payment route", () => {
     });
   });
 
-  it("rejects cash payment on UPI Gateway reservations", async () => {
-    const supabase = createCashPaymentSupabaseMock({
-      reservation: {
-        id: "reservation-1",
-        status: "Room Hold",
-        payment_method: "UPI Gateway",
-      },
-    });
+  it("records a cash folio item via the balance-guard RPC", async () => {
+    const folioRow: CashFolioRow = {
+      id: "folio-1",
+      reservation_id: "reservation-1",
+      description: "Payment - Cash",
+      amount: -500.56,
+      timestamp: "2026-06-03T08:30:00.000Z",
+      payment_method: "Cash",
+      transaction_id: null,
+      external_source: "cash_payment",
+      external_reference: "cash-reference",
+      external_metadata: { actorUserId: "profile-1" },
+      received_by: "profile-1",
+      received_at: "2026-06-03T08:30:00.000Z",
+    };
+    const rpc = vi.fn(async () => ({ data: folioRow, error: null }));
     mockedCreateServerSupabaseClient.mockReturnValue(
-      supabase.client as unknown as ReturnType<typeof createServerSupabaseClient>
+      { rpc } as unknown as ReturnType<typeof createServerSupabaseClient>
     );
 
-    const response = await POST(buildRequest({ amount: 500 }), {
-      params: Promise.resolve({ id: "reservation-1" }),
-    });
-    const body = await response.json();
-
-    expect(response.status).toBe(409);
-    expect(body).toEqual({
-      message:
-        "UPI Gateway reservations must be paid through the linked QR or admin override.",
-    });
-    expect(supabase.folioInsert).not.toHaveBeenCalled();
-  });
-
-  it("records a cash folio item with the current receptionist as receiver", async () => {
-    const supabase = createCashPaymentSupabaseMock({
-      reservation: {
-        id: "reservation-1",
-        status: "Confirmed",
-        payment_method: "Cash",
-      },
-    });
-    mockedCreateServerSupabaseClient.mockReturnValue(
-      supabase.client as unknown as ReturnType<typeof createServerSupabaseClient>
+    const response = await POST(
+      buildRequest({ amount: 500.555, notes: "Paid at front desk" }),
+      { params: Promise.resolve({ id: "reservation-1" }) }
     );
-
-    const response = await POST(buildRequest({ amount: 500.555 }), {
-      params: Promise.resolve({ id: "reservation-1" }),
-    });
     const body = await response.json();
 
     expect(response.status).toBe(201);
     const permissionCall = mockedRequirePermission.mock.calls[0];
     expect(permissionCall?.[0]).toBeInstanceOf(Request);
     expect(permissionCall?.[1]).toBe("update:reservation");
-    expect(supabase.folioInsert).toHaveBeenCalledWith(
+    expect(rpc).toHaveBeenCalledWith(
+      "record_cash_payment_with_balance_guard",
       expect.objectContaining({
-        reservation_id: "reservation-1",
-        description: "Payment - Cash",
-        amount: -500.56,
-        payment_method: "Cash",
-        external_source: "cash_payment",
-        received_by: "profile-1",
+        p_reservation_id: "reservation-1",
+        p_paid_amount: 500.56,
+        p_actor_user_id: "profile-1",
+        p_notes: "Paid at front desk",
       })
     );
     expect(body.folioItem).toEqual(
@@ -122,6 +99,43 @@ describe("cash payment route", () => {
       })
     );
   });
+
+  it("forwards a null remark when none is provided", async () => {
+    const rpc = vi.fn(async () => ({
+      data: buildFolioRow(),
+      error: null,
+    }));
+    mockedCreateServerSupabaseClient.mockReturnValue(
+      { rpc } as unknown as ReturnType<typeof createServerSupabaseClient>
+    );
+
+    await POST(buildRequest({ amount: 250 }), {
+      params: Promise.resolve({ id: "reservation-1" }),
+    });
+
+    expect(rpc).toHaveBeenCalledWith(
+      "record_cash_payment_with_balance_guard",
+      expect.objectContaining({ p_notes: null })
+    );
+  });
+
+  it("surfaces a balance-guard rejection as a 409", async () => {
+    const rpc = vi.fn(async () => ({
+      data: null,
+      error: { message: "Amount exceeds the outstanding balance." },
+    }));
+    mockedCreateServerSupabaseClient.mockReturnValue(
+      { rpc } as unknown as ReturnType<typeof createServerSupabaseClient>
+    );
+
+    const response = await POST(buildRequest({ amount: 9999 }), {
+      params: Promise.resolve({ id: "reservation-1" }),
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(body).toEqual({ message: "Amount exceeds the outstanding balance." });
+  });
 });
 
 function buildRequest(body: unknown): Request {
@@ -132,44 +146,19 @@ function buildRequest(body: unknown): Request {
   });
 }
 
-function createCashPaymentSupabaseMock(args: { reservation: ReservationRow | null }) {
-  const reservationMaybeSingle = vi.fn(async () => ({
-    data: args.reservation,
-    error: null,
-  }));
-  const reservationEq = vi.fn(() => ({ maybeSingle: reservationMaybeSingle }));
-  const reservationSelect = vi.fn(() => ({ eq: reservationEq }));
-
-  const folioRow: FolioRow = {
+function buildFolioRow(): CashFolioRow {
+  return {
     id: "folio-1",
     reservation_id: "reservation-1",
     description: "Payment - Cash",
-    amount: -500.56,
-    timestamp: "2026-05-24T08:30:00.000Z",
+    amount: -250,
+    timestamp: "2026-06-03T08:30:00.000Z",
     payment_method: "Cash",
     transaction_id: null,
     external_source: "cash_payment",
     external_reference: "cash-reference",
     external_metadata: { actorUserId: "profile-1" },
     received_by: "profile-1",
-    received_at: "2026-05-24T08:30:00.000Z",
-  };
-  const folioSingle = vi.fn(async () => ({ data: folioRow, error: null }));
-  const folioSelect = vi.fn(() => ({ single: folioSingle }));
-  const folioInsert = vi.fn(() => ({ select: folioSelect }));
-
-  const from = vi.fn((table: string): unknown => {
-    if (table === "reservations") {
-      return { select: reservationSelect };
-    }
-    if (table === "folio_items") {
-      return { insert: folioInsert };
-    }
-    throw new Error(`Unexpected table ${table}`);
-  });
-
-  return {
-    client: { from },
-    folioInsert,
+    received_at: "2026-06-03T08:30:00.000Z",
   };
 }

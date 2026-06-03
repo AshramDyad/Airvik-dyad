@@ -68,7 +68,7 @@ describe("RecordPaymentDialog", () => {
         "/api/admin/reservations/reservation-1/cash-payment",
         expect.objectContaining({
           method: "POST",
-          body: JSON.stringify({ amount: 100 }),
+          body: JSON.stringify({ amount: 100, notes: "" }),
         })
       );
     });
@@ -76,6 +76,48 @@ describe("RecordPaymentDialog", () => {
     expect(loadBookingDetails).toHaveBeenCalledWith("reservation-1");
     expect(notifyReservationsChanged).toHaveBeenCalledWith({
       reservationId: "reservation-1",
+    });
+  });
+
+  it("forwards the optional remark in the request body", async () => {
+    const user = userEvent.setup();
+    const reservation = buildReservation({
+      id: "reservation-1",
+      totalAmount: 100,
+      folio: [],
+    });
+
+    mockedUseDataContext.mockReturnValue({
+      reservations: [reservation],
+      property: { tax_enabled: false, tax_percentage: 0 },
+      refreshReservations: vi.fn().mockResolvedValue(undefined),
+      loadBookingDetails: vi.fn().mockResolvedValue(undefined),
+      notifyReservationsChanged: vi.fn(),
+    } as unknown as ReturnType<typeof useDataContext>);
+
+    render(
+      <RecordPaymentDialog reservationId="reservation-1">
+        <button type="button">Open cash dialog</button>
+      </RecordPaymentDialog>
+    );
+
+    await user.click(screen.getByRole("button", { name: "Open cash dialog" }));
+    await user.clear(screen.getByLabelText("Amount"));
+    await user.type(screen.getByLabelText("Amount"), "100");
+    await user.type(
+      screen.getByLabelText("Remarks (optional)"),
+      "Paid at front desk"
+    );
+    await user.click(screen.getByRole("button", { name: "Record Cash" }));
+
+    await waitFor(() => {
+      expect(mockedAuthorizedFetch).toHaveBeenCalledWith(
+        "/api/admin/reservations/reservation-1/cash-payment",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ amount: 100, notes: "Paid at front desk" }),
+        })
+      );
     });
   });
 });

@@ -74,7 +74,6 @@ export function BillingCard({ reservation, groupSummary }: BillingCardProps) {
   const roomCountLabel = groupSummary.roomCount === 1
     ? "Totals include 1 room in this booking"
     : `Totals include ${groupSummary.roomCount} rooms in this booking`;
-  const isGatewayReservation = reservation.paymentMethod === "UPI Gateway";
 
   const {
     roomCharges,
@@ -112,17 +111,15 @@ export function BillingCard({ reservation, groupSummary }: BillingCardProps) {
             </CardDescription>
           </div>
           <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-            {!isGatewayReservation && (
-              <RecordPaymentDialog
-                reservationId={reservation.id}
-                billingSource={billingSource}
-                taxConfig={summaryTaxConfig}
-              >
-                <Button variant="outline" size="sm">
-                  Record Cash
-                </Button>
-              </RecordPaymentDialog>
-            )}
+            <RecordPaymentDialog
+              reservationId={reservation.id}
+              billingSource={billingSource}
+              taxConfig={summaryTaxConfig}
+            >
+              <Button variant="outline" size="sm">
+                Record Payment
+              </Button>
+            </RecordPaymentDialog>
             <AddChargeDialog reservationId={reservation.id}>
               <Button variant="outline" size="sm">
                 Add Charge

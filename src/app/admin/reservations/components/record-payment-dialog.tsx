@@ -25,6 +25,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useDataContext } from "@/context/data-context";
 import type { Reservation } from "@/data/types";
@@ -44,6 +45,7 @@ const paymentSchema = z.object({
     .max(100, "Percentage cannot exceed 100%")
     .optional(),
   entryMode: z.enum(["amount", "percentage"]),
+  notes: z.string().trim().max(500, "Remarks must be 500 characters or fewer.").optional(),
 });
 
 interface RecordPaymentDialogProps {
@@ -96,6 +98,7 @@ export function RecordPaymentDialog({
       amount: 0,
       percentage: undefined,
       entryMode: "amount",
+      notes: "",
     },
   });
 
@@ -196,7 +199,7 @@ export function RecordPaymentDialog({
           method: "POST",
           cache: "no-store",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ amount: paymentAmount }),
+          body: JSON.stringify({ amount: paymentAmount, notes: values.notes }),
         }
       );
       const body: unknown = await response.json().catch(() => null);
@@ -213,6 +216,7 @@ export function RecordPaymentDialog({
         amount: 0,
         percentage: undefined,
         entryMode: "amount",
+        notes: "",
       });
       setOpen(false);
     } catch (error) {
@@ -321,6 +325,25 @@ export function RecordPaymentDialog({
                       ? "Amount auto-calculated from percentage."
                       : "Enter the amount to record."}
                   </p>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="notes"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Remarks (optional)</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      rows={2}
+                      placeholder="Add a note about this cash payment"
+                      disabled={isSubmitting}
+                      {...field}
+                      value={field.value ?? ""}
+                    />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}

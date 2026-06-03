@@ -18,6 +18,7 @@ vi.mock("@/context/data-context", () => ({
 
 vi.mock("@/hooks/use-currency", () => ({
   useCurrencyFormatter: () => (value: number) => `₹${value.toFixed(2)}`,
+  useWholeCurrencyFormatter: () => (value: number) => `₹${Math.round(value)}`,
 }));
 
 vi.mock("@/app/admin/reservations/components/add-charge-dialog", () => ({
@@ -67,10 +68,10 @@ describe("BillingCard", () => {
     render(<BillingCard reservation={reservation} groupSummary={emptyGroupSummary()} />);
 
     expect(screen.getByTestId("payment-requests-panel")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Record Cash" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Record Payment" })).toBeInTheDocument();
   });
 
-  it("keeps payment QR visible but hides cash recording for gateway reservations", () => {
+  it("shows cash recording alongside the payment QR for gateway reservations", () => {
     const guest = buildGuest({ id: "guest-1" });
     const reservation = toReservationDetails({
       guestId: guest.id,
@@ -91,7 +92,7 @@ describe("BillingCard", () => {
     render(<BillingCard reservation={reservation} groupSummary={emptyGroupSummary()} />);
 
     expect(screen.getByTestId("payment-requests-panel")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Record Cash" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Record Payment" })).toBeInTheDocument();
   });
 });
 
