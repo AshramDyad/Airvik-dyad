@@ -105,16 +105,16 @@ export function ReservationPaymentRequestsPanel({
     setSiteUrl(window.location.origin);
   }, []);
 
+  // Seed the amount (and the override dialog's amount) from the balance due:
+  // once on mount, and again only if the balance itself changes (e.g. a
+  // payment is recorded). Keyed on defaultAmount alone so clearing/editing the
+  // field never snaps the value back — the user can type any custom amount.
   React.useEffect(() => {
-    if (amount.trim()) {
-      return;
-    }
-
     if (defaultAmount > 0) {
       setAmount(defaultAmount.toFixed(2));
       setOverrideAmount(defaultAmount.toFixed(2));
     }
-  }, [amount, defaultAmount]);
+  }, [defaultAmount]);
 
   const loadRequests = React.useCallback(
     async (sync = false) => {

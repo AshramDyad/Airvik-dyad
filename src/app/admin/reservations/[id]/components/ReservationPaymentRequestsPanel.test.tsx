@@ -55,6 +55,28 @@ describe("ReservationPaymentRequestsPanel", () => {
     } as unknown as ReturnType<typeof useDataContext>);
   });
 
+  it("keeps the amount field empty after the user clears the prefilled balance", async () => {
+    const user = userEvent.setup();
+    mockedUseAuthContext.mockReturnValue({
+      hasPermission: () => false,
+    } as unknown as ReturnType<typeof useAuthContext>);
+    mockedAuthorizedFetch.mockResolvedValue(
+      jsonResponse({ requests: [] }, { status: 200 })
+    );
+
+    renderPanel({ balanceDue: 1500 });
+
+    const amountInput = await screen.findByLabelText("UPI Gateway Amount");
+    expect(amountInput).toHaveValue(1500);
+
+    await user.clear(amountInput);
+
+    await waitFor(() => {
+      expect(amountInput).toHaveValue(null);
+    });
+    expect(amountInput).toHaveValue(null);
+  });
+
   it("hides admin override when the role does not have update payment permission", async () => {
     mockedUseAuthContext.mockReturnValue({
       hasPermission: () => false,
