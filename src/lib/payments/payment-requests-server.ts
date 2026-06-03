@@ -27,6 +27,7 @@ import {
 
 const IDENTIFIER_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
 const STATEMENT_CODE_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const MANUAL_ADMIN_CONFIRM_REFERENCE = "manual-admin-confirm";
 const PAYMENT_REQUEST_SELECT = [
   "id",
   "identifier",
@@ -223,6 +224,31 @@ export async function reconcilePaymentRequests(
   }
 
   return { matched: matches.length, expired };
+}
+
+export async function markPaymentRequestPaidManually(args: {
+  supabase: SupabaseClient;
+  paymentRequestId: string;
+}): Promise<PaymentRequest> {
+  const { supabase, paymentRequestId } = args;
+
+  // Manual admin confirm of a single QR. p_paid_amount is null so the function
+  // uses the request's own amount; p_matched_transaction is null so this entry
+  // is NOT subject to the auto-match unique-reference guard (which only applies
+  // when matched_transaction IS NOT NULL), letting many manual confirms share
+  // the sentinel reference safely.
+  const { data, error } = await supabase.rpc("mark_payment_request_paid", {
+    p_payment_request_id: paymentRequestId,
+    p_paid_amount: null,
+    p_payment_reference: MANUAL_ADMIN_CONFIRM_REFERENCE,
+    p_matched_transaction: null,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return toPaymentRequest(data as unknown as DbPaymentRequest);
 }
 
 async function listUsedPaymentReferences(

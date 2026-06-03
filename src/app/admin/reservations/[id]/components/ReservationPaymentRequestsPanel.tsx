@@ -28,7 +28,6 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Table,
   TableBody,
@@ -76,22 +75,20 @@ export function ReservationPaymentRequestsPanel({
   } = useDataContext();
   const { hasPermission } = useAuthContext();
   const [amount, setAmount] = React.useState("");
-  const [overrideAmount, setOverrideAmount] = React.useState("");
-  const [overrideReference, setOverrideReference] = React.useState("");
-  const [overrideReason, setOverrideReason] = React.useState("");
   const [requests, setRequests] = React.useState<PaymentRequest[]>(EMPTY_REQUESTS);
   const [activeRequest, setActiveRequest] = React.useState<PaymentRequest | null>(null);
+  const [requestPendingConfirm, setRequestPendingConfirm] =
+    React.useState<PaymentRequest | null>(null);
   const [siteUrl, setSiteUrl] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
   const [isCreating, setIsCreating] = React.useState(false);
   const [isRefreshing, setIsRefreshing] = React.useState(false);
   const [isQrDialogOpen, setIsQrDialogOpen] = React.useState(false);
-  const [isOverrideDialogOpen, setIsOverrideDialogOpen] = React.useState(false);
   const [qrPreviewDataUrl, setQrPreviewDataUrl] = React.useState<string | null>(null);
   const [isPreparingQr, setIsPreparingQr] = React.useState(false);
   const [isSendingQr, setIsSendingQr] = React.useState(false);
-  const [isOverriding, setIsOverriding] = React.useState(false);
+  const [isConfirming, setIsConfirming] = React.useState(false);
   const requestsRef = React.useRef<PaymentRequest[]>(EMPTY_REQUESTS);
 
   const defaultAmount = Math.max(balanceDue, 0);
@@ -105,14 +102,13 @@ export function ReservationPaymentRequestsPanel({
     setSiteUrl(window.location.origin);
   }, []);
 
-  // Seed the amount (and the override dialog's amount) from the balance due:
-  // once on mount, and again only if the balance itself changes (e.g. a
-  // payment is recorded). Keyed on defaultAmount alone so clearing/editing the
-  // field never snaps the value back — the user can type any custom amount.
+  // Seed the amount from the balance due: once on mount, and again only if the
+  // balance itself changes (e.g. a payment is recorded). Keyed on defaultAmount
+  // alone so clearing/editing the field never snaps the value back — the user
+  // can type any custom amount.
   React.useEffect(() => {
     if (defaultAmount > 0) {
       setAmount(defaultAmount.toFixed(2));
-      setOverrideAmount(defaultAmount.toFixed(2));
     }
   }, [defaultAmount]);
 
@@ -329,64 +325,39 @@ export function ReservationPaymentRequestsPanel({
     }
   }
 
-  async function handleOverridePayment(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const parsedAmount = Number.parseFloat(overrideAmount);
-    const amountError = validateReservationPaymentAmount({
-      amount: parsedAmount,
-      balanceDue: defaultAmount,
-    });
-
-    if (amountError) {
-      setError(amountError);
-      return;
-    }
-
-    if (!overrideReason.trim()) {
-      setError("Enter an admin override reason.");
-      return;
-    }
-
-    setIsOverriding(true);
+  async function handleConfirmRequest(request: PaymentRequest) {
+    setIsConfirming(true);
     setError(null);
 
     try {
       const response = await authorizedFetch(
-        `/api/admin/reservations/${reservationId}/payment-override`,
+        `/api/admin/payment-requests/${request.id}/confirm`,
         {
           method: "POST",
           cache: "no-store",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            amount: parsedAmount,
-            reference: overrideReference.trim() || null,
-            reason: overrideReason.trim(),
-          }),
         }
       );
       const body: unknown = await response.json().catch(() => null);
 
       if (!response.ok) {
-        throw new Error(readMessage(body) ?? "Unable to confirm payment override.");
+        throw new Error(readMessage(body) ?? "Unable to confirm payment.");
       }
 
-      setIsOverrideDialogOpen(false);
-      setOverrideReason("");
-      setOverrideReference("");
+      setRequestPendingConfirm(null);
       await revalidateReservationsCache();
       await loadBookingDetails(reservationId);
       void refreshReservations();
       notifyReservationsChanged({ reservationId });
       await loadRequests(true);
-      toast.success("Payment override recorded and booking confirmed.");
-    } catch (overrideError) {
+      toast.success("Payment confirmed.");
+    } catch (confirmError) {
       setError(
-        overrideError instanceof Error
-          ? overrideError.message
-          : "Unable to confirm payment override."
+        confirmError instanceof Error
+          ? confirmError.message
+          : "Unable to confirm payment."
       );
     } finally {
-      setIsOverriding(false);
+      setIsConfirming(false);
     }
   }
 
@@ -433,18 +404,6 @@ export function ReservationPaymentRequestsPanel({
         </form>
 
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap xl:justify-end">
-          {canOverridePayment && (
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full shrink-0 sm:w-auto"
-              onClick={() => setIsOverrideDialogOpen(true)}
-              disabled={defaultAmount <= 0}
-            >
-              <ShieldCheck className="h-4 w-4" />
-              Admin Confirm
-            </Button>
-          )}
           <Button
             type="button"
             variant="outline"
@@ -544,6 +503,17 @@ export function ReservationPaymentRequestsPanel({
                         )}
                         Send
                       </Button>
+                      {canOverridePayment && request.status === "pending" && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="shrink-0"
+                          onClick={() => setRequestPendingConfirm(request)}
+                        >
+                          <ShieldCheck className="h-3.5 w-3.5" />
+                          Confirm
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>
@@ -600,59 +570,54 @@ export function ReservationPaymentRequestsPanel({
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isOverrideDialogOpen} onOpenChange={setIsOverrideDialogOpen}>
+      <Dialog
+        open={requestPendingConfirm !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setRequestPendingConfirm(null);
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="font-sans text-lg">
-              Admin Payment Override
-            </DialogTitle>
+            <DialogTitle className="font-sans text-lg">Confirm payment</DialogTitle>
             <DialogDescription>
-              Use only when the UPI payment is verified outside auto-match.
+              Use only when this UPI payment is verified outside auto-match.
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleOverridePayment} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="override-amount">Paid Amount</Label>
-              <Input
-                id="override-amount"
-                type="number"
-                min="1"
-                step="0.01"
-                inputMode="decimal"
-                value={overrideAmount}
-                onChange={(event) => setOverrideAmount(event.target.value)}
-              />
+          {requestPendingConfirm ? (
+            <div className="space-y-4">
+              <div className="space-y-1 text-sm">
+                <p className="text-muted-foreground">
+                  Payment{" "}
+                  <span className="font-mono font-semibold text-foreground">
+                    {getPaymentRequestDisplayCode(requestPendingConfirm)}
+                  </span>
+                </p>
+                <p className="text-lg font-semibold tabular-nums">
+                  {formatCurrency(requestPendingConfirm.amount, currency)}
+                </p>
+                <p className="text-muted-foreground">
+                  This records the payment and confirms the booking if it is the
+                  first one.
+                </p>
+              </div>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  onClick={() => void handleConfirmRequest(requestPendingConfirm)}
+                  disabled={isConfirming}
+                >
+                  {isConfirming ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <ShieldCheck className="h-4 w-4" />
+                  )}
+                  Confirm Payment
+                </Button>
+              </DialogFooter>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="override-reference">Reference</Label>
-              <Input
-                id="override-reference"
-                value={overrideReference}
-                onChange={(event) => setOverrideReference(event.target.value)}
-                placeholder="Optional bank / UPI reference"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="override-reason">Reason</Label>
-              <Textarea
-                id="override-reason"
-                value={overrideReason}
-                onChange={(event) => setOverrideReason(event.target.value)}
-                placeholder="Why auto-match did not confirm this payment"
-                rows={4}
-              />
-            </div>
-            <DialogFooter>
-              <Button type="submit" disabled={isOverriding}>
-                {isOverriding ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <ShieldCheck className="h-4 w-4" />
-                )}
-                Confirm Booking
-              </Button>
-            </DialogFooter>
-          </form>
+          ) : null}
         </DialogContent>
       </Dialog>
     </div>

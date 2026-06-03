@@ -77,23 +77,50 @@ describe("ReservationPaymentRequestsPanel", () => {
     expect(amountInput).toHaveValue(null);
   });
 
-  it("hides admin override when the role does not have update payment permission", async () => {
+  it("hides the per-row Confirm button when the role lacks update payment permission", async () => {
     mockedUseAuthContext.mockReturnValue({
       hasPermission: () => false,
     } as unknown as ReturnType<typeof useAuthContext>);
     mockedAuthorizedFetch.mockResolvedValue(
-      jsonResponse({ requests: [] }, { status: 200 })
+      jsonResponse({ requests: [buildPendingRequest(1500)] }, { status: 200 })
     );
 
     renderPanel();
 
-    await screen.findByText("No payment QR created for this reservation.");
+    await screen.findByText("XALP");
     expect(
-      screen.queryByRole("button", { name: /admin confirm/i })
+      screen.queryByRole("button", { name: "Confirm" })
     ).not.toBeInTheDocument();
   });
 
-  it("records an admin override and refreshes reservation state", async () => {
+  it("shows the Confirm button only on pending rows", async () => {
+    const expiredRequest = {
+      ...buildPendingRequest(1500),
+      id: "payment-request-expired",
+      statementCode: "EXPD",
+      status: "expired",
+    } satisfies PaymentRequest;
+    mockedUseAuthContext.mockReturnValue({
+      hasPermission: (permission: Permission) => permission === "update:payment",
+    } as unknown as ReturnType<typeof useAuthContext>);
+    mockedAuthorizedFetch.mockResolvedValue(
+      jsonResponse(
+        { requests: [buildPaidRequest(), expiredRequest] },
+        { status: 200 }
+      )
+    );
+
+    renderPanel();
+
+    await screen.findByText("KJRM");
+    // Paid and expired rows are present, but neither exposes a Confirm button.
+    expect(screen.getByText("EXPD")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Confirm" })
+    ).not.toBeInTheDocument();
+  });
+
+  it("confirms a single pending QR and refreshes reservation state", async () => {
     const user = userEvent.setup();
     const refreshReservations = vi.fn().mockResolvedValue(undefined);
     const loadBookingDetails = vi.fn().mockResolvedValue(undefined);
@@ -107,9 +134,11 @@ describe("ReservationPaymentRequestsPanel", () => {
       hasPermission: (permission: Permission) => permission === "update:payment",
     } as unknown as ReturnType<typeof useAuthContext>);
     mockedAuthorizedFetch
-      .mockResolvedValueOnce(jsonResponse({ requests: [] }, { status: 200 }))
       .mockResolvedValueOnce(
-        jsonResponse({ folioItem: { id: "folio-override-1" } }, { status: 201 })
+        jsonResponse({ requests: [buildPendingRequest(1500)] }, { status: 200 })
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({ request: buildPaidRequest() }, { status: 200 })
       )
       .mockResolvedValueOnce(
         jsonResponse({ requests: [buildPaidRequest()] }, { status: 200 })
@@ -117,24 +146,16 @@ describe("ReservationPaymentRequestsPanel", () => {
 
     renderPanel();
 
-    await user.click(await screen.findByRole("button", { name: /admin confirm/i }));
-    await user.clear(screen.getByLabelText("Paid Amount"));
-    await user.type(screen.getByLabelText("Paid Amount"), "1500");
-    await user.type(screen.getByLabelText("Reference"), "UPI123");
-    await user.type(screen.getByLabelText("Reason"), "Verified in bank app");
-    await user.click(screen.getByRole("button", { name: /confirm booking/i }));
+    await screen.findByText("XALP");
+    await user.click(screen.getByRole("button", { name: "Confirm" }));
+    await user.click(
+      await screen.findByRole("button", { name: /confirm payment/i })
+    );
 
     await waitFor(() => {
       expect(mockedAuthorizedFetch).toHaveBeenCalledWith(
-        "/api/admin/reservations/reservation-1/payment-override",
-        expect.objectContaining({
-          method: "POST",
-          body: JSON.stringify({
-            amount: 1500,
-            reference: "UPI123",
-            reason: "Verified in bank app",
-          }),
-        })
+        "/api/admin/payment-requests/payment-request-pending/confirm",
+        expect.objectContaining({ method: "POST" })
       );
     });
     expect(refreshReservations).toHaveBeenCalled();
