@@ -1,16 +1,19 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import {
   AlertTriangle,
   Banknote,
   Clock3,
   Download,
+  Link2,
   Loader2,
   ReceiptText,
   RefreshCw,
   Search,
 } from "lucide-react";
+import { toast } from "sonner";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -21,7 +24,16 @@ import {
   CardDescription,
   CardHeader,
 } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Table,
   TableBody,
@@ -30,12 +42,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useAuthContext } from "@/context/auth-context";
 import { useDataContext } from "@/context/data-context";
 import type {
   GoogleSheetTransaction,
   GoogleSheetTransactionsApiResponse,
 } from "@/data/types";
 import { authorizedFetch } from "@/lib/auth/client-session";
+import type { StatementBookingLink } from "@/lib/payments/statement-links";
+import { formatBookingCode } from "@/lib/reservations/formatting";
 import { cn } from "@/lib/utils";
 
 const AUTO_REFRESH_MS = 60_000;
@@ -53,66 +68,165 @@ type LoadOptions = {
 
 export function PaymentsClient() {
   const { property } = useDataContext();
+  const { hasPermission } = useAuthContext();
   const [payload, setPayload] =
     React.useState<GoogleSheetTransactionsApiResponse | null>(null);
+  const [bookingLinks, setBookingLinks] = React.useState<
+    Map<string, StatementBookingLink>
+  >(() => new Map());
   const [query, setQuery] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
   const [isInitialLoading, setIsInitialLoading] = React.useState(true);
   const [isRefreshing, setIsRefreshing] = React.useState(false);
+  const [attachTarget, setAttachTarget] =
+    React.useState<GoogleSheetTransaction | null>(null);
+  const [attachBookingId, setAttachBookingId] = React.useState("");
+  const [attachError, setAttachError] = React.useState<string | null>(null);
+  const [isAttaching, setIsAttaching] = React.useState(false);
   const payloadRef =
     React.useRef<GoogleSheetTransactionsApiResponse | null>(null);
 
   const currency = property?.currency || "INR";
   const timeZone = property?.timezone || DEFAULT_TIME_ZONE;
+  const canAttachPayment = hasPermission("update:payment");
 
   React.useEffect(() => {
     payloadRef.current = payload;
   }, [payload]);
 
-  const loadTransactions = React.useCallback(async (options: LoadOptions = {}) => {
-    const { force = false, silent = false } = options;
-    const hasPayload = Boolean(payloadRef.current);
-
-    if (!silent) {
-      if (hasPayload) {
-        setIsRefreshing(true);
-      } else {
-        setIsInitialLoading(true);
-      }
-    }
-
+  const loadBookingLinks = React.useCallback(async () => {
     try {
-      const response = await authorizedFetch(
-        `/api/admin/google-sheet-transactions${force ? "?refresh=1" : ""}`,
-        { cache: "no-store" }
-      );
-      const body: unknown = await response.json();
-
-      if (!response.ok) {
-        throw new Error(readMessage(body) ?? "Unable to load payments.");
-      }
-
-      const nextPayload = body as GoogleSheetTransactionsApiResponse;
-      payloadRef.current = nextPayload;
-      setPayload(nextPayload);
-      setError(null);
-      void authorizedFetch("/api/admin/payment-requests/reconcile", {
-        method: "POST",
+      const response = await authorizedFetch("/api/admin/payment-statement/links", {
         cache: "no-store",
-      }).catch(() => undefined);
-    } catch (loadError) {
-      setError(
-        loadError instanceof Error
-          ? loadError.message
-          : "Unable to load payments."
-      );
-    } finally {
-      if (!silent) {
-        setIsInitialLoading(false);
-        setIsRefreshing(false);
+      });
+      const body: unknown = await response.json();
+      if (!response.ok) {
+        console.warn(
+          "Failed to load statement booking links:",
+          readMessage(body) ?? response.status
+        );
+        return;
       }
+
+      const links = (body as { links?: StatementBookingLink[] }).links ?? [];
+      const nextMap = new Map<string, StatementBookingLink>();
+      for (const link of links) {
+        nextMap.set(link.reference.trim().toLowerCase(), link);
+      }
+      setBookingLinks(nextMap);
+    } catch {
+      // A failed link lookup just hides booking columns; the statement still loads.
     }
   }, []);
+
+  const loadTransactions = React.useCallback(
+    async (options: LoadOptions = {}) => {
+      const { force = false, silent = false } = options;
+      const hasPayload = Boolean(payloadRef.current);
+
+      if (!silent) {
+        if (hasPayload) {
+          setIsRefreshing(true);
+        } else {
+          setIsInitialLoading(true);
+        }
+      }
+
+      try {
+        const response = await authorizedFetch(
+          `/api/admin/google-sheet-transactions${force ? "?refresh=1" : ""}`,
+          { cache: "no-store" }
+        );
+        const body: unknown = await response.json();
+
+        if (!response.ok) {
+          throw new Error(readMessage(body) ?? "Unable to load payments.");
+        }
+
+        const nextPayload = body as GoogleSheetTransactionsApiResponse;
+        payloadRef.current = nextPayload;
+        setPayload(nextPayload);
+        setError(null);
+        // Show booking links from already-recorded payments right away.
+        await loadBookingLinks();
+        // Reconcile in the background, then refresh links once new matches land,
+        // so the statement table never waits behind the Google Sheet match.
+        void authorizedFetch("/api/admin/payment-requests/reconcile", {
+          method: "POST",
+          cache: "no-store",
+        })
+          .then(() => loadBookingLinks())
+          .catch(() => undefined);
+      } catch (loadError) {
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load payments."
+        );
+      } finally {
+        if (!silent) {
+          setIsInitialLoading(false);
+          setIsRefreshing(false);
+        }
+      }
+    },
+    [loadBookingLinks]
+  );
+
+  function openAttachDialog(row: GoogleSheetTransaction) {
+    setAttachTarget(row);
+    setAttachBookingId("");
+    setAttachError(null);
+  }
+
+  async function handleAttach() {
+    if (!attachTarget) {
+      return;
+    }
+
+    const reference = attachTarget.reference?.trim() ?? "";
+    const amount = attachTarget.amount;
+    const bookingId = attachBookingId.trim();
+
+    if (!bookingId) {
+      setAttachError("Enter a booking id.");
+      return;
+    }
+    if (!reference) {
+      setAttachError("This transaction has no reference to attach.");
+      return;
+    }
+    if (amount === null || amount <= 0) {
+      setAttachError("This transaction has no amount to attach.");
+      return;
+    }
+
+    setIsAttaching(true);
+    setAttachError(null);
+    try {
+      const response = await authorizedFetch("/api/admin/payment-statement/attach", {
+        method: "POST",
+        cache: "no-store",
+        body: JSON.stringify({ bookingId, amount, reference }),
+      });
+      const body: unknown = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(readMessage(body) ?? "Unable to attach payment.");
+      }
+
+      setAttachTarget(null);
+      await loadBookingLinks();
+      toast.success("Payment attached to booking.");
+    } catch (attachException) {
+      setAttachError(
+        attachException instanceof Error
+          ? attachException.message
+          : "Unable to attach payment."
+      );
+    } finally {
+      setIsAttaching(false);
+    }
+  }
 
   React.useEffect(() => {
     void loadTransactions();
@@ -267,16 +381,18 @@ export function PaymentsClient() {
             <Table className="table-fixed">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[120px]">Date</TableHead>
-                  <TableHead className="w-[42%]">Description/Payer</TableHead>
-                  <TableHead className="w-[130px]">Amount</TableHead>
-                  <TableHead className="w-[180px]">Reference</TableHead>
-                  <TableHead className="w-[120px]">Status</TableHead>
+                  <TableHead className="w-[110px]">Date</TableHead>
+                  <TableHead className="w-[34%]">Description/Payer</TableHead>
+                  <TableHead className="w-[120px]">Amount</TableHead>
+                  <TableHead className="w-[160px]">Reference</TableHead>
+                  <TableHead className="w-[110px]">Status</TableHead>
+                  <TableHead className="w-[160px]">Booking</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredRows.map((row) => {
                   const transactionStatus = getTransactionStatus(row);
+                  const bookingLink = getBookingLink(row, bookingLinks);
 
                   return (
                     <TableRow key={row.rowNumber}>
@@ -316,6 +432,28 @@ export function PaymentsClient() {
                           "-"
                         )}
                       </TableCell>
+                      <TableCell>
+                        {bookingLink ? (
+                          <Link
+                            href={`/admin/reservations/${bookingLink.reservationId}`}
+                            className="font-mono text-xs text-primary hover:underline"
+                          >
+                            {formatBookingCode(bookingLink.bookingId)}
+                          </Link>
+                        ) : canAttachPayment ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 shrink-0 px-2 text-xs"
+                            onClick={() => openAttachDialog(row)}
+                          >
+                            <Link2 className="h-3.5 w-3.5" />
+                            Attach
+                          </Button>
+                        ) : (
+                          "-"
+                        )}
+                      </TableCell>
                     </TableRow>
                   );
                 })}
@@ -324,6 +462,80 @@ export function PaymentsClient() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog
+        open={attachTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setAttachTarget(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-[460px]">
+          <DialogHeader>
+            <DialogTitle>Attach payment to booking</DialogTitle>
+            <DialogDescription>
+              Record this transaction as a payment on the booking you enter. If the
+              booking is still on Room Hold, it will be confirmed.
+            </DialogDescription>
+          </DialogHeader>
+
+          {attachTarget && (
+            <div className="space-y-4">
+              <div className="rounded-md border border-border/60 bg-muted/30 p-3 text-sm">
+                <div className="flex justify-between gap-3">
+                  <span className="text-muted-foreground">Amount</span>
+                  <span className="font-medium">
+                    {getAmountDisplay(attachTarget, currency)}
+                  </span>
+                </div>
+                <div className="mt-1 flex justify-between gap-3">
+                  <span className="text-muted-foreground">Reference</span>
+                  <span className="break-all text-right font-mono text-xs">
+                    {attachTarget.reference ?? "-"}
+                  </span>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="attach-booking-id">Booking id</Label>
+                <Input
+                  id="attach-booking-id"
+                  value={attachBookingId}
+                  onChange={(event) => setAttachBookingId(event.target.value)}
+                  placeholder="e.g. A123456"
+                  autoComplete="off"
+                />
+              </div>
+
+              {attachError && (
+                <Alert variant="destructive">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>{attachError}</AlertDescription>
+                </Alert>
+              )}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setAttachTarget(null)}
+              disabled={isAttaching}
+            >
+              Cancel
+            </Button>
+            <Button onClick={() => void handleAttach()} disabled={isAttaching}>
+              {isAttaching ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Link2 className="h-4 w-4" />
+              )}
+              Attach Booking
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -388,6 +600,18 @@ function readMessage(value: unknown): string | null {
   }
 
   return null;
+}
+
+function getBookingLink(
+  row: GoogleSheetTransaction,
+  links: Map<string, StatementBookingLink>
+): StatementBookingLink | null {
+  const reference = row.reference?.trim().toLowerCase();
+  if (!reference) {
+    return null;
+  }
+
+  return links.get(reference) ?? null;
 }
 
 function getSearchText(row: GoogleSheetTransaction): string {
