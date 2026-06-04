@@ -117,10 +117,6 @@ const legendStatuses: Array<{ key: AvailabilityCellStatus; label: string }> = [
   { key: "closed", label: "Closed" },
 ];
 
-const roomLabelColumnRem = 14;
-const dayColumnRem = 4;
-const roomLabelColumnPx = roomLabelColumnRem * 16;
-const dayColumnPx = dayColumnRem * 16;
 const trailingScrollSpace = "var(--availability-scroll-tail-width, 0px)";
 
 export function AvailabilityCalendar() {
@@ -229,13 +225,17 @@ export function AvailabilityCalendar() {
       ref={elementRef}
       className={cn(
         "rounded-3xl border border-border/60 bg-card shadow-xl transition-all duration-300",
+        // Responsive grid column widths. Narrow on mobile so several day
+        // columns are visible at once (the desktop 14rem/4rem only fit ~1 day
+        // on a phone); restored to full width from the `sm` breakpoint up.
+        "[--avail-label-w:8rem] [--avail-day-w:3.5rem] sm:[--avail-label-w:14rem] sm:[--avail-day-w:4rem]",
         isFullscreen && "fixed inset-0 z-[100] h-screen w-screen overflow-auto rounded-none border-none shadow-none"
       )}
     >
-      <div className="border-b border-border/50 px-4 py-5 sm:px-6">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-            <div className="flex items-center gap-2 rounded-2xl border border-border/60 bg-card/60 p-1">
+      <div className="border-b border-border/50 px-4 py-3 sm:px-6 sm:py-5">
+        <div className="flex flex-col gap-3 sm:gap-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:gap-3">
+            <div className="flex items-center gap-1 rounded-2xl border border-border/60 bg-card/60 p-1 sm:gap-2">
               <Button
                 variant="ghost"
                 size="icon"
@@ -249,7 +249,7 @@ export function AvailabilityCalendar() {
                 value={format(currentMonth, "yyyy-MM-dd")}
                 onValueChange={handleMonthSelect}
               >
-                <SelectTrigger className="min-w-[160px] rounded-xl border bg-transparent focus:outline-none text-sm font-semibold">
+                <SelectTrigger className="w-full min-w-0 rounded-xl border bg-transparent focus:outline-none text-sm font-semibold sm:min-w-[160px]">
                   <SelectValue placeholder="Select month" />
                 </SelectTrigger>
                 <SelectContent>
@@ -270,14 +270,14 @@ export function AvailabilityCalendar() {
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
-            <div className="flex flex-col gap-1">
+            <div className="flex items-stretch gap-2 sm:contents">
               <Select
                 value={String(visibleMonths)}
                 onValueChange={handleVisibleMonthsChange}
               >
                 <SelectTrigger
                   id="availability-months"
-                  className="h-14 min-w-[130px] rounded-xl border border-border/60 bg-card/60 text-sm font-semibold text-foreground"
+                  className="h-11 min-w-0 flex-1 rounded-xl border border-border/60 bg-card/60 text-sm font-semibold text-foreground sm:h-14 sm:min-w-[130px] sm:flex-initial"
                 >
                   <SelectValue placeholder="Months" />
                 </SelectTrigger>
@@ -291,42 +291,42 @@ export function AvailabilityCalendar() {
                   )}
                 </SelectContent>
               </Select>
+              <Select
+                value={unitsView}
+                onValueChange={(value) => setUnitsView(value as UnitsViewMode)}
+              >
+                <SelectTrigger className="h-11 min-w-0 flex-1 rounded-xl border border-border/60 bg-card/60 text-xs font-semibold uppercase tracking-wide text-muted-foreground sm:h-14 sm:min-w-[150px] sm:flex-initial">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="remaining">Units left</SelectItem>
+                  <SelectItem value="booked">Units booked</SelectItem>
+                </SelectContent>
+              </Select>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="hidden h-14 w-14 rounded-xl border border-border/60 bg-card/60 flex-shrink-0 sm:flex"
+                      onClick={toggleFullscreen}
+                    >
+                      {isFullscreen ? (
+                        <Minimize2 className="h-5 w-5" />
+                      ) : (
+                        <Maximize2 className="h-5 w-5" />
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
-            <Select
-              value={unitsView}
-              onValueChange={(value) => setUnitsView(value as UnitsViewMode)}
-            >
-              <SelectTrigger className="h-14 min-w-[150px] rounded-xl border border-border/60 bg-card/60 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="remaining">Units left</SelectItem>
-                <SelectItem value="booked">Units booked</SelectItem>
-              </SelectContent>
-            </Select>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-14 w-14 rounded-xl border border-border/60 bg-card/60 flex-shrink-0"
-                    onClick={toggleFullscreen}
-                  >
-                    {isFullscreen ? (
-                      <Minimize2 className="h-5 w-5" />
-                    ) : (
-                      <Maximize2 className="h-5 w-5" />
-                    )}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  {isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
           </div>
-          <div className="mt-3 flex flex-wrap items-center gap-3 text-xs font-semibold text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-semibold text-muted-foreground sm:mt-3 sm:gap-3 sm:text-xs">
             {legendStatuses
               .filter(
                 (status) => property.showPartialDays || status.key !== "partial"
@@ -334,11 +334,11 @@ export function AvailabilityCalendar() {
               .map((status) => (
                 <div
                   key={status.key}
-                  className="flex items-center gap-2 rounded-full border border-border/60 bg-card px-3 py-1.5 shadow-sm"
+                  className="flex items-center gap-1.5 rounded-full border border-border/60 bg-card px-2.5 py-1 shadow-sm sm:gap-2 sm:px-3 sm:py-1.5"
                 >
                   <span
                     className={cn(
-                      "h-2.5 w-2.5 rounded-full",
+                      "h-2 w-2 rounded-full sm:h-2.5 sm:w-2.5",
                       availabilityDotClasses[status.key]
                     )}
                   />
@@ -390,8 +390,7 @@ export function AvailabilityCalendar() {
                     : monthAvailability;
                 const headerDays = buildHeaderDays(headerSource, monthDate);
                 const monthLabel = format(monthDate, "MMMM yyyy");
-                const tableWidthRem =
-                  roomLabelColumnRem + headerDays.length * dayColumnRem;
+                const tableWidth = `calc(var(--avail-label-w) + ${headerDays.length} * var(--avail-day-w))`;
                 const initialScrollDate = headerDays.some(
                   (day) => day.iso === todayIso
                 )
@@ -412,24 +411,31 @@ export function AvailabilityCalendar() {
                         <Table
                           className="table-fixed border-separate border-spacing-0"
                           style={{
-                            width: `calc(${tableWidthRem}rem + ${trailingScrollSpace})`,
-                            minWidth: `calc(${tableWidthRem}rem + ${trailingScrollSpace})`,
+                            width: `calc(${tableWidth} + ${trailingScrollSpace})`,
+                            minWidth: `calc(${tableWidth} + ${trailingScrollSpace})`,
                           }}
                           baseWrapper={false}
                         >
                           <colgroup>
-                            <col style={{ width: `${roomLabelColumnRem}rem` }} />
+                            <col style={{ width: "var(--avail-label-w)" }} />
                             {headerDays.map((day) => (
-                              <col key={day.iso} style={{ width: `${dayColumnRem}rem` }} />
+                              <col key={day.iso} style={{ width: "var(--avail-day-w)" }} />
                             ))}
                             <col style={{ width: trailingScrollSpace }} />
                           </colgroup>
                           <TableHeader className="sticky top-0 z-30 bg-card/95 backdrop-blur shadow-sm">
                             <TableRow>
-                              <TableHead className="sticky left-0 z-40 w-56 min-w-[14rem] max-w-[14rem] border-r border-b border-border/40 bg-card/95 backdrop-blur px-4 py-3 text-left text-xs font-semibold text-muted-foreground">
+                              <TableHead
+                                className="sticky left-0 z-40 border-r border-b border-border/40 bg-card/95 backdrop-blur px-3 py-3 text-left text-xs font-semibold text-muted-foreground sm:px-4"
+                                style={{
+                                  width: "var(--avail-label-w)",
+                                  minWidth: "var(--avail-label-w)",
+                                  maxWidth: "var(--avail-label-w)",
+                                }}
+                              >
                                 <div>
                                   <p className="text-[11px]">Month</p>
-                                  <p className="text-base font-semibold text-foreground">
+                                  <p className="text-sm font-semibold text-foreground sm:text-base">
                                     {monthLabel}
                                   </p>
                                 </div>
@@ -440,8 +446,13 @@ export function AvailabilityCalendar() {
                                   <TableHead
                                     key={day.iso}
                                     data-availability-date={day.iso}
+                                    style={{
+                                      width: "var(--avail-day-w)",
+                                      minWidth: "var(--avail-day-w)",
+                                      maxWidth: "var(--avail-day-w)",
+                                    }}
                                     className={cn(
-                                      "w-16 min-w-[4rem] max-w-[4rem] border-l border-b border-border/60 px-2 py-3 text-center text-[11px] font-semibold uppercase tracking-wide",
+                                      "border-l border-b border-border/60 px-1 py-3 text-center text-[11px] font-semibold uppercase tracking-wide sm:px-2",
                                       isTodayColumn
                                         ? "bg-primary text-white shadow-[0_4px_20px_rgba(16,185,129,0.2)]"
                                         : "bg-card/95 backdrop-blur text-foreground"
@@ -534,9 +545,19 @@ function DragScrollContainer({
     if (!container) return;
 
     const updateTrailingScrollSpace = () => {
+      // Column widths are responsive (CSS vars), so measure the rendered label
+      // and day columns rather than relying on fixed constants.
+      const labelHeader = container.querySelector<HTMLElement>(
+        "thead th:first-child"
+      );
+      const dayHeader = container.querySelector<HTMLElement>(
+        "thead th[data-availability-date]"
+      );
+      const labelWidth = labelHeader?.getBoundingClientRect().width ?? 0;
+      const dayWidth = dayHeader?.getBoundingClientRect().width ?? 0;
       const tailWidth = Math.max(
         0,
-        container.clientWidth - roomLabelColumnPx - dayColumnPx
+        container.clientWidth - labelWidth - dayWidth
       );
       container.style.setProperty(
         "--availability-scroll-tail-width",
@@ -588,6 +609,13 @@ function DragScrollContainer({
   }, [initialScrollDate]);
 
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    // Touch (and pen) devices already have excellent native scrolling on both
+    // axes. The manual drag-to-scroll logic is for mouse users only; running it
+    // on touch hijacks native momentum/vertical scroll and makes the grid feel
+    // janky on phones.
+    if (event.pointerType !== "mouse") {
+      return;
+    }
     if (event.button !== 0) {
       return;
     }

@@ -116,14 +116,21 @@ export function RoomTypeRow({
     <>
       {/* Aggregated Room Type Row */}
       <TableRow className="bg-transparent text-sm hover:bg-transparent data-[state=selected]:bg-transparent">
-        <TableCell className="sticky left-0 z-20 w-56 min-w-[14rem] max-w-[14rem] border-r border-b border-border/50 bg-card">
-          <div className="flex items-center gap-3">
+        <TableCell
+          className="sticky left-0 z-20 border-r border-b border-border/50 bg-card px-2 sm:px-4"
+          style={{
+            width: "var(--avail-label-w)",
+            minWidth: "var(--avail-label-w)",
+            maxWidth: "var(--avail-label-w)",
+          }}
+        >
+          <div className="flex items-center gap-2 sm:gap-3">
             <button
               type="button"
               onClick={toggleExpand}
               disabled={!canExpand}
               className={cn(
-                "flex h-7 w-7 items-center justify-center rounded-full border border-border/60 text-muted-foreground transition hover:text-foreground",
+                "flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border border-border/60 text-muted-foreground transition hover:text-foreground",
                 canExpand ? "bg-white hover:bg-secondary" : "cursor-not-allowed opacity-40"
               )}
               aria-label={isExpanded ? "Collapse" : "Expand"}
@@ -134,9 +141,9 @@ export function RoomTypeRow({
                 <ChevronRight className="h-4 w-4" />
               )}
             </button>
-            <div className="flex flex-col gap-1">
+            <div className="flex min-w-0 flex-col gap-1">
               <span
-                className="max-w-[14rem] truncate text-sm font-semibold text-foreground"
+                className="max-w-full truncate text-sm font-semibold text-foreground"
                 title={roomType.name}
               >
                 {roomType.name}
@@ -223,7 +230,15 @@ export function RoomTypeRow({
           );
 
           return (
-            <TableCell key={day.date} className="w-16 min-w-[4rem] max-w-[4rem] overflow-hidden p-0">
+            <TableCell
+              key={day.date}
+              className="overflow-hidden p-0"
+              style={{
+                width: "var(--avail-day-w)",
+                minWidth: "var(--avail-day-w)",
+                maxWidth: "var(--avail-day-w)",
+              }}
+            >
               {cellContent}
             </TableCell>
           );
@@ -235,8 +250,15 @@ export function RoomTypeRow({
       {isExpanded &&
         roomType.rooms.map((room) => (
           <TableRow key={room.id} className="text-sm hover:bg-transparent data-[state=selected]:bg-transparent">
-            <TableCell className="sticky left-0 z-20 w-56 min-w-[14rem] max-w-[14rem] border-r border-b border-border/40 bg-card">
-              <div className="flex items-center gap-2 pl-8 text-muted-foreground">
+            <TableCell
+              className="sticky left-0 z-20 border-r border-b border-border/40 bg-card"
+              style={{
+                width: "var(--avail-label-w)",
+                minWidth: "var(--avail-label-w)",
+                maxWidth: "var(--avail-label-w)",
+              }}
+            >
+              <div className="flex items-center gap-2 pl-4 text-muted-foreground sm:pl-8">
                 <span>→</span>
                 <span className="font-semibold text-foreground">
                   Room {room.roomNumber}
@@ -317,7 +339,15 @@ export function RoomTypeRow({
 
                 const roomStatus: AvailabilityCellStatus = isClosed ? "closed" : "free";
                 dayCells.push(
-                  <TableCell key={`${room.id}-${day.date}`} className="w-16 min-w-[4rem] max-w-[4rem] overflow-hidden p-0">
+                  <TableCell
+                    key={`${room.id}-${day.date}`}
+                    className="overflow-hidden p-0"
+                    style={{
+                      width: "var(--avail-day-w)",
+                      minWidth: "var(--avail-day-w)",
+                      maxWidth: "var(--avail-day-w)",
+                    }}
+                  >
                     <div
                       className={cn(
                         cellBaseClasses,
