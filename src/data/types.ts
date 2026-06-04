@@ -293,6 +293,30 @@ export interface Guest {
   avatarUrl?: string;
 }
 
+// Status of a credit note. It is "active" while it still has money left to use,
+// and becomes "redeemed" once the remaining amount reaches 0. The remaining
+// amount is the real source of truth; status is just a convenient label.
+export type CreditNoteStatus = "active" | "redeemed";
+
+// A credit note is store credit issued to a guest when a booking is cancelled.
+// It can be at most the amount the guest actually paid, and is later applied to
+// a future booking as a "Credit Note" payment.
+export interface CreditNote {
+  id: string;
+  guestId: string;
+  // The cancelled booking this credit came from (matches Reservation.bookingId).
+  sourceBookingId: string;
+  // Amount when first issued.
+  originalAmount: number;
+  // Amount still available to use (0 .. originalAmount).
+  remainingAmount: number;
+  status: CreditNoteStatus;
+  notes?: string | null;
+  createdBy?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type ReservationStatus =
   | "Room Hold"
   | "Standby"

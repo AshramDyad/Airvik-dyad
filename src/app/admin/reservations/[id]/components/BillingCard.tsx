@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/table";
 import { AddChargeDialog } from "@/app/admin/reservations/components/add-charge-dialog";
 import { RecordPaymentDialog } from "@/app/admin/reservations/components/record-payment-dialog";
+import { ApplyCreditNoteDialog } from "@/app/admin/reservations/components/credit-note-dialogs";
 import { ReservationPaymentRequestsPanel } from "./ReservationPaymentRequestsPanel";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -120,6 +121,17 @@ export function BillingCard({ reservation, groupSummary }: BillingCardProps) {
                 Record Payment
               </Button>
             </RecordPaymentDialog>
+            <ApplyCreditNoteDialog
+              reservationId={reservation.id}
+              guestId={reservation.guestId}
+              guestName={guest ? `${guest.firstName} ${guest.lastName}`.trim() : "this guest"}
+              guestPhone={guest?.phone ?? ""}
+              balanceDue={Math.max(balance, 0)}
+            >
+              <Button variant="outline" size="sm">
+                Apply Credit Note
+              </Button>
+            </ApplyCreditNoteDialog>
             <AddChargeDialog reservationId={reservation.id}>
               <Button variant="outline" size="sm">
                 Add Charge

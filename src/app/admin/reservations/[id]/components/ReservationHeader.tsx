@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, LogIn, LogOut, XCircle, Edit } from "lucide-react";
+import { ArrowLeft, LogIn, LogOut, XCircle, Edit, Wallet } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { useSearchParams } from "next/navigation";
@@ -11,6 +11,10 @@ import { useDataContext } from "@/context/data-context";
 import type { ReservationWithDetails } from "@/app/admin/reservations/components/columns";
 import type { ReservationStatus } from "@/data/types";
 import { CancelReservationDialog } from "@/app/admin/reservations/components/cancel-reservation-dialog";
+import {
+  IssueCreditNoteDialog,
+  calculateReceivedForBooking,
+} from "@/app/admin/reservations/components/credit-note-dialogs";
 import { InvoiceDownloadButton } from "@/components/shared/invoice-download-button";
 import { SendInvoiceWhatsAppButton } from "@/components/shared/send-invoice-whatsapp-button";
 import * as React from "react";
@@ -44,6 +48,18 @@ export function ReservationHeader({
   const guest = React.useMemo(() => {
     return guests.find((g) => g.id === reservation.guestId);
   }, [guests, reservation.guestId]);
+
+  // Amount already paid across this booking, used to cap the credit note. We
+  // read it from bookingReservations because their folio is loaded on this page.
+  const receivedForBooking = React.useMemo(() => {
+    const folioAmounts = bookingReservations.flatMap((res) =>
+      (res.folio ?? []).map((item) => ({
+        amount: item.amount,
+        externalSource: item.externalSource,
+      }))
+    );
+    return calculateReceivedForBooking(folioAmounts);
+  }, [bookingReservations]);
 
   const handleStatusUpdate = async (
     status: "Checked-in" | "Checked-out" | "Cancelled"
@@ -181,6 +197,18 @@ export function ReservationHeader({
             <XCircle className="h-4 w-4 mr-2" />
             Cancel
           </Button>
+          {reservation.status === "Cancelled" && (
+            <IssueCreditNoteDialog
+              bookingId={reservation.bookingId}
+              guestId={reservation.guestId}
+              received={receivedForBooking}
+            >
+              <Button variant="outline" size="sm" className="shrink-0">
+                <Wallet className="h-4 w-4 mr-2" />
+                Issue Credit Note
+              </Button>
+            </IssueCreditNoteDialog>
+          )}
         </div>
       </div>
       <CancelReservationDialog

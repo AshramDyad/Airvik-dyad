@@ -21,6 +21,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { getCountryByCode } from "@/lib/countries";
+import { authorizedFetch } from "@/lib/auth/client-session";
+import { useCurrencyFormatter } from "@/hooks/use-currency";
+import type { CreditNote } from "@/data/types";
 
 export default function GuestDetailsPage() {
   const params = useParams<{ id: string }>();
@@ -96,6 +99,8 @@ export default function GuestDetailsPage() {
         </CardContent>
       </Card>
 
+      <GuestCreditNotes guestId={guest.id} />
+
       <Card>
         <CardHeader>
           <CardTitle>Reservation History</CardTitle>
@@ -134,5 +139,111 @@ export default function GuestDetailsPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+// Shows the guest's credit notes (money available + history). Fetches its own
+// data so it does not interfere with the page's loading/notFound handling.
+function GuestCreditNotes({ guestId }: { guestId: string }) {
+  const formatCurrency = useCurrencyFormatter();
+  const [creditNotes, setCreditNotes] = React.useState<CreditNote[]>([]);
+  const [isLoading, setIsLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    let active = true;
+    async function load() {
+      setIsLoading(true);
+      try {
+        const response = await authorizedFetch(
+          `/api/admin/credit-notes?guestId=${encodeURIComponent(guestId)}`,
+          { cache: "no-store" }
+        );
+        const body: unknown = await response.json().catch(() => null);
+        if (!response.ok) {
+          throw new Error("Failed to load credit notes.");
+        }
+        const list =
+          body && typeof body === "object" && "creditNotes" in body
+            ? ((body as { creditNotes: CreditNote[] }).creditNotes ?? [])
+            : [];
+        if (active) {
+          setCreditNotes(list);
+        }
+      } catch {
+        if (active) {
+          setCreditNotes([]);
+        }
+      } finally {
+        if (active) {
+          setIsLoading(false);
+        }
+      }
+    }
+    void load();
+    return () => {
+      active = false;
+    };
+  }, [guestId]);
+
+  const totalAvailable = creditNotes
+    .filter((note) => note.status === "active")
+    .reduce((sum, note) => sum + note.remainingAmount, 0);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Credit Notes</CardTitle>
+        <CardDescription>
+          Store credit issued from cancelled bookings.
+          {!isLoading && (
+            <span className="mt-1 block font-medium text-foreground">
+              Total available: {formatCurrency(totalAvailable)}
+            </span>
+          )}
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="rounded-2xl border border-border/40">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>From Booking</TableHead>
+                <TableHead>Issued</TableHead>
+                <TableHead>Remaining</TableHead>
+                <TableHead>Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {creditNotes.map((note) => (
+                <TableRow key={note.id}>
+                  <TableCell className="font-mono text-xs">{note.sourceBookingId}</TableCell>
+                  <TableCell className="tabular-nums">
+                    {formatCurrency(note.originalAmount)}
+                  </TableCell>
+                  <TableCell className="tabular-nums">
+                    {formatCurrency(note.remainingAmount)}
+                  </TableCell>
+                  <TableCell className="capitalize">{note.status}</TableCell>
+                </TableRow>
+              ))}
+              {!isLoading && creditNotes.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
+                    No credit notes.
+                  </TableCell>
+                </TableRow>
+              )}
+              {isLoading && (
+                <TableRow>
+                  <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
+                    Loading...
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
