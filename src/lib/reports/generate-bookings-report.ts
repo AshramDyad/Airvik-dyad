@@ -1,5 +1,9 @@
 import { jsPDF } from "jspdf";
-import "jspdf-autotable";
+import { applyPlugin } from "jspdf-autotable";
+
+// jspdf-autotable v5 only auto-attaches `doc.autoTable()` when jsPDF is found on
+// `window` (the UMD build); in a bundled app we register the plugin explicitly.
+applyPlugin(jsPDF);
 import { format, parseISO, differenceInDays } from "date-fns";
 import type { BookingSummary, Property, ReservationStatus } from "@/data/types";
 import {

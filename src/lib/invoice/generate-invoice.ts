@@ -1,5 +1,11 @@
 import { jsPDF } from "jspdf";
-import "jspdf-autotable";
+import { applyPlugin } from "jspdf-autotable";
+
+// jspdf-autotable v5 only auto-attaches `doc.autoTable()` when it finds jsPDF on
+// `window` (the UMD global build). In a bundled app we import jsPDF as a module,
+// so we must register the plugin on the constructor ourselves. Without this,
+// `doc.autoTable(...)` throws "autoTable is not a function".
+applyPlugin(jsPDF);
 import { format, parseISO, differenceInDays } from "date-fns";
 import type {
   Guest,
