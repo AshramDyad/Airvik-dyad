@@ -355,14 +355,15 @@ export default function BookingConfirmationPage() {
                 <CheckCircle2 className="h-8 w-8" />
               </div>
               <p className="mt-4 text-xs uppercase tracking-[0.4em] text-primary/80">
-                Reservation confirmed
+                Reservation received
               </p>
               <h1 className="mt-3 text-4xl font-serif font-bold text-foreground">
-                Your stay is ready at {property.name}
+                We&apos;ve received your booking at {property.name}
               </h1>
               <p className="mt-3 text-lg text-muted-foreground">
-                Thanks, {customerDetails.fullName}. We&apos;ve secured your
-                rooms and our team is preparing to welcome you.
+                Thanks, {customerDetails.fullName}. We&apos;ve held your rooms.
+                Our reception team will call shortly to confirm the booking and
+                collect payment.
               </p>
               <div className="mx-auto mt-5 inline-flex items-center gap-3 rounded-full border border-border/60 bg-background/70 px-4 py-2 text-sm text-muted-foreground">
                 <span className="font-medium text-foreground">

@@ -7,6 +7,7 @@ import type {
 } from "@supabase/supabase-js";
 import { useSessionContext } from "@/context/session-context";
 import { useActivityLogger } from "@/hooks/use-activity-logger";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import * as api from "@/lib/api";
 import { extractChangedFields } from "@/lib/activity/change-detector";
@@ -309,6 +310,9 @@ export function useAppData() {
   const [bookings, setBookings] = React.useState<BookingSummary[]>([]);
   const [reservations, setReservations] = React.useState<Reservation[]>([]);
   const [todayReservations, setTodayReservations] = React.useState<Reservation[]>([]);
+  // Booking ids already announced via the "new website booking" toast, so a
+  // multi-room booking (several reservation rows) only alerts reception once.
+  const notifiedWebsiteBookingIdsRef = React.useRef<Set<string>>(new Set());
   const [guests, setGuests] = React.useState<Guest[]>([]);
   const [rooms, setRooms] = React.useState<Room[]>([]);
   const [roomTypes, setRoomTypes] = React.useState<RoomType[]>([]);
@@ -806,6 +810,36 @@ export function useAppData() {
           readRealtimeString(payload.old, "reservation_id"),
       });
 
+    // Alert reception the moment a new website booking lands in "Pending".
+    // Fires once per booking (multi-room bookings insert several rows).
+    const maybeNotifyNewWebsiteBooking = (
+      payload: RealtimePostgresChangesPayload<ReservationRealtimeRow>
+    ) => {
+      if (payload.eventType !== "INSERT") {
+        return;
+      }
+      const status = readRealtimeString(payload.new, "status");
+      const source = readRealtimeString(payload.new, "source");
+      if (status !== "Pending" || source !== "website") {
+        return;
+      }
+      const bookingId = readRealtimeString(payload.new, "booking_id");
+      if (!bookingId || notifiedWebsiteBookingIdsRef.current.has(bookingId)) {
+        return;
+      }
+      notifiedWebsiteBookingIdsRef.current.add(bookingId);
+
+      const checkIn = readRealtimeString(payload.new, "check_in_date");
+      const checkOut = readRealtimeString(payload.new, "check_out_date");
+      const dates =
+        checkIn && checkOut ? `${checkIn} → ${checkOut}` : undefined;
+      toast.info(`New website booking ${bookingId}`, {
+        description: dates
+          ? `${dates} · awaiting reception confirmation`
+          : "Awaiting reception confirmation",
+      });
+    };
+
     const channel = supabase
       .channel(`admin-reservations-sync:${userId}`)
       .on(
@@ -828,6 +862,7 @@ export function useAppData() {
         { event: "*", schema: "public", table: "reservations" },
         (payload: RealtimePostgresChangesPayload<ReservationRealtimeRow>) => {
           scheduleReservationsSync(readReservationHint(payload));
+          maybeNotifyNewWebsiteBooking(payload);
         }
       )
       .on(

@@ -16,6 +16,7 @@ import {
   ChevronRight,
   Clock3,
   DownloadCloud,
+  BellRing,
 } from "lucide-react";
 import { format } from "date-fns";
 import Link from "next/link";
@@ -58,6 +59,7 @@ export type ReservationWithDetails = Reservation & {
 };
 
 export const statuses = [
+  { value: "Pending", label: "Pending", icon: BellRing },
   { value: "Room Hold", label: getReservationStatusLabel("Room Hold"), icon: HelpCircle },
   { value: "Standby", label: "Standby", icon: Clock3 },
   { value: "Confirmed", label: "Confirmed", icon: CheckCircle2 },
@@ -411,7 +413,9 @@ export const columns: ColumnDef<ReservationWithDetails>[] = [
           variant={variant}
           className={cn(
             status.value === "Room Hold" &&
-              "border-amber-200 bg-amber-50 text-amber-900 hover:bg-amber-50"
+              "border-amber-200 bg-amber-50 text-amber-900 hover:bg-amber-50",
+            status.value === "Pending" &&
+              "border-orange-300 bg-orange-100 text-orange-900 hover:bg-orange-100"
           )}
         >
           {status.label}

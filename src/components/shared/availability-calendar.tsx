@@ -60,6 +60,10 @@ const reservationStatusStyles: Record<
   ReservationStatus,
   { ribbon: string; dot: string }
 > = {
+  Pending: {
+    ribbon: "border border-orange-300 bg-orange-100 text-orange-900",
+    dot: "bg-orange-500",
+  },
   "Room Hold": {
     ribbon: "border border-amber-200 bg-amber-50 text-amber-900",
     dot: "bg-amber-500",
@@ -948,6 +952,17 @@ function LegacyAvailabilityCalendar() {
             <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Legend
             </span>
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <div
+                className={cn(
+                  "h-2.5 w-2.5 sm:h-3 sm:w-3 rounded-full shrink-0",
+                  getStatusStyle("Pending").dot
+                )}
+              />
+              <span className="text-xs sm:text-sm text-muted-foreground">
+                Pending
+              </span>
+            </div>
             <div className="flex items-center gap-1.5 sm:gap-2">
               <div
                 className={cn(

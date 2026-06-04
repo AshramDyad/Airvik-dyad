@@ -4,6 +4,7 @@ export const ROOM_HOLD_STATUS: ReservationStatus = "Room Hold";
 export const ROOM_HOLD_LABEL = "(Pending) Room Hold";
 
 export const ACTIVE_RESERVATION_STATUSES: readonly ReservationStatus[] = [
+  "Pending",
   ROOM_HOLD_STATUS,
   "Standby",
   "Confirmed",
@@ -12,11 +13,12 @@ export const ACTIVE_RESERVATION_STATUSES: readonly ReservationStatus[] = [
 ];
 
 const RESERVATION_STATUS_PRIORITY: Record<ReservationStatus, number> = {
-  "Checked-out": 5,
-  "Checked-in": 4,
-  Confirmed: 3,
-  Standby: 2,
-  "Room Hold": 1,
+  "Checked-out": 6,
+  "Checked-in": 5,
+  Confirmed: 4,
+  Standby: 3,
+  "Room Hold": 2,
+  Pending: 1,
   Cancelled: 0,
   "No-show": -1,
 };

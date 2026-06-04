@@ -561,7 +561,7 @@ function BookingReviewContent() {
         numberOfGuests: guestCounts.total,
         adultCount: guestCounts.adults,
         childCount: guestCounts.children,
-        status: "Confirmed",
+        status: "Pending",
         notes: additionalRequest || undefined,
         bookingDate: new Date().toISOString(),
         source: "website",

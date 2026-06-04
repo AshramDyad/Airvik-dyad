@@ -28,6 +28,8 @@ const bookedPillClasses =
 
 const roomHoldPillClasses = "border-amber-300 bg-amber-200 text-amber-950";
 
+const pendingPillClasses = "border-orange-300 bg-orange-200 text-orange-950";
+
 const cellBaseClasses =
   "relative flex min-h-[60px] min-w-0 w-full items-center justify-center rounded-none px-2 text-lg font-semibold transition focus-visible:outline-none";
 
@@ -292,7 +294,9 @@ export function RoomTypeRow({
                   const pillTextClass =
                     entry.status === "Room Hold"
                       ? "text-amber-950"
-                      : columnTextClass;
+                      : entry.status === "Pending"
+                        ? "text-orange-950"
+                        : columnTextClass;
                   dayCells.push(
                     <TableCell
                       key={`${room.id}-${entry.reservationId}-${day.date}`}
@@ -311,10 +315,12 @@ export function RoomTypeRow({
                           className={cn(
                             bookedPillClasses,
                             entry.status === "Room Hold" && roomHoldPillClasses,
+                            entry.status === "Pending" && pendingPillClasses,
                             pillTextClass,
                             "cursor-pointer",
                             isTodayColumn &&
                               entry.status !== "Room Hold" &&
+                              entry.status !== "Pending" &&
                               "bg-primary border-primary text-white shadow-[0_0_0_2px_rgba(15,118,110,0.15)]"
                           )}
                           aria-label={`View booking details for ${guestName} in Room ${

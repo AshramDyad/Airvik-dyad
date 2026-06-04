@@ -23,6 +23,10 @@ const reservationStatusStyles: Record<
   ReservationStatus,
   { ribbon: string; dot: string }
 > = {
+  Pending: {
+    ribbon: "border border-orange-300 bg-orange-100 text-orange-900",
+    dot: "bg-orange-500",
+  },
   "Room Hold": {
     ribbon: "border border-amber-200 bg-amber-50 text-amber-900",
     dot: "bg-amber-500",

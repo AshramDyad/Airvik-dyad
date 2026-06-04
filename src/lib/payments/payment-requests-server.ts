@@ -152,6 +152,41 @@ export async function createPaymentRequest(args: {
     throw new Error(error.message);
   }
 
+  // A website booking arrives as "Pending" (held, but never auto-expiring).
+  // Generating its first UPI Gateway QR starts the standard gateway flow, so
+  // promote it to "Room Hold" here. From this point the existing reconcile /
+  // mark_payment_request_paid path confirms it (that path flips only Room Hold
+  // rows), and the DB overlap trigger sets the 30-minute hold automatically.
+  // The QR covers the whole-booking balance, so promote every Pending room of
+  // the booking together — matching how admin gateway bookings hold all rooms.
+  // Only Pending rows are touched, so Room Hold / Confirmed bookings are safe.
+  if (reservationId) {
+    const { data: reservationRow, error: reservationError } = await supabase
+      .from("reservations")
+      .select("booking_id")
+      .eq("id", reservationId)
+      .single();
+
+    if (reservationError) {
+      throw new Error(reservationError.message);
+    }
+
+    const bookingId = (reservationRow as { booking_id: string | null } | null)
+      ?.booking_id;
+
+    if (bookingId) {
+      const { error: holdError } = await supabase
+        .from("reservations")
+        .update({ status: "Room Hold" })
+        .eq("booking_id", bookingId)
+        .eq("status", "Pending");
+
+      if (holdError) {
+        throw new Error(holdError.message);
+      }
+    }
+  }
+
   return toPaymentRequest(data as unknown as DbPaymentRequest);
 }
 

@@ -318,6 +318,7 @@ export interface CreditNote {
 }
 
 export type ReservationStatus =
+  | "Pending"
   | "Room Hold"
   | "Standby"
   | "Confirmed"

@@ -29,6 +29,7 @@ describe("reservation status helpers", () => {
   });
 
   it("shows financials for all statuses except cancelled and no-show", () => {
+    expect(shouldShowReservationFinancials("Pending")).toBe(true);
     expect(shouldShowReservationFinancials("Room Hold")).toBe(true);
     expect(shouldShowReservationFinancials("Confirmed")).toBe(true);
     expect(shouldShowReservationFinancials("Checked-in")).toBe(true);
