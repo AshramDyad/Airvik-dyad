@@ -143,7 +143,7 @@ describe("payment request matching", () => {
     expect(matches[0].request.id).toBe("request-1");
   });
 
-  it("does not match a statement-code request by amount only", () => {
+  it("matches a unique dynamic-decimal amount when the bank dropped the code", () => {
     const matches = findPaymentRequestMatches(
       [
         createRequest({
@@ -169,7 +169,8 @@ describe("payment request matching", () => {
       new Date("2026-05-19T10:00:00.000Z")
     );
 
-    expect(matches).toEqual([]);
+    expect(matches).toHaveLength(1);
+    expect(matches[0].request.id).toBe("request-1");
   });
 
   it("does not auto-match a missing-code transaction when the amount is ambiguous", () => {
@@ -224,7 +225,7 @@ describe("payment request matching", () => {
     expect(matches).toEqual([]);
   });
 
-  it("does not match a two-letter statement prefix", () => {
+  it("matches an unambiguous two-letter code prefix on the rupee amount", () => {
     const matches = findPaymentRequestMatches(
       [
         createRequest({
@@ -250,7 +251,8 @@ describe("payment request matching", () => {
       new Date("2026-05-19T10:00:00.000Z")
     );
 
-    expect(matches).toEqual([]);
+    expect(matches).toHaveLength(1);
+    expect(matches[0].request.id).toBe("request-1");
   });
 
   it("does not match a one-letter statement prefix", () => {
@@ -492,6 +494,367 @@ describe("payment request matching", () => {
           amount: 1200,
           description: "UPI payment XYZ91",
           raw: { credit: "1,200.00", debit: "" },
+        }),
+      ],
+      new Date("2026-05-19T10:00:00.000Z")
+    );
+
+    expect(matches).toEqual([]);
+  });
+
+  // ---- Pass 3: dynamic-decimal OR truncated identifier (booking A8840 family) ----
+
+  it("matches the real A8840 row where the bank truncated ACNO to AC", () => {
+    const matches = findPaymentRequestMatches(
+      [
+        createRequest({
+          id: "request-1",
+          identifier: "4SJHS",
+          statementCode: "ACNO",
+          amount: 1800.03,
+        }),
+      ],
+      [
+        createTransaction({
+          amount: 1800.03,
+          description: "UPI IN/652134562452/dodiasuresh11@okicici/AC/0000",
+          reference: "S46105089",
+          raw: { credit: "1,800.03", debit: "" },
+        }),
+      ],
+      new Date("2026-05-19T10:00:00.000Z")
+    );
+
+    expect(matches).toHaveLength(1);
+    expect(matches[0].request.id).toBe("request-1");
+  });
+
+  it("matches on the exact decimal alone when the bank dropped the code entirely", () => {
+    const matches = findPaymentRequestMatches(
+      [
+        createRequest({
+          id: "request-1",
+          identifier: "4SJHS",
+          statementCode: "ACNO",
+          amount: 1800.03,
+        }),
+      ],
+      [
+        createTransaction({
+          amount: 1800.03,
+          description: "UPI IN/652134562452/dodiasuresh11@okicici/0000",
+          raw: { credit: "1,800.03", debit: "" },
+        }),
+      ],
+      new Date("2026-05-19T10:00:00.000Z")
+    );
+
+    expect(matches).toHaveLength(1);
+    expect(matches[0].request.id).toBe("request-1");
+  });
+
+  it("matches on the rupee amount plus prefix when the guest dropped the decimal", () => {
+    const matches = findPaymentRequestMatches(
+      [
+        createRequest({
+          id: "request-1",
+          identifier: "4SJHS",
+          statementCode: "ACNO",
+          amount: 1800.03,
+        }),
+      ],
+      [
+        createTransaction({
+          amount: 1800,
+          description: "UPI IN/652134562452/dodiasuresh11@okicici/AC/0000",
+          raw: { credit: "1,800.00", debit: "" },
+        }),
+      ],
+      new Date("2026-05-19T10:00:00.000Z")
+    );
+
+    expect(matches).toHaveLength(1);
+    expect(matches[0].request.id).toBe("request-1");
+  });
+
+  it("matches a three-letter surviving prefix", () => {
+    const matches = findPaymentRequestMatches(
+      [
+        createRequest({
+          id: "request-1",
+          identifier: "4SJHS",
+          statementCode: "ACNO",
+          amount: 1800,
+        }),
+      ],
+      [
+        createTransaction({
+          amount: 1800,
+          description: "UPI IN/652134562452/dodiasuresh11@okicici/ACN/0000",
+          raw: { credit: "1,800.00", debit: "" },
+        }),
+      ],
+      new Date("2026-05-19T10:00:00.000Z")
+    );
+
+    expect(matches).toHaveLength(1);
+    expect(matches[0].request.id).toBe("request-1");
+  });
+
+  it("uses the exact decimal to pick one of two same-rupee requests", () => {
+    const matches = findPaymentRequestMatches(
+      [
+        createRequest({
+          id: "request-1",
+          identifier: "4SJHS",
+          statementCode: "ACNO",
+          amount: 1800.03,
+        }),
+        createRequest({
+          id: "request-2",
+          identifier: "MNO82",
+          statementCode: "KJRM",
+          amount: 1800.05,
+        }),
+      ],
+      [
+        createTransaction({
+          amount: 1800.03,
+          description: "UPI IN/652134562452/dodiasuresh11@okicici/0000",
+          raw: { credit: "1,800.03", debit: "" },
+        }),
+      ],
+      new Date("2026-05-19T10:00:00.000Z")
+    );
+
+    expect(matches).toHaveLength(1);
+    expect(matches[0].request.id).toBe("request-1");
+  });
+
+  it("uses the identifier prefix to pick one of two same-rupee requests", () => {
+    const matches = findPaymentRequestMatches(
+      [
+        createRequest({
+          id: "request-1",
+          identifier: "4SJHS",
+          statementCode: "ACNO",
+          amount: 1800.03,
+        }),
+        createRequest({
+          id: "request-2",
+          identifier: "MNO82",
+          statementCode: "KJRM",
+          amount: 1800.05,
+        }),
+      ],
+      [
+        createTransaction({
+          amount: 1800,
+          description: "UPI IN/652134562452/dodiasuresh11@okicici/AC/0000",
+          raw: { credit: "1,800.00", debit: "" },
+        }),
+      ],
+      new Date("2026-05-19T10:00:00.000Z")
+    );
+
+    expect(matches).toHaveLength(1);
+    expect(matches[0].request.id).toBe("request-1");
+  });
+
+  it("does not match the whole-rupee amount alone", () => {
+    const matches = findPaymentRequestMatches(
+      [
+        createRequest({
+          id: "request-1",
+          identifier: "4SJHS",
+          statementCode: "ACNO",
+          amount: 1800,
+        }),
+      ],
+      [
+        createTransaction({
+          amount: 1800,
+          description: "UPI IN/652134562452/dodiasuresh11@okicici/0000",
+          raw: { credit: "1,800.00", debit: "" },
+        }),
+      ],
+      new Date("2026-05-19T10:00:00.000Z")
+    );
+
+    expect(matches).toEqual([]);
+  });
+
+  it("holds a decimal-only match when a different full code is shown", () => {
+    const matches = findPaymentRequestMatches(
+      [
+        createRequest({
+          id: "request-1",
+          identifier: "4SJHS",
+          statementCode: "ACNO",
+          amount: 1800.03,
+        }),
+      ],
+      [
+        createTransaction({
+          amount: 1800.03,
+          description: "UPI IN/652134562452/dodiasuresh11@okicici/QAFA/0000",
+          raw: { credit: "1,800.03", debit: "" },
+        }),
+      ],
+      new Date("2026-05-19T10:00:00.000Z")
+    );
+
+    expect(matches).toEqual([]);
+  });
+
+  it("does not match an ambiguous exact decimal shared by two requests", () => {
+    const matches = findPaymentRequestMatches(
+      [
+        createRequest({
+          id: "request-1",
+          identifier: "4SJHS",
+          statementCode: "ACNO",
+          amount: 1800.03,
+        }),
+        createRequest({
+          id: "request-2",
+          identifier: "MNO82",
+          statementCode: "KJRM",
+          amount: 1800.03,
+        }),
+      ],
+      [
+        createTransaction({
+          amount: 1800.03,
+          description: "UPI IN/652134562452/dodiasuresh11@okicici/0000",
+          raw: { credit: "1,800.03", debit: "" },
+        }),
+      ],
+      new Date("2026-05-19T10:00:00.000Z")
+    );
+
+    expect(matches).toEqual([]);
+  });
+
+  it("does not match an ambiguous two-letter prefix shared by two codes", () => {
+    const matches = findPaymentRequestMatches(
+      [
+        createRequest({
+          id: "request-1",
+          identifier: "4SJHS",
+          statementCode: "ACNO",
+          amount: 1800.03,
+        }),
+        createRequest({
+          id: "request-2",
+          identifier: "MNO82",
+          statementCode: "ACXY",
+          amount: 1800.07,
+        }),
+      ],
+      [
+        createTransaction({
+          amount: 1800,
+          description: "UPI IN/652134562452/dodiasuresh11@okicici/AC/0000",
+          raw: { credit: "1,800.00", debit: "" },
+        }),
+      ],
+      new Date("2026-05-19T10:00:00.000Z")
+    );
+
+    expect(matches).toEqual([]);
+  });
+
+  it("does not match a single-letter surviving prefix", () => {
+    const matches = findPaymentRequestMatches(
+      [
+        createRequest({
+          id: "request-1",
+          identifier: "4SJHS",
+          statementCode: "ACNO",
+          amount: 1800.03,
+        }),
+      ],
+      [
+        createTransaction({
+          amount: 1800,
+          description: "UPI IN/652134562452/dodiasuresh11@okicici/A/0000",
+          raw: { credit: "1,800.00", debit: "" },
+        }),
+      ],
+      new Date("2026-05-19T10:00:00.000Z")
+    );
+
+    expect(matches).toEqual([]);
+  });
+
+  it("does not match a stale truncated-code row fetched before the request", () => {
+    const matches = findPaymentRequestMatches(
+      [
+        createRequest({
+          id: "request-1",
+          identifier: "4SJHS",
+          statementCode: "ACNO",
+          amount: 1800.03,
+          requestedAt: "2026-05-19T10:08:00.000Z",
+        }),
+      ],
+      [
+        createTransaction({
+          amount: 1800.03,
+          fetchedAt: "2026-05-19T04:05:00.000Z",
+          description: "UPI IN/652134562452/dodiasuresh11@okicici/AC/0000",
+          raw: { credit: "1,800.03", debit: "" },
+        }),
+      ],
+      new Date("2026-05-19T11:00:00.000Z")
+    );
+
+    expect(matches).toEqual([]);
+  });
+
+  it("does not reuse an already-used reference for a truncated-code row", () => {
+    const matches = findPaymentRequestMatches(
+      [
+        createRequest({
+          id: "request-1",
+          identifier: "4SJHS",
+          statementCode: "ACNO",
+          amount: 1800.03,
+        }),
+      ],
+      [
+        createTransaction({
+          amount: 1800.03,
+          description: "UPI IN/652134562452/dodiasuresh11@okicici/AC/0000",
+          reference: "S46105089",
+          raw: { credit: "1,800.03", debit: "" },
+        }),
+      ],
+      {
+        now: new Date("2026-05-19T10:00:00.000Z"),
+        usedPaymentReferences: new Set(["S46105089"]),
+      }
+    );
+
+    expect(matches).toEqual([]);
+  });
+
+  it("does not match a debit truncated-code row", () => {
+    const matches = findPaymentRequestMatches(
+      [
+        createRequest({
+          id: "request-1",
+          identifier: "4SJHS",
+          statementCode: "ACNO",
+          amount: 1800.03,
+        }),
+      ],
+      [
+        createTransaction({
+          amount: 1800.03,
+          description: "UPI IN/652134562452/dodiasuresh11@okicici/AC/0000",
+          raw: { credit: "", debit: "1,800.03" },
         }),
       ],
       new Date("2026-05-19T10:00:00.000Z")

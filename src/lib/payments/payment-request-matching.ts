@@ -173,6 +173,71 @@ export function findPaymentRequestMatches(
     }
   }
 
+  // Pass 3: dynamic-decimal OR truncated identifier (high-confidence fuzzy fallback).
+  // Banks render the UPI note in a fixed-width "particulars" field, so the 4-letter
+  // statement code is often truncated (e.g. "ACNO" arrives as "AC"). Confirm a credited,
+  // fresh, not-yet-used row when it points to exactly one waiting request either by its
+  // exact unique decimal amount, or by the whole-rupee amount plus at least the first two
+  // letters of its code. A decimal-only match is held back if a *different* full code is
+  // shown (likely another booking's payment).
+  for (const row of transactions) {
+    if (
+      usedRowNumbers.has(row.rowNumber) ||
+      row.amount === null ||
+      !isCreditedSheetTransaction(row) ||
+      !isUnusedPaymentReference(row, usedPaymentReferences)
+    ) {
+      continue;
+    }
+
+    const note = (row.description ?? "").toUpperCase();
+    const candidates = activeRequests.filter((request) => {
+      if (matchedRequestIds.has(request.id)) {
+        return false;
+      }
+
+      const statementCode = normalizeStatementCode(request.statementCode);
+      if (!statementCode || !isFreshPaymentTransaction(row, request)) {
+        return false;
+      }
+
+      const decimalMatch =
+        hasDynamicDecimal(request.amount) &&
+        isSameMoneyAmount(row.amount, request.amount);
+      const identifierMatch =
+        isSameWholeRupeeAmount(row.amount, request.amount) &&
+        hasStatementCodePrefixToken(note, statementCode, 2);
+
+      return decimalMatch || identifierMatch;
+    });
+
+    if (candidates.length !== 1) {
+      continue;
+    }
+
+    const request = candidates[0];
+    const statementCode = normalizeStatementCode(request.statementCode);
+    if (!statementCode) {
+      continue;
+    }
+
+    const identifierMatch = hasStatementCodePrefixToken(note, statementCode, 2);
+    const decimalMatch =
+      hasDynamicDecimal(request.amount) &&
+      isSameMoneyAmount(row.amount, request.amount);
+    const confirmed =
+      identifierMatch ||
+      (decimalMatch && !hasForeignFullCode(note, statementCode));
+
+    if (!confirmed) {
+      continue;
+    }
+
+    usedRowNumbers.add(row.rowNumber);
+    matchedRequestIds.add(request.id);
+    matches.push({ request, transaction: row });
+  }
+
   return matches;
 }
 
@@ -312,6 +377,53 @@ function hasStatementCodeToken(matchText: string, code: string): boolean {
     `(^|[^A-Z0-9])${escapeRegExp(normalizedCode)}([^A-Z0-9]|$)`
   );
   return pattern.test(matchText);
+}
+
+// True when the statement text contains at least the first `minLen` letters of the code
+// as a clean token. Tries the longest prefix first so a fully-surviving code still wins.
+function hasStatementCodePrefixToken(
+  matchText: string,
+  code: string,
+  minLen: number
+): boolean {
+  const normalizedCode = code.toUpperCase();
+  for (let length = normalizedCode.length; length >= minLen; length -= 1) {
+    if (hasStatementCodeToken(matchText, normalizedCode.slice(0, length))) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+// True when the text contains a clean 4-letter (statement-code length) token that is NOT
+// this request's code — i.e. a different booking's full code is shown. Used to hold back a
+// decimal-only match that is contradicted by another visible code.
+function hasForeignFullCode(matchText: string, code: string): boolean {
+  const normalizedCode = code.toUpperCase();
+  const tokens = matchText.toUpperCase().match(/[A-Z]+/g);
+  if (!tokens) {
+    return false;
+  }
+
+  return tokens.some(
+    (token) =>
+      token.length === PAYMENT_STATEMENT_CODE_LENGTH && token !== normalizedCode
+  );
+}
+
+// True when the amount carries a real 1-9 paise dynamic-decimal suffix (not a round .x0).
+function hasDynamicDecimal(amount: number): boolean {
+  return toPaise(amount) % 10 !== 0;
+}
+
+// True when both amounts share the same whole-rupee value, ignoring the paise suffix.
+function isSameWholeRupeeAmount(left: number | null, right: number): boolean {
+  if (left === null) {
+    return false;
+  }
+
+  return Math.floor(toPaise(left) / 100) === Math.floor(toPaise(right) / 100);
 }
 
 function normalizeStatementCode(
