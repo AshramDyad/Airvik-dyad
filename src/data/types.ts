@@ -139,6 +139,7 @@ export type AvailabilityCellStatus = 'free' | 'partial' | 'busy' | 'closed';
 export interface RoomDayReservation {
   reservationId: string;
   guestId: string;
+  guestName?: string | null;
   checkInDate: string;
   checkOutDate: string;
   status?: ReservationStatus;

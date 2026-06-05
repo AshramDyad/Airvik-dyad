@@ -289,7 +289,8 @@ export function RoomTypeRow({
                     span += 1;
                   }
 
-                  const guestName = getGuestName(entry.guestId);
+                  const guestName =
+                    entry.guestName?.trim() || getGuestName(entry.guestId);
                   const reservationCardId = `${roomType.id}:${room.id}:${entry.reservationId}:${day.date}`;
                   const pillTextClass =
                     entry.status === "Room Hold"
