@@ -27,8 +27,6 @@ import * as React from "react";
 
 import { cn } from "@/lib/utils";
 import { useAuthContext } from "@/context/auth-context";
-import { useDataContext } from "@/context/data-context";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -193,30 +191,9 @@ interface SidebarProps {
 export function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
   const pathname = usePathname() ?? "";
   const { hasPermission, hasAnyPermission } = useAuthContext();
-  const { reservations } = useDataContext();
   const [openDropdowns, setOpenDropdowns] = React.useState<
     Record<string, boolean>
   >({});
-
-  // Count website bookings still waiting for reception to confirm. Shown as a
-  // badge on the Reservations and Calendar nav items so a new web booking is
-  // noticed instantly. `reservations` holds the most-recent bookings (kept live
-  // by realtime), and pending web bookings are always freshly dated. Dedup by
-  // booking id so a multi-room booking counts once (it's one call to make).
-  const pendingWebsiteCount = React.useMemo(() => {
-    const bookingIds = new Set<string>();
-    reservations.forEach((reservation) => {
-      if (reservation.status === "Pending" && reservation.source === "website") {
-        bookingIds.add(reservation.bookingId);
-      }
-    });
-    return bookingIds.size;
-  }, [reservations]);
-
-  const navBadgeCount = (href: string): number =>
-    href === "/admin/reservations" || href === "/admin/calendar"
-      ? pendingWebsiteCount
-      : 0;
 
   const canAccessItem = (
     item:
@@ -328,7 +305,6 @@ export function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
         <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-3 py-4">
           {accessibleNavItems.map((item) => {
             const { href, icon: Icon, label, subItems } = item;
-            const badgeCount = navBadgeCount(href);
             const isActive =
               isPathActive(href) ||
               (subItems?.some((sub) => isSubItemActive(sub)) ?? false);
@@ -345,9 +321,6 @@ export function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
                       )}
                     >
                       <Icon className="h-5 w-5" />
-                      {badgeCount > 0 && (
-                        <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-orange-500" />
-                      )}
                       <span className="sr-only">{label}</span>
                     </Link>
                   </TooltipTrigger>
@@ -471,14 +444,6 @@ export function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
               >
                 <Icon className="h-4 w-4" />
                 {label}
-                {badgeCount > 0 && (
-                  <Badge
-                    variant="outline"
-                    className="ml-auto border-orange-300 bg-orange-100 px-2 py-0.5 text-xs font-semibold text-orange-900"
-                  >
-                    {badgeCount}
-                  </Badge>
-                )}
               </Link>
             );
           })}
