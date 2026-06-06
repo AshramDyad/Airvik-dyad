@@ -6,12 +6,15 @@ import {
   clampReservationPageParams,
   getCachedReservationsCount,
   getCachedReservationsPage,
+  getCachedReservationStatusCounts,
 } from "@/server/reservations/cache";
+import type { ReservationStatus } from "@/data/types";
 
 type ReservationsApiResponse = {
   data: Awaited<ReturnType<typeof getCachedReservationsPage>>["data"];
   nextOffset: number | null;
   count?: number | null;
+  statusCounts: Awaited<ReturnType<typeof getCachedReservationStatusCounts>>;
 };
 
 const parseBoolean = (value: string | null): boolean => {
@@ -33,6 +36,7 @@ export async function GET(request: NextRequest) {
   const limitParam = url.searchParams.get("limit");
   const offsetParam = url.searchParams.get("offset");
   const query = url.searchParams.get("query") ?? undefined;
+  const statuses = url.searchParams.getAll("status") as ReservationStatus[];
   const includeCount = parseBoolean(url.searchParams.get("includeCount"));
 
   const limit = limitParam ? Number(limitParam) : undefined;
@@ -46,8 +50,11 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const normalized = clampReservationPageParams({ limit, offset, query });
-    const page = await getCachedReservationsPage(normalized);
+    const normalized = clampReservationPageParams({ limit, offset, query, statuses });
+    const [page, statusCounts] = await Promise.all([
+      getCachedReservationsPage(normalized),
+      getCachedReservationStatusCounts(),
+    ]);
 
     let count: number | null | undefined = page.totalCount;
     if (includeCount && (count === null || typeof count === "undefined")) {
@@ -58,6 +65,7 @@ export async function GET(request: NextRequest) {
       data: page.data,
       nextOffset: page.nextOffset,
       count,
+      statusCounts,
     };
 
     return NextResponse.json(body, {

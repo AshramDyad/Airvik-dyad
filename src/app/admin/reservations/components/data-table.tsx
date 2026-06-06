@@ -33,6 +33,7 @@ import { DataTableToolbar } from "./data-table-toolbar"
 import { DataTablePagination } from "./data-table-pagination"
 import { CancelReservationDialog } from "./cancel-reservation-dialog"
 import type { ReservationWithDetails } from "./columns"
+import type { ReservationStatus } from "@/data/types"
 import { GeistSpinner } from "@/components/shared/vercel-spinner"
 interface DataTableProps {
   columns: ColumnDef<ReservationWithDetails, unknown>[]
@@ -52,6 +53,9 @@ interface DataTableProps {
     onPageSizeChange: (size: number) => void;
   };
   onSearch?: (query: string) => void;
+  activeStatus?: ReservationStatus | null;
+  onStatusChange?: (status: ReservationStatus | null) => void;
+  statusCounts?: Partial<Record<ReservationStatus, number>>;
 }
 
 export function DataTable({
@@ -67,6 +71,9 @@ export function DataTable({
   totalCount,
   pagination,
   onSearch,
+  activeStatus,
+  onStatusChange,
+  statusCounts,
 }: DataTableProps) {
   const [sorting, setSorting] = React.useState<SortingState>([
     { id: "bookingDate", desc: true },
@@ -269,6 +276,9 @@ export function DataTable({
           onRefresh={onRefresh}
           isRefreshing={Boolean(isRefreshing)}
           isLoading={Boolean(isLoading)}
+          activeStatus={activeStatus ?? null}
+          onStatusChange={onStatusChange}
+          statusCounts={statusCounts}
         />
       </div>
       <div

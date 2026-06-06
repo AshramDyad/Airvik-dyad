@@ -2,7 +2,11 @@ import "server-only";
 
 import { unstable_cache } from "next/cache";
 
-import type { Reservation, ReservationPageResult } from "@/data/types";
+import type {
+  Reservation,
+  ReservationPageResult,
+  ReservationStatus,
+} from "@/data/types";
 import { createServerSupabaseClient } from "@/integrations/supabase/server";
 
 const DEFAULT_PAGE_LIMIT = 50;
@@ -10,6 +14,25 @@ const MAX_PAGE_LIMIT = 500;
 
 export const RESERVATIONS_CACHE_TAG = "reservations";
 export const RESERVATIONS_COUNT_CACHE_TAG = "reservations:count";
+
+// Statuses allowed as a server-side filter, and the subset shown as toolbar chips
+// with live counts. Kept here so the filter and the counts share one source of truth.
+const ALLOWED_STATUSES: ReservationStatus[] = [
+  "Pending",
+  "Room Hold",
+  "Standby",
+  "Confirmed",
+  "Checked-in",
+  "Checked-out",
+  "Cancelled",
+  "No-show",
+];
+
+export const STATUS_COUNT_STATUSES: ReservationStatus[] = [
+  "Room Hold",
+  "Confirmed",
+  "Checked-in",
+];
 
 export type DbBookingSummaryRow = {
   booking_id: string;
@@ -35,6 +58,7 @@ type ReservationPageParams = {
   limit?: number;
   offset?: number;
   query?: string;
+  statuses?: ReservationStatus[];
 };
 
 const normalizePageParams = (params: ReservationPageParams = {}): Required<ReservationPageParams> => {
@@ -44,7 +68,10 @@ const normalizePageParams = (params: ReservationPageParams = {}): Required<Reser
   );
   const offset = Math.max(Number(params.offset ?? 0), 0);
   const query = params.query?.trim() ?? "";
-  return { limit, offset, query };
+  const statuses = Array.from(
+    new Set((params.statuses ?? []).filter((status) => ALLOWED_STATUSES.includes(status)))
+  ).sort();
+  return { limit, offset, query, statuses };
 };
 
 export const mapBookingSummaryRow = (row: DbBookingSummaryRow) => {
@@ -107,6 +134,10 @@ const fetchReservationPage = async (params: Required<ReservationPageParams>) => 
     );
   }
 
+  if (params.statuses.length > 0) {
+    queryBuilder = queryBuilder.in("status", params.statuses);
+  }
+
   const { data, error, count } = await queryBuilder
     .order("booking_date", { ascending: false, nullsFirst: false })
     .range(params.offset, toIndex);
@@ -130,8 +161,11 @@ const fetchReservationPage = async (params: Required<ReservationPageParams>) => 
 };
 
 const reservationsPageCache = unstable_cache(
-  async (limit: number, offset: number, query: string) => {
-    const normalized = normalizePageParams({ limit, offset, query });
+  async (limit: number, offset: number, query: string, statusesKey: string) => {
+    const statuses = statusesKey
+      ? (statusesKey.split(",") as ReservationStatus[])
+      : [];
+    const normalized = normalizePageParams({ limit, offset, query, statuses });
     return fetchReservationPage(normalized);
   },
   ["reservations-page"],
@@ -148,7 +182,8 @@ export const getCachedReservationsPage = async (
   return reservationsPageCache(
     normalized.limit,
     normalized.offset,
-    normalized.query
+    normalized.query,
+    normalized.statuses.join(",")
   );
 };
 
@@ -177,5 +212,37 @@ const reservationsCountCache = unstable_cache(
 
 export const getCachedReservationsCount = (): Promise<number | null> =>
   reservationsCountCache();
+
+// Per-status booking counts for the toolbar chips. Counts come from the same
+// bookings_summary_view.status used by the filter, so a chip's badge and its
+// filtered result always agree. Independent of search/page → stable totals.
+const reservationStatusCountsCache = unstable_cache(
+  async (): Promise<Partial<Record<ReservationStatus, number>>> => {
+    const supabase = createServerSupabaseClient();
+    const entries = await Promise.all(
+      STATUS_COUNT_STATUSES.map(async (status) => {
+        const { count, error } = await supabase
+          .from("bookings_summary_view")
+          .select("*", { count: "exact", head: true })
+          .eq("status", status);
+        if (error) {
+          console.error(`Failed to count "${status}" bookings:`, error);
+          return [status, 0] as const;
+        }
+        return [status, count ?? 0] as const;
+      })
+    );
+    return Object.fromEntries(entries) as Partial<Record<ReservationStatus, number>>;
+  },
+  ["reservations-status-counts"],
+  {
+    revalidate: 120,
+    tags: [RESERVATIONS_CACHE_TAG],
+  }
+);
+
+export const getCachedReservationStatusCounts = (): Promise<
+  Partial<Record<ReservationStatus, number>>
+> => reservationStatusCountsCache();
 
 export const clampReservationPageParams = normalizePageParams;

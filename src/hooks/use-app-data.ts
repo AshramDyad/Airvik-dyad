@@ -238,12 +238,14 @@ type ReservationsApiPayload = {
   data: BookingSummary[];
   nextOffset: number | null;
   count?: number | null;
+  statusCounts?: Partial<Record<ReservationStatus, number>>;
 };
 
 type FetchReservationsArgs = {
   limit: number;
   offset: number;
   query?: string;
+  statuses?: ReservationStatus[];
   includeCount?: boolean;
 };
 
@@ -255,6 +257,9 @@ const fetchReservationsFromApi = async (
   query.set("offset", String(params.offset));
   if (params.query) {
     query.set("query", params.query);
+  }
+  if (params.statuses) {
+    params.statuses.forEach((status) => query.append("status", status));
   }
   if (params.includeCount) {
     query.set("includeCount", "1");
@@ -306,6 +311,9 @@ export function useAppData() {
   const [lookupStatus, setLookupStatus] = React.useState<Record<string, 'pending' | 'success' | 'error'>>({});
   const [activeBookingReservations, setActiveBookingReservations] = React.useState<Reservation[]>([]);
   const [reservationsTotalCount, setReservationsTotalCount] = React.useState<number>(0);
+  const [reservationStatusCounts, setReservationStatusCounts] = React.useState<
+    Partial<Record<ReservationStatus, number>>
+  >({});
   const [property, setProperty] = React.useState<Property>(defaultProperty);
   const [bookings, setBookings] = React.useState<BookingSummary[]>([]);
   const [reservations, setReservations] = React.useState<Reservation[]>([]);
@@ -331,6 +339,7 @@ export function useAppData() {
     limit: number;
     offset: number;
     query?: string;
+    statuses?: ReservationStatus[];
   } | null>(null);
   const reservationSyncSourceIdRef = React.useRef(createReservationSyncSourceId());
   const reservationSyncRevisionRef = React.useRef(0);
@@ -412,7 +421,12 @@ export function useAppData() {
   );
 
   const loadReservationsPage = React.useCallback(
-    async (params: { limit: number; offset: number; query?: string }) => {
+    async (params: {
+      limit: number;
+      offset: number;
+      query?: string;
+      statuses?: ReservationStatus[];
+    }) => {
       lastReservationsPageParamsRef.current = params;
       setIsReservationsInitialLoading(true);
       try {
@@ -420,12 +434,16 @@ export function useAppData() {
           limit: params.limit,
           offset: params.offset,
           query: params.query,
+          statuses: params.statuses,
           includeCount: true,
         });
         const bookingsData = response.data || [];
 
         setBookings(bookingsData);
         setReservationsTotalCount(response.count ?? 0);
+        if (response.statusCounts) {
+          setReservationStatusCounts(response.statusCounts);
+        }
       } catch (error) {
         console.error("Failed to load reservations page:", error);
       } finally {
@@ -592,6 +610,9 @@ export function useAppData() {
       });
       setBookings(response.data || []);
       setReservationsTotalCount(response.count ?? 0);
+      if (response.statusCounts) {
+        setReservationStatusCounts(response.statusCounts);
+      }
     } catch (error) {
       console.error("[AppData] Failed to reload reservations page:", error);
     }
@@ -1879,6 +1900,7 @@ export function useAppData() {
     lookupStatus,
     activeBookingReservations,
     reservationsTotalCount,
+    reservationStatusCounts,
     property,
     bookings,
     reservations,

@@ -151,6 +151,7 @@ interface DataContextType {
   todayReservations: Reservation[];
   activeBookingReservations: Reservation[];
   reservationsTotalCount: number;
+  reservationStatusCounts: Partial<Record<ReservationStatus, number>>;
   guests: Guest[];
   rooms: Room[];
   roomTypes: RoomType[];
@@ -263,6 +264,7 @@ interface DataContextType {
     limit: number;
     offset: number;
     query?: string;
+    statuses?: ReservationStatus[];
   }) => Promise<void>;
   loadBookingDetails: (id: string) => Promise<void>;
   logActivity: (entry: AdminActivityLogInput) => Promise<void>;

@@ -7,7 +7,7 @@ import { differenceInDays, parseISO } from "date-fns";
 import { columns, ReservationWithDetails } from "./components/columns";
 import { DataTable } from "./components/data-table";
 import { useDataContext } from "@/context/data-context";
-import type { FolioItem } from "@/data/types";
+import type { FolioItem, ReservationStatus } from "@/data/types";
 import {
   calculateReservationTaxAmount,
   calculateReservationFinancials,
@@ -60,6 +60,7 @@ export default function ReservationsPage() {
     loadReservationsPage,
     bookings,
     reservationsTotalCount,
+    reservationStatusCounts,
     updateReservationStatus,
     updateBookingReservationStatus,
     property,
@@ -68,6 +69,7 @@ export default function ReservationsPage() {
   const pageIndex = Number(searchParams?.get("page") ?? "0");
   const pageSize = Number(searchParams?.get("limit") ?? "10");
   const searchQuery = searchParams?.get("q") ?? "";
+  const activeStatus = (searchParams?.get("status") as ReservationStatus | null) ?? null;
 
   const updateQueryParams = React.useCallback(
     (params: Record<string, string | number | null>) => {
@@ -94,8 +96,9 @@ export default function ReservationsPage() {
       limit: pageSize,
       offset: pageIndex * pageSize,
       query: searchQuery,
+      statuses: activeStatus ? [activeStatus] : undefined,
     });
-  }, [loadReservationsPage, pageIndex, pageSize, searchQuery]);
+  }, [loadReservationsPage, pageIndex, pageSize, searchQuery, activeStatus]);
 
   const handlePageChange = (index: number) => {
     updateQueryParams({ page: index });
@@ -107,6 +110,10 @@ export default function ReservationsPage() {
 
   const handleSearch = (query: string) => {
     updateQueryParams({ q: query, page: 0 });
+  };
+
+  const handleStatusChange = (status: ReservationStatus | null) => {
+    updateQueryParams({ status, page: 0 });
   };
 
   const groupedReservations = React.useMemo(() => {
@@ -193,6 +200,9 @@ export default function ReservationsPage() {
           onCancelReservation={handleCancelReservation}
           onCheckInReservation={handleCheckInReservation}
           onCheckOutReservation={handleCheckOutReservation}
+          activeStatus={activeStatus}
+          onStatusChange={handleStatusChange}
+          statusCounts={reservationStatusCounts}
           pagination={{
             pageIndex,
             pageSize,
