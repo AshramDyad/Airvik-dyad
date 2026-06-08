@@ -8,6 +8,8 @@ import type {
   GoogleSheetTransactionsPayload,
 } from "@/data/types";
 
+import { dedupeByReference } from "./dedupe";
+
 const READONLY_SCOPE = "https://www.googleapis.com/auth/spreadsheets.readonly";
 const DEFAULT_RANGE = "Transactions!A:L";
 const SHEETS_VALUES_BASE_URL = "https://sheets.googleapis.com/v4/spreadsheets";
@@ -296,7 +298,7 @@ function parseTransactions(
     range,
     fetchedAt: new Date().toISOString(),
     headers,
-    rows,
+    rows: dedupeByReference(rows),
   };
 }
 
