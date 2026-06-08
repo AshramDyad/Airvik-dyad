@@ -22,6 +22,7 @@ import {
   Megaphone,
   Receipt,
   CreditCard,
+  Landmark,
 } from "lucide-react";
 import * as React from "react";
 
@@ -180,6 +181,12 @@ const navItems: SidebarNavItem[] = [
     icon: Receipt,
     label: "Manual Receipt",
     feature: "donations",
+  },
+  {
+    href: "/admin/owner-overview",
+    icon: Landmark,
+    label: "Owner Overview",
+    feature: "ownerOverview",
   },
 ] satisfies SidebarNavItem[];
 

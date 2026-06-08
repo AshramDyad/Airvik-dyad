@@ -494,7 +494,16 @@ export function useAppData() {
         userId ? api.getHousekeepingAssignments() : Promise.resolve({ data: [] }),
         api.getRoomTypeAmenities(),
         userId
-          ? fetchReservationsFromApi({ limit: 1000, offset: 0, includeCount: true })
+          ? fetchReservationsFromApi({ limit: 1000, offset: 0, includeCount: true }).catch(
+              (error: unknown) => {
+                // A view-only role (e.g. Rishiraj-ji) lacks read:reservation, so
+                // this preload 403s. Degrade gracefully instead of failing the
+                // whole admin data load; pages that need reservations have their
+                // own loaders that still surface real errors.
+                console.warn("[AppData] Skipping reservations preload:", error);
+                return { data: [], nextOffset: null, count: 0 } as ReservationsApiPayload;
+              }
+            )
           : Promise.resolve({ data: [], nextOffset: null, count: 0 } as ReservationsApiPayload)
       ]);
 

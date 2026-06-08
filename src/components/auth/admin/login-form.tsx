@@ -16,7 +16,8 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { signOutUser } from "@/context/session-context";
 import { getUserProfile } from "@/lib/api";
-import { ADMIN_ROLES } from "@/constants/roles";
+import { ADMIN_SHELL_ROLES } from "@/constants/roles";
+import { getAdminLandingPath } from "@/lib/auth/landing";
 
 const formSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address." }),
@@ -89,7 +90,7 @@ export function AdminLoginForm() {
         } catch {}
       }
 
-      const isAdminRole = ADMIN_ROLES.some((adminRole) => adminRole === roleName);
+      const isAdminRole = ADMIN_SHELL_ROLES.some((adminRole) => adminRole === roleName);
 
       if (!roleName || !isAdminRole) {
         await signOutUser();
@@ -99,7 +100,7 @@ export function AdminLoginForm() {
       }
 
       toast.success("Welcome back", { description: "Redirecting to Admin..." });
-      router.push("/admin");
+      router.push(getAdminLandingPath(roleName));
     } catch {
       toast.error("Connection error", {
         description:

@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { useAuthContext } from "@/context/auth-context";
 import { useDataContext } from "@/context/data-context";
 import { GeistSpinner } from "@/components/shared/vercel-spinner";
+import { ADMIN_SHELL_ROLES } from "@/constants/roles";
 
 export default function AdminLayout({
   children,
@@ -37,24 +38,14 @@ function AdminLayoutInner({
       return;
     }
     const roleName = userRole?.name;
-    const allowed =
-      roleName === "Administration" ||
-      roleName === "Hotel Owner" ||
-      roleName === "Hotel Manager" ||
-      roleName === "Receptionist" ||
-      roleName === "Housekeeper";
+    const allowed = ADMIN_SHELL_ROLES.some((role) => role === roleName);
     if (!allowed) {
       router.replace("/profile");
     }
   }, [currentUser, userRole, isLoading, router]);
 
   const roleName = userRole?.name;
-  const allowed =
-    roleName === "Administration" ||
-    roleName === "Hotel Owner" ||
-    roleName === "Hotel Manager" ||
-    roleName === "Receptionist" ||
-    roleName === "Housekeeper";
+  const allowed = ADMIN_SHELL_ROLES.some((role) => role === roleName);
   if (!isAuthRoute && (!currentUser || !allowed)) {
     return null;
   }

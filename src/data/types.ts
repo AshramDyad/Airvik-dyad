@@ -16,7 +16,8 @@ export type PermissionResource =
   | "feedback"
   | "review"
   | "donation"
-  | "payment";
+  | "payment"
+  | "owner_overview";
 export type Permission = `${PermissionAction}:${PermissionResource}`;
 
 export type GoogleSheetTransactionRawRow = Record<string, string>;
@@ -91,6 +92,7 @@ export const allPermissions: readonly Permission[] = [
   "read:report",
   "update:setting",
   "create:user", "read:user", "update:user", "delete:user",
+  "read:owner_overview",
 ] as const;
 
 export type DashboardComponentId = 'stats' | 'tables' | 'notes' | 'calendar';
