@@ -11,7 +11,7 @@ import type {
 import { dedupeByReference } from "./dedupe";
 
 const READONLY_SCOPE = "https://www.googleapis.com/auth/spreadsheets.readonly";
-const DEFAULT_RANGE = "Transactions!A:L";
+const DEFAULT_RANGE = "Transactions!A:M";
 const SHEETS_VALUES_BASE_URL = "https://sheets.googleapis.com/v4/spreadsheets";
 
 type FieldKey =
@@ -263,7 +263,7 @@ function readValuesResponse(body: unknown): string[][] {
   });
 }
 
-function parseTransactions(
+export function parseTransactions(
   values: string[][],
   spreadsheetId: string,
   range: string
@@ -274,9 +274,16 @@ function parseTransactions(
   });
   const fieldIndexes = detectFieldIndexes(headers);
   const startRow = parseStartRow(range);
+  const hideIndex = headers.findIndex(
+    (header) => header.trim().toLowerCase() === "hide"
+  );
 
   const rows = values.slice(1).reduce<GoogleSheetTransaction[]>((acc, cells, index) => {
     if (cells.every((cell) => cell.trim().length === 0)) {
+      return acc;
+    }
+
+    if (isHiddenRow(cells, hideIndex)) {
       return acc;
     }
 
@@ -349,6 +356,13 @@ function isSheetHeaderRow(row: GoogleSheetTransaction): boolean {
       description === "description") &&
     (amount === "amount" || amount === "credit")
   );
+}
+
+function isHiddenRow(cells: string[], hideIndex: number): boolean {
+  if (hideIndex < 0) {
+    return false;
+  }
+  return (cells[hideIndex] ?? "").trim().toLowerCase() === "hide";
 }
 
 function detectFieldIndexes(headers: string[]): FieldIndexes {
