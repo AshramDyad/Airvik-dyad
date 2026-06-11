@@ -1,40 +1,18 @@
 "use client";
 
 import * as React from "react";
-import {
-  differenceInBusinessDays,
-  format,
-  parseISO,
-  startOfMonth,
-  subDays,
-} from "date-fns";
+import { format, parseISO, startOfMonth, subDays } from "date-fns";
 import type { DateRange } from "react-day-picker";
-import {
-  AlertTriangle,
-  ArrowDownCircle,
-  CalendarIcon,
-  Landmark,
-  Loader2,
-  RefreshCw,
-} from "lucide-react";
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
+import { ArrowDownCircle, CalendarIcon, Loader2, RefreshCw } from "lucide-react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
-import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-  type ChartConfig,
-} from "@/components/ui/chart";
 import {
   Popover,
   PopoverContent,
@@ -67,11 +45,6 @@ const PRESETS: { key: Exclude<PresetKey, "custom">; label: string }[] = [
   { key: "month", label: "This month" },
 ];
 
-const CHART_CONFIG: ChartConfig = {
-  credit: { label: "Credit", color: "hsl(142 71% 45%)" },
-  debit: { label: "Debit", color: "hsl(var(--destructive))" },
-};
-
 function presetRange(key: Exclude<PresetKey, "custom">, today: Date): DateRange {
   switch (key) {
     case "today":
@@ -91,9 +64,9 @@ function toParam(date: Date): string {
 
 export function OwnerOverviewClient() {
   const formatCurrency = useCurrencyFormatter();
-  const [preset, setPreset] = React.useState<PresetKey>("30d");
+  const [preset, setPreset] = React.useState<PresetKey>("today");
   const [range, setRange] = React.useState<DateRange>(() =>
-    presetRange("30d", new Date())
+    presetRange("today", new Date())
   );
   const [summary, setSummary] = React.useState<OwnerOverviewSummary | null>(null);
   const [error, setError] = React.useState<string | null>(null);
@@ -159,13 +132,7 @@ export function OwnerOverviewClient() {
         <div>
           <h1 className="text-2xl font-serif font-semibold">Owner Overview</h1>
           <p className="text-sm text-muted-foreground">
-            {summary?.account ? (
-              <span className="inline-flex items-center gap-1">
-                <Landmark className="h-3.5 w-3.5" /> {summary.account}
-              </span>
-            ) : (
-              "Pay-ins, settlements and payouts at a glance."
-            )}
+            Pay-ins, settlements and payouts at a glance.
           </p>
         </div>
         <Button
@@ -227,109 +194,56 @@ export function OwnerOverviewClient() {
         </Alert>
       )}
 
-      {/* Payout + flow cards */}
-      <div className="grid gap-4 md:grid-cols-3">
+      {/* Period snapshot — follows the date filter above */}
+      <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardDescription>Payouts</CardDescription>
+            <CardDescription>Transactions</CardDescription>
             <ArrowDownCircle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-semibold">
-              {summary ? formatCurrency(summary.payoutTotal) : "…"}
+              {summary ? formatCurrency(summary.transactionsTotal) : "…"}
             </div>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Money transferred to your account this period
-            </p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription>Credit / Debit</CardDescription>
+            <CardDescription>Settled</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex items-baseline gap-2 text-lg font-semibold">
-              <span className="text-emerald-600">
-                {summary ? formatCurrency(summary.creditTotal) : "…"}
-              </span>
-              <span className="text-muted-foreground">/</span>
-              <span className="text-destructive">
-                {summary ? formatCurrency(summary.debitTotal) : "…"}
-              </span>
+            <div className="text-2xl font-semibold text-emerald-600">
+              {summary ? formatCurrency(summary.settledSummary.net) : "…"}
             </div>
-            <p className="mt-1 text-xs text-muted-foreground">In vs out this period</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Settling now</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-semibold">
-              {summary ? summary.settlement.length : "…"}
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <div>
+                <p className="text-xs text-muted-foreground">Total Txn.</p>
+                <p className="font-medium">
+                  {summary ? formatCurrency(summary.settledSummary.gross) : "…"}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Deduction</p>
+                <p className="font-medium text-destructive">
+                  {summary ? formatCurrency(summary.settledSummary.fee) : "…"}
+                </p>
+              </div>
             </div>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Pay-ins clearing over the next working days
-            </p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Fee incentive + floor */}
-      <FeeIncentiveCard summary={summary} formatCurrency={formatCurrency} />
-
-      {/* Daily credit vs debit */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="font-sans text-lg">Daily money flow</CardTitle>
-          <CardDescription>Credit vs debit for the selected period.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {summary && summary.dailyCreditDebit.length > 0 ? (
-            <ChartContainer config={CHART_CONFIG} className="h-[260px] w-full">
-              <BarChart
-                data={summary.dailyCreditDebit.map((point) => ({
-                  date: format(parseISO(point.date), "dd MMM"),
-                  credit: point.credit,
-                  debit: point.debit,
-                }))}
-              >
-                <CartesianGrid vertical={false} />
-                <XAxis dataKey="date" tickLine={false} axisLine={false} tickMargin={8} />
-                <YAxis
-                  tickLine={false}
-                  axisLine={false}
-                  width={48}
-                  tickFormatter={(value) =>
-                    formatCurrency(value as number, { notation: "compact" })
-                  }
-                />
-                <ChartTooltip
-                  content={
-                    <ChartTooltipContent
-                      formatter={(value) => formatCurrency(value as number)}
-                    />
-                  }
-                  cursor={{ fill: "hsl(var(--accent))" }}
-                />
-                <Bar dataKey="credit" fill="var(--color-credit)" radius={4} />
-                <Bar dataKey="debit" fill="var(--color-debit)" radius={4} />
-              </BarChart>
-            </ChartContainer>
-          ) : (
-            <EmptyState label="No money movement in this period." />
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Settlement / Settled */}
+      {/* Settled / Settling / Payout */}
       <Tabs defaultValue="settled">
         <TabsList>
           <TabsTrigger value="settled">
             Settled {summary ? `(${summary.settled.length})` : ""}
           </TabsTrigger>
-          <TabsTrigger value="settlement">
-            Settlement {summary ? `(${summary.settlement.length})` : ""}
+          <TabsTrigger value="settling">
+            Settling {summary ? `(${summary.settling.length})` : ""}
+          </TabsTrigger>
+          <TabsTrigger value="payout">
+            Payout {summary ? `(${summary.payouts.length})` : ""}
           </TabsTrigger>
         </TabsList>
         <TabsContent value="settled">
@@ -341,13 +255,22 @@ export function OwnerOverviewClient() {
             mode="settled"
           />
         </TabsContent>
-        <TabsContent value="settlement">
+        <TabsContent value="settling">
           <LedgerTable
-            rows={summary?.settlement ?? []}
+            rows={summary?.settling ?? []}
             isLoading={isLoading}
             emptyLabel="Nothing is currently settling."
             formatCurrency={formatCurrency}
-            mode="settlement"
+            mode="settling"
+          />
+        </TabsContent>
+        <TabsContent value="payout">
+          <LedgerTable
+            rows={summary?.payouts ?? []}
+            isLoading={isLoading}
+            emptyLabel="No payouts in this period."
+            formatCurrency={formatCurrency}
+            mode="payout"
           />
         </TabsContent>
       </Tabs>
@@ -355,66 +278,7 @@ export function OwnerOverviewClient() {
   );
 }
 
-function FeeIncentiveCard({
-  summary,
-  formatCurrency,
-}: {
-  summary: OwnerOverviewSummary | null;
-  formatCurrency: (value: number, options?: Intl.NumberFormatOptions) => string;
-}) {
-  if (!summary) {
-    return null;
-  }
-  const {
-    feeTier,
-    maintainedParked,
-    maintainedWindowDays,
-    minimumBalance,
-    belowFloor,
-    floor,
-  } = summary;
-  return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="font-sans text-lg">Your gateway fee</CardTitle>
-        <CardDescription>
-          The more you keep in our system, the less you pay on each transaction.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-2 text-sm">
-        <p>
-          Kept in our system (last {maintainedWindowDays} days):{" "}
-          <span className="font-semibold">{formatCurrency(maintainedParked)}</span> —
-          you&apos;re on the{" "}
-          <span className="font-semibold">{feeTier.ratePercent}%</span> gateway fee.
-        </p>
-        {feeTier.nextThreshold !== null && feeTier.nextRatePercent !== null ? (
-          <p className="text-muted-foreground">
-            Keep {formatCurrency(feeTier.nextThreshold)} to drop to{" "}
-            <span className="font-medium text-emerald-600">
-              {feeTier.nextRatePercent}%
-            </span>{" "}
-            — you save more the longer it stays.
-          </p>
-        ) : (
-          <p className="text-emerald-600">You&apos;re on the best available rate.</p>
-        )}
-        <p className="text-muted-foreground">
-          Lowest bank balance this period:{" "}
-          <span className="font-medium text-foreground">
-            {minimumBalance !== null ? formatCurrency(minimumBalance) : "—"}
-          </span>
-        </p>
-        {belowFloor && (
-          <p className="flex items-center gap-1.5 text-destructive">
-            <AlertTriangle className="h-4 w-4" />
-            Below the {formatCurrency(floor)} bank minimum — penalty risk.
-          </p>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
+type LedgerMode = "settled" | "settling" | "payout";
 
 function LedgerTable({
   rows,
@@ -427,8 +291,10 @@ function LedgerTable({
   isLoading: boolean;
   emptyLabel: string;
   formatCurrency: (value: number) => string;
-  mode: "settled" | "settlement";
+  mode: LedgerMode;
 }) {
+  const isPayout = mode === "payout";
+  const isSettling = mode === "settling";
   return (
     <Card>
       <CardContent className="pt-6">
@@ -442,10 +308,10 @@ function LedgerTable({
               <TableRow>
                 <TableHead>Date</TableHead>
                 <TableHead>Description</TableHead>
-                <TableHead>
-                  {mode === "settlement" ? "Settles" : "Type"}
+                {isSettling && <TableHead>Settles</TableHead>}
+                <TableHead className="text-right">
+                  {mode === "settled" ? "Amount (after 1% fee)" : "Amount"}
                 </TableHead>
-                <TableHead className="text-right">Amount</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -457,25 +323,21 @@ function LedgerTable({
                   <TableCell className="max-w-[360px] truncate" title={row.description}>
                     {row.description || "—"}
                   </TableCell>
-                  <TableCell className="whitespace-nowrap">
-                    {mode === "settlement" ? (
-                      <SettlesHint settledOn={row.settledOn} />
-                    ) : (
-                      <Badge
-                        variant={row.kind === "payout" ? "destructive" : "secondary"}
-                      >
-                        {row.kind === "payout" ? "Payout" : "Credit"}
-                      </Badge>
-                    )}
-                  </TableCell>
+                  {isSettling && (
+                    <TableCell className="whitespace-nowrap text-muted-foreground">
+                      {row.settledOn
+                        ? format(parseISO(row.settledOn), "dd MMM yyyy")
+                        : "—"}
+                    </TableCell>
+                  )}
                   <TableCell
                     className={cn(
                       "text-right font-medium whitespace-nowrap",
-                      row.kind === "payout" ? "text-destructive" : "text-emerald-600"
+                      isPayout ? "text-destructive" : "text-emerald-600"
                     )}
                   >
-                    {row.kind === "payout" ? "−" : "+"}
-                    {formatCurrency(row.amount)}
+                    {isPayout ? "−" : "+"}
+                    {formatCurrency(mode === "settled" ? row.netAmount : row.amount)}
                   </TableCell>
                 </TableRow>
               ))}
@@ -484,20 +346,6 @@ function LedgerTable({
         )}
       </CardContent>
     </Card>
-  );
-}
-
-function SettlesHint({ settledOn }: { settledOn: string | null }) {
-  if (!settledOn) {
-    return <span className="text-muted-foreground">—</span>;
-  }
-  const target = parseISO(settledOn);
-  const daysLeft = Math.max(0, differenceInBusinessDays(target, new Date()));
-  return (
-    <span className="text-muted-foreground">
-      {format(target, "dd MMM")}
-      {daysLeft > 0 ? ` · ${daysLeft} working day${daysLeft === 1 ? "" : "s"}` : " · soon"}
-    </span>
   );
 }
 
@@ -521,10 +369,10 @@ function EmptyState({ label }: { label: string }) {
 function readSummary(body: unknown): OwnerOverviewSummary {
   if (
     !isRecord(body) ||
-    !Array.isArray(body.settlement) ||
+    !Array.isArray(body.settling) ||
     !Array.isArray(body.settled) ||
-    !Array.isArray(body.dailyCreditDebit) ||
-    !isRecord(body.feeTier)
+    !Array.isArray(body.payouts) ||
+    !isRecord(body.settledSummary)
   ) {
     throw new Error("Overview response was not valid.");
   }

@@ -1,43 +1,122 @@
-import {
-  addBusinessDays,
-  endOfDay,
-  format,
-  isAfter,
-  isBefore,
-  isValid,
-  parseISO,
-  startOfDay,
-  subDays,
-} from "date-fns";
+import { addBusinessDays, format, parseISO, startOfDay } from "date-fns";
 
 import type { GoogleSheetTransaction } from "@/data/types";
 import type {
-  OwnerDailyPoint,
-  OwnerFeeTier,
   OwnerLedgerEntry,
   OwnerOverviewSummary,
+  OwnerSettledSummary,
 } from "./types";
 
 // ---- Tunable business rules (single source of truth) ----
-export const SETTLEMENT_BUSINESS_DAYS = 4;
-export const BANK_MIN_FLOOR = 100000; // ₹1,00,000 — bank's required minimum balance
-// The fee tier reflects a maintained (kept) amount over a fixed trailing window
-// so it reads as a stable benefit level, not something that flips with the
-// page's date filter.
-export const MAINTAINED_WINDOW_DAYS = 30;
+export const SETTLEMENT_BUSINESS_DAYS = 7;
+// Flat gateway fee cut from every settled credit. The owner sees the gross amount
+// while it is still settling and the after-fee amount once it has cleared.
+export const SETTLEMENT_FEE_PERCENT = 1;
+// Bank statement days and "today" are read on the property's clock.
+export const DEFAULT_TIME_ZONE = "Asia/Kolkata";
 const PAYOUT_PATTERN = /payout/i;
-
-// Fee tiers by parked amount (credits − payouts), ascending by threshold.
-// More money kept in our system → a lower gateway fee.
-const FEE_TIERS: ReadonlyArray<{ threshold: number; ratePercent: number }> = [
-  { threshold: 0, ratePercent: 1 },
-  { threshold: 300000, ratePercent: 0.7 },
-  { threshold: 600000, ratePercent: 0.3 },
-];
 
 export interface OwnerDateRange {
   from: Date;
   to: Date;
+}
+
+/** Round a rupee value to paise (2 decimal places). */
+function round2(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+/** Split a gross credit into the gateway fee and the amount that lands as settled. */
+function applyFee(gross: number): { fee: number; net: number } {
+  const fee = round2((gross * SETTLEMENT_FEE_PERCENT) / 100);
+  return { fee, net: round2(gross - fee) };
+}
+
+function pad2(value: number): string {
+  return value < 10 ? `0${value}` : `${value}`;
+}
+
+/**
+ * A bank statement date is a calendar *day*, not an instant — so `DD/MM/YYYY`,
+ * `DD-MM-YYYY`, `DD.MM.YYYY` and compact `DDMMYYYY` are read straight into a
+ * `yyyy-MM-dd` key with no timezone shift (mirrors the Payments page parser). Only a
+ * real timestamp falls back to a timezone-aware conversion.
+ */
+function getSheetDateKey(value: string | null, timeZone: string): string | null {
+  if (!value) {
+    return null;
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    return trimmed;
+  }
+
+  const separated = trimmed.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4}|\d{2})/);
+  if (separated) {
+    const first = Number.parseInt(separated[1], 10);
+    const second = Number.parseInt(separated[2], 10);
+    const yearPart = Number.parseInt(separated[3], 10);
+    const year = yearPart < 100 ? 2000 + yearPart : yearPart;
+    // Day/month disambiguation: whichever side is > 12 must be the day.
+    const day = first > 12 ? first : second > 12 ? second : first;
+    const month = first > 12 ? second : second > 12 ? first : second;
+    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      return `${year}-${pad2(month)}-${pad2(day)}`;
+    }
+  }
+
+  const compact = trimmed.match(/^(\d{2})(\d{2})(\d{2}|\d{4})$/);
+  if (compact) {
+    const day = Number.parseInt(compact[1], 10);
+    const month = Number.parseInt(compact[2], 10);
+    const yearPart = Number.parseInt(compact[3], 10);
+    const year = yearPart < 100 ? 2000 + yearPart : yearPart;
+    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      return `${year}-${pad2(month)}-${pad2(day)}`;
+    }
+  }
+
+  const timestamp = Date.parse(trimmed);
+  if (Number.isFinite(timestamp)) {
+    return getDateKeyForInstant(new Date(timestamp), timeZone);
+  }
+  return null;
+}
+
+/** The `yyyy-MM-dd` calendar day of an instant, read in the given timezone. */
+function getDateKeyForInstant(date: Date, timeZone: string): string | null {
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+  try {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(date);
+    const year = parts.find((part) => part.type === "year")?.value;
+    const month = parts.find((part) => part.type === "month")?.value;
+    const day = parts.find((part) => part.type === "day")?.value;
+    if (!year || !month || !day) {
+      return null;
+    }
+    return `${year}-${month}-${day}`;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Add working days to a `yyyy-MM-dd` key and return a `yyyy-MM-dd` key. The round-trip
+ * through `parseISO` (local midnight) and `format` cancels the local timezone, so the
+ * calendar arithmetic is timezone-independent.
+ */
+function addBusinessDaysKey(dayKey: string, days: number): string {
+  return format(addBusinessDays(parseISO(dayKey), days), "yyyy-MM-dd");
 }
 
 /** Parse a sheet money cell ("27,945.12", "-174000.00", "") to a number or null. */
@@ -69,82 +148,29 @@ function getSignedAmount(transaction: GoogleSheetTransaction): number | null {
   return null;
 }
 
-/** The transaction's date as a valid Date, or null when missing/unparseable. */
-function getTransactionDate(transaction: GoogleSheetTransaction): Date | null {
-  if (!transaction.date) {
-    return null;
-  }
-  const parsed = parseISO(transaction.date);
-  return isValid(parsed) ? parsed : null;
-}
-
-function isWithin(date: Date, range: OwnerDateRange): boolean {
-  const from = startOfDay(range.from);
-  const to = endOfDay(range.to);
-  return !isBefore(date, from) && !isAfter(date, to);
-}
-
 function isPayout(transaction: GoogleSheetTransaction, signedAmount: number): boolean {
   return signedAmount < 0 && PAYOUT_PATTERN.test(transaction.description ?? "");
 }
 
-/** Net money kept (credits − payouts) over a range — used for the fee tier. */
-function getParkedNet(
-  transactions: GoogleSheetTransaction[],
-  range: OwnerDateRange
-): number {
-  let credit = 0;
-  let payout = 0;
-  for (const transaction of transactions) {
-    const date = getTransactionDate(transaction);
-    const signedAmount = getSignedAmount(transaction);
-    if (!date || signedAmount === null || signedAmount === 0) {
-      continue;
-    }
-    if (!isWithin(date, range)) {
-      continue;
-    }
-    if (signedAmount > 0) {
-      credit += signedAmount;
-    } else if (isPayout(transaction, signedAmount)) {
-      payout += Math.abs(signedAmount);
-    }
-  }
-  return credit - payout;
-}
-
-function getFeeTier(parkedNet: number): OwnerFeeTier {
-  let currentIndex = 0;
-  for (let index = 0; index < FEE_TIERS.length; index += 1) {
-    if (parkedNet >= FEE_TIERS[index].threshold) {
-      currentIndex = index;
-    }
-  }
-  const current = FEE_TIERS[currentIndex];
-  const next = FEE_TIERS[currentIndex + 1] ?? null;
-  return {
-    ratePercent: current.ratePercent,
-    nextThreshold: next ? next.threshold : null,
-    nextRatePercent: next ? next.ratePercent : null,
-  };
-}
-
 function toLedgerEntry(
   transaction: GoogleSheetTransaction,
-  date: Date,
-  signedAmount: number,
+  dateKey: string,
+  amount: number,
+  feeAmount: number,
   kind: OwnerLedgerEntry["kind"],
-  settledOn: Date | null
+  settledOn: string | null
 ): OwnerLedgerEntry {
   const id = transaction.raw["transaction_id"]?.trim() || `row-${transaction.rowNumber}`;
   return {
     id,
-    date: format(date, "yyyy-MM-dd"),
+    date: dateKey,
     description: transaction.description ?? "",
     reference: transaction.reference ?? "",
-    amount: Math.abs(signedAmount),
+    amount,
+    feeAmount,
+    netAmount: round2(amount - feeAmount),
     kind,
-    settledOn: settledOn ? format(settledOn, "yyyy-MM-dd") : null,
+    settledOn,
   };
 }
 
@@ -152,112 +178,101 @@ function sortByDateDesc(entries: OwnerLedgerEntry[]): OwnerLedgerEntry[] {
   return [...entries].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
 }
 
+/** Newest settlement on top — what the owner reads as "the latest money to land". */
+function sortBySettledOnDesc(entries: OwnerLedgerEntry[]): OwnerLedgerEntry[] {
+  return [...entries].sort((a, b) => {
+    const left = a.settledOn ?? a.date;
+    const right = b.settledOn ?? b.date;
+    return left < right ? 1 : left > right ? -1 : 0;
+  });
+}
+
 /**
  * Build the owner overview summary from raw sheet rows.
  *
- * - `range` filters the Settled ledger, totals, daily chart and min-balance by txn date.
- * - The Settlement (pending) list ignores the range: it always reflects credits that
- *   have not yet cleared as of `today`.
+ * - The two cards (transactions, settled) follow the selected `range`: transactions received
+ *   in range and credits that cleared in range.
+ * - `range` also filters the Settled ledger (by settle date) and the Payout ledger (by txn date).
+ * - The Settling (pending) list ignores the range: it always reflects credits that have not
+ *   yet cleared as of `today`.
  */
 export function computeOwnerOverview(
   transactions: GoogleSheetTransaction[],
   range: OwnerDateRange,
   today: Date
 ): OwnerOverviewSummary {
-  const todayStart = startOfDay(today);
+  const timeZone = DEFAULT_TIME_ZONE;
+  const todayKey =
+    getDateKeyForInstant(today, timeZone) ?? format(startOfDay(today), "yyyy-MM-dd");
+  const fromKey = format(startOfDay(range.from), "yyyy-MM-dd");
+  const toKey = format(startOfDay(range.to), "yyyy-MM-dd");
 
-  const settlement: OwnerLedgerEntry[] = [];
+  const settling: OwnerLedgerEntry[] = [];
   const settled: OwnerLedgerEntry[] = [];
-  const dailyMap = new Map<string, OwnerDailyPoint>();
+  const payouts: OwnerLedgerEntry[] = [];
 
-  let creditTotal = 0;
-  let debitTotal = 0;
-  let payoutTotal = 0;
-  let minimumBalance: number | null = null;
-  let account = "";
+  let transactionsTotal = 0;
+  let transactionsCount = 0;
+  let settledGross = 0;
+  let settledFee = 0;
+  let settledNet = 0;
+  let settledCount = 0;
 
   for (const transaction of transactions) {
-    if (!account) {
-      account = transaction.raw["account"]?.trim() ?? "";
-    }
-
-    const date = getTransactionDate(transaction);
+    const txnKey = getSheetDateKey(transaction.date ?? transaction.fetchedAt, timeZone);
     const signedAmount = getSignedAmount(transaction);
-    if (!date || signedAmount === null || signedAmount === 0) {
+    if (!txnKey || signedAmount === null || signedAmount === 0) {
       continue;
     }
 
-    const isCredit = signedAmount > 0;
-    const payout = isPayout(transaction, signedAmount);
-    const settledOn = isCredit
-      ? addBusinessDays(date, SETTLEMENT_BUSINESS_DAYS)
-      : null;
+    if (signedAmount > 0) {
+      const settledKey = addBusinessDaysKey(txnKey, SETTLEMENT_BUSINESS_DAYS);
+      const hasCleared = settledKey <= todayKey;
 
-    // Settlement (pending) — global, not range filtered.
-    if (isCredit && settledOn && isAfter(startOfDay(settledOn), todayStart)) {
-      settlement.push(toLedgerEntry(transaction, date, signedAmount, "credit", settledOn));
-    }
-
-    if (!isWithin(date, range)) {
-      continue;
-    }
-
-    // Range-scoped aggregates below.
-    const dayKey = format(date, "yyyy-MM-dd");
-    const point = dailyMap.get(dayKey) ?? { date: dayKey, credit: 0, debit: 0 };
-
-    if (isCredit) {
-      creditTotal += signedAmount;
-      point.credit += signedAmount;
-      // A credit lands in "Settled" once it has cleared.
-      if (settledOn && !isAfter(startOfDay(settledOn), todayStart)) {
-        settled.push(toLedgerEntry(transaction, date, signedAmount, "credit", settledOn));
+      // Card: pay-ins received in the selected range.
+      if (txnKey >= fromKey && txnKey <= toKey) {
+        transactionsTotal += signedAmount;
+        transactionsCount += 1;
       }
-    } else {
+
+      if (!hasCleared) {
+        // Settling — global (not range filtered), shown gross.
+        settling.push(toLedgerEntry(transaction, txnKey, signedAmount, 0, "credit", settledKey));
+        continue;
+      }
+
+      const { fee, net } = applyFee(signedAmount);
+
+      // Settled card + tab — keyed off the settle date, range filtered.
+      if (settledKey >= fromKey && settledKey <= toKey) {
+        settledGross += signedAmount;
+        settledFee += fee;
+        settledNet += net;
+        settledCount += 1;
+        settled.push(toLedgerEntry(transaction, txnKey, signedAmount, fee, "credit", settledKey));
+      }
+    } else if (isPayout(transaction, signedAmount)) {
       const magnitude = Math.abs(signedAmount);
-      debitTotal += magnitude;
-      point.debit += magnitude;
-      if (payout) {
-        payoutTotal += magnitude;
-        settled.push(toLedgerEntry(transaction, date, signedAmount, "payout", null));
+      if (txnKey >= fromKey && txnKey <= toKey) {
+        payouts.push(toLedgerEntry(transaction, txnKey, magnitude, 0, "payout", null));
       }
-    }
-
-    dailyMap.set(dayKey, point);
-
-    const balance = parseMoney(transaction.raw["balance"]);
-    if (balance !== null) {
-      minimumBalance = minimumBalance === null ? balance : Math.min(minimumBalance, balance);
     }
   }
 
-  const parkedNet = creditTotal - payoutTotal;
-  const dailyCreditDebit = Array.from(dailyMap.values()).sort((a, b) =>
-    a.date < b.date ? -1 : a.date > b.date ? 1 : 0
-  );
-
-  // Fee tier is based on a fixed trailing window, not the selected range, so it
-  // stays a stable benefit level regardless of which dates the owner views.
-  const maintainedRange: OwnerDateRange = {
-    from: subDays(startOfDay(today), MAINTAINED_WINDOW_DAYS - 1),
-    to: today,
+  const settledSummary: OwnerSettledSummary = {
+    gross: round2(settledGross),
+    fee: round2(settledFee),
+    net: round2(settledNet),
+    count: settledCount,
   };
-  const maintainedParked = getParkedNet(transactions, maintainedRange);
 
   return {
-    account,
-    settlement: sortByDateDesc(settlement),
-    settled: sortByDateDesc(settled),
-    creditTotal,
-    debitTotal,
-    payoutTotal,
-    parkedNet,
-    maintainedParked,
-    maintainedWindowDays: MAINTAINED_WINDOW_DAYS,
-    minimumBalance,
-    belowFloor: minimumBalance !== null && minimumBalance < BANK_MIN_FLOOR,
-    floor: BANK_MIN_FLOOR,
-    feeTier: getFeeTier(maintainedParked),
-    dailyCreditDebit,
+    transactionsTotal: round2(transactionsTotal),
+    transactionsCount,
+    settledSummary,
+    settling: sortByDateDesc(settling),
+    settled: sortBySettledOnDesc(settled),
+    payouts: sortByDateDesc(payouts),
+    feePercent: SETTLEMENT_FEE_PERCENT,
   };
 }

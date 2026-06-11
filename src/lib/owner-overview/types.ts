@@ -11,49 +11,41 @@ export interface OwnerLedgerEntry {
   date: string;
   description: string;
   reference: string;
-  /** Always a positive rupee amount; `kind` tells the direction. */
+  /** Always a positive rupee amount (the gross value); `kind` tells the direction. */
   amount: number;
+  /** Gateway fee cut from a settled credit. Always 0 for payouts. */
+  feeAmount: number;
+  /** Amount after the fee (`amount − feeAmount`). For payouts this equals `amount`. */
+  netAmount: number;
   kind: OwnerLedgerKind;
   /** For credits: the working-day date this clears into "Settled". Null for payouts. */
   settledOn: string | null;
 }
 
-export interface OwnerFeeTier {
-  /** Current gateway fee rate (e.g. 1, 0.7, 0.3). */
-  ratePercent: number;
-  /** Parked amount needed to reach the next (lower) rate; null if already best. */
-  nextThreshold: number | null;
-  /** The rate unlocked at `nextThreshold`; null if already best. */
-  nextRatePercent: number | null;
-}
-
-export interface OwnerDailyPoint {
-  /** yyyy-MM-dd */
-  date: string;
-  credit: number;
-  debit: number;
+export interface OwnerSettledSummary {
+  /** Gross total of pay-ins that cleared in the selected range (before the fee). */
+  gross: number;
+  /** Gateway fee cut from those cleared pay-ins. */
+  fee: number;
+  /** Net total that landed = gross − fee. */
+  net: number;
+  /** How many pay-ins cleared in the range. */
+  count: number;
 }
 
 export interface OwnerOverviewSummary {
-  account: string;
+  /** Gross total of pay-ins received in the selected range. */
+  transactionsTotal: number;
+  /** How many pay-ins were received in the range. */
+  transactionsCount: number;
+  /** What cleared in the selected range, shown net with a gross/fee breakdown. */
+  settledSummary: OwnerSettledSummary;
   /** Credits not yet cleared (settles > today) — shown regardless of the date range. */
-  settlement: OwnerLedgerEntry[];
-  /** Cleared credits + payout debits within the selected range. */
+  settling: OwnerLedgerEntry[];
+  /** Credits that cleared within the selected range, recorded net of the gateway fee. */
   settled: OwnerLedgerEntry[];
-  creditTotal: number;
-  debitTotal: number;
-  payoutTotal: number;
-  /** Money kept in our system over the selected range = creditTotal − payoutTotal. */
-  parkedNet: number;
-  /** Money kept over a fixed trailing window — drives the (stable) fee tier. */
-  maintainedParked: number;
-  /** Length of that trailing window in days (e.g. 30). */
-  maintainedWindowDays: number;
-  /** Lowest bank balance over the range; null when no row carries a balance. */
-  minimumBalance: number | null;
-  belowFloor: boolean;
-  /** Bank's required minimum balance (penalty risk below this). */
-  floor: number;
-  feeTier: OwnerFeeTier;
-  dailyCreditDebit: OwnerDailyPoint[];
+  /** Payout debits within the selected range. */
+  payouts: OwnerLedgerEntry[];
+  /** Flat gateway fee rate applied to settled credits (e.g. 1). */
+  feePercent: number;
 }

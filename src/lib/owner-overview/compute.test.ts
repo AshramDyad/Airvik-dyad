@@ -5,7 +5,6 @@ import type { GoogleSheetTransaction } from "@/data/types";
 import { computeOwnerOverview, type OwnerDateRange } from "./compute";
 
 type TxnOverrides = Partial<GoogleSheetTransaction> & {
-  balance?: string;
   account?: string;
   transaction_id?: string;
   credit?: string;
@@ -13,9 +12,8 @@ type TxnOverrides = Partial<GoogleSheetTransaction> & {
 };
 
 function makeTxn(overrides: TxnOverrides): GoogleSheetTransaction {
-  const { balance, account, transaction_id, credit, debit, ...rest } = overrides;
+  const { account, transaction_id, credit, debit, ...rest } = overrides;
   const raw: Record<string, string> = {};
-  if (balance !== undefined) raw.balance = balance;
   if (account !== undefined) raw.account = account;
   if (transaction_id !== undefined) raw.transaction_id = transaction_id;
   if (credit !== undefined) raw.credit = credit;
@@ -38,170 +36,143 @@ function makeTxn(overrides: TxnOverrides): GoogleSheetTransaction {
   };
 }
 
-const TODAY = parseISO("2026-06-08"); // Monday
+// Noon IST so the "today" key is stable regardless of the CI machine timezone.
+const TODAY = new Date("2026-06-09T12:00:00+05:30"); // Tuesday, IST day = 2026-06-09
 const RANGE: OwnerDateRange = {
   from: parseISO("2026-06-01"),
-  to: parseISO("2026-06-08"),
+  to: parseISO("2026-06-09"),
 };
 
-describe("computeOwnerOverview – settlement split (4 working days, weekends skipped)", () => {
-  it("keeps a fresh credit pending and clears an older one into settled", () => {
+describe("computeOwnerOverview – robust date parsing (DD/MM/YYYY)", () => {
+  it("parses DD/MM/YYYY dates instead of dropping them", () => {
+    // 05/06/2026 (Fri) + 7 business days = Tue 2026-06-16 → still settling after today.
     const txns = [
-      // Mon 06-08 + 4 business days = Fri 06-12 → still pending (after today 06-08)
-      makeTxn({ transaction_id: "fresh", date: "2026-06-08", amount: 5000, description: "UPI IN" }),
-      // Mon 06-01 + 4 business days = Fri 06-05 → cleared (<= today)
-      makeTxn({ transaction_id: "old", date: "2026-06-01", amount: 3000, description: "UPI IN" }),
+      makeTxn({ transaction_id: "ddmmyyyy", date: "05/06/2026", amount: 100, description: "UPI IN" }),
     ];
-
     const summary = computeOwnerOverview(txns, RANGE, TODAY);
-
-    expect(summary.settlement.map((e) => e.id)).toEqual(["fresh"]);
-    expect(summary.settled.map((e) => e.id)).toEqual(["old"]);
-    expect(summary.settlement[0].settledOn).toBe("2026-06-12");
+    expect(summary.settling.map((e) => e.id)).toEqual(["ddmmyyyy"]);
+    expect(summary.settling[0].settledOn).toBe("2026-06-16");
   });
 });
 
-describe("computeOwnerOverview – payout detection", () => {
-  it("treats only debits whose description contains 'payout' as payouts", () => {
+describe("computeOwnerOverview – transactions card (follows the range)", () => {
+  it("sums pay-ins received within the selected range", () => {
+    const txns = [
+      makeTxn({ transaction_id: "in", date: "09/06/2026", amount: 5000, description: "UPI IN" }),
+      makeTxn({ transaction_id: "in2", date: "08/06/2026", amount: 999, description: "UPI IN" }),
+      makeTxn({ transaction_id: "out", date: "01/05/2026", amount: 7777, description: "UPI IN" }),
+    ];
+    const summary = computeOwnerOverview(txns, RANGE, TODAY);
+    expect(summary.transactionsTotal).toBe(5999);
+    expect(summary.transactionsCount).toBe(2);
+  });
+
+  it("counts only today's pay-ins when the range is just today", () => {
+    const today: OwnerDateRange = { from: parseISO("2026-06-09"), to: parseISO("2026-06-09") };
+    const txns = [
+      makeTxn({ transaction_id: "today", date: "09/06/2026", amount: 5000, description: "UPI IN" }),
+      makeTxn({ transaction_id: "yesterday", date: "08/06/2026", amount: 999, description: "UPI IN" }),
+    ];
+    const summary = computeOwnerOverview(txns, today, TODAY);
+    expect(summary.transactionsTotal).toBe(5000);
+    expect(summary.transactionsCount).toBe(1);
+    // Today's pay-in is still settling and appears in that tab.
+    expect(summary.settling.some((e) => e.id === "today")).toBe(true);
+  });
+});
+
+describe("computeOwnerOverview – settled card (follows the range)", () => {
+  it("reports gross, fee and net of what cleared in the range", () => {
+    // 29/05/2026 (Fri) + 7 business days = Tue 2026-06-09 → cleared, inside range.
+    const txns = [
+      makeTxn({ transaction_id: "cleared", date: "29/05/2026", amount: 100, description: "UPI IN" }),
+    ];
+    const summary = computeOwnerOverview(txns, RANGE, TODAY);
+    expect(summary.settledSummary).toEqual({ gross: 100, fee: 1, net: 99, count: 1 });
+    // It also lands in the settled tab, recorded net of fee.
+    expect(summary.settled.map((e) => e.id)).toEqual(["cleared"]);
+    expect(summary.settled[0].netAmount).toBe(99);
+  });
+
+  it("rounds the fee to paise", () => {
+    const txns = [
+      makeTxn({ transaction_id: "small", date: "29/05/2026", amount: 1, description: "UPI IN" }),
+    ];
+    const summary = computeOwnerOverview(txns, RANGE, TODAY);
+    expect(summary.settledSummary.fee).toBe(0.01);
+    expect(summary.settledSummary.net).toBe(0.99);
+  });
+});
+
+describe("computeOwnerOverview – settled tab", () => {
+  it("filters by settle date in range and lists newest settlement first", () => {
+    const txns = [
+      // 28/05/2026 (Thu) + 7 biz = Mon 2026-06-08 (cleared, in range)
+      makeTxn({ transaction_id: "older", date: "28/05/2026", amount: 100, description: "UPI IN" }),
+      // 29/05/2026 (Fri) + 7 biz = Tue 2026-06-09 (cleared today, in range)
+      makeTxn({ transaction_id: "newer", date: "29/05/2026", amount: 100, description: "UPI IN" }),
+    ];
+    const summary = computeOwnerOverview(txns, RANGE, TODAY);
+    expect(summary.settled.map((e) => e.id)).toEqual(["newer", "older"]);
+  });
+
+  it("excludes settlements whose settle date is outside the range", () => {
+    // 02/06/2026 + 7 biz = settles 2026-06-11, but the range ends 2026-06-05.
+    const narrow: OwnerDateRange = { from: parseISO("2026-06-01"), to: parseISO("2026-06-05") };
+    const txns = [
+      makeTxn({ transaction_id: "late", date: "02/06/2026", amount: 100, description: "UPI IN" }),
+    ];
+    const summary = computeOwnerOverview(txns, narrow, TODAY);
+    expect(summary.settled).toHaveLength(0);
+  });
+});
+
+describe("computeOwnerOverview – settling is global", () => {
+  it("shows currently pending pay-ins even when outside the date range", () => {
+    // Range is just 06-01..06-05, but a 06-09 pay-in is still pending today.
+    const narrow: OwnerDateRange = { from: parseISO("2026-06-01"), to: parseISO("2026-06-05") };
+    const txns = [
+      makeTxn({ transaction_id: "pending", date: "09/06/2026", amount: 5000, description: "UPI IN" }),
+    ];
+    const summary = computeOwnerOverview(txns, narrow, TODAY);
+    expect(summary.settling.map((e) => e.id)).toEqual(["pending"]);
+  });
+});
+
+describe("computeOwnerOverview – payouts", () => {
+  it("lists payout debits within range and ignores non-payout debits", () => {
     const txns = [
       makeTxn({
         transaction_id: "payout",
-        date: "2026-06-07",
+        date: "07/06/2026",
         amount: -174000,
         description: "FT IMPS/IFO/615911415404/PUNB0371400/payout",
       }),
-      makeTxn({
-        transaction_id: "atm",
-        date: "2026-06-06",
-        amount: -500,
-        description: "ATM withdrawal",
-      }),
-      // Credit that happens to mention payout must NOT be a payout (amount > 0).
-      makeTxn({
-        transaction_id: "refund",
-        date: "2026-06-05",
-        amount: 100,
-        description: "payout refund",
-      }),
+      makeTxn({ transaction_id: "atm", date: "06/06/2026", amount: -500, description: "ATM withdrawal" }),
     ];
-
     const summary = computeOwnerOverview(txns, RANGE, TODAY);
+    expect(summary.payouts.map((e) => e.id)).toEqual(["payout"]);
+    expect(summary.payouts[0].amount).toBe(174000);
+  });
 
-    expect(summary.payoutTotal).toBe(174000);
-    expect(summary.debitTotal).toBe(174500); // payout + atm
-    expect(summary.creditTotal).toBe(100); // the refund
-    const settledPayouts = summary.settled.filter((e) => e.kind === "payout");
-    expect(settledPayouts.map((e) => e.id)).toEqual(["payout"]);
+  it("excludes payouts outside the range", () => {
+    const narrow: OwnerDateRange = { from: parseISO("2026-06-01"), to: parseISO("2026-06-05") };
+    const txns = [
+      makeTxn({ transaction_id: "payout", date: "07/06/2026", amount: -100, description: "payout" }),
+    ];
+    const summary = computeOwnerOverview(txns, narrow, TODAY);
+    expect(summary.payouts).toHaveLength(0);
   });
 });
 
-describe("computeOwnerOverview – parked amount drives the fee tier", () => {
-  function tierFor(creditAmount: number, payoutAmount: number) {
-    const txns = [
-      makeTxn({ date: "2026-06-02", amount: creditAmount, description: "UPI IN" }),
-      makeTxn({ date: "2026-06-03", amount: -payoutAmount, description: "payout" }),
-    ];
-    return computeOwnerOverview(txns, RANGE, TODAY);
-  }
-
-  it("is 1% below ₹3L, with ₹3L as the next reward", () => {
-    const summary = tierFor(299999, 0);
-    expect(summary.parkedNet).toBe(299999);
-    expect(summary.feeTier.ratePercent).toBe(1);
-    expect(summary.feeTier.nextThreshold).toBe(300000);
-    expect(summary.feeTier.nextRatePercent).toBe(0.7);
-  });
-
-  it("is 0.7% at exactly ₹3L parked (credits − payouts)", () => {
-    const summary = tierFor(474000, 174000); // 300000 parked
-    expect(summary.parkedNet).toBe(300000);
-    expect(summary.feeTier.ratePercent).toBe(0.7);
-    expect(summary.feeTier.nextThreshold).toBe(600000);
-  });
-
-  it("is 0.3% at ₹6L with no further tier", () => {
-    const summary = tierFor(600000, 0);
-    expect(summary.feeTier.ratePercent).toBe(0.3);
-    expect(summary.feeTier.nextThreshold).toBeNull();
-    expect(summary.feeTier.nextRatePercent).toBeNull();
-  });
-
-  it("computes the tier over the trailing window, not the selected range", () => {
-    // Big credit on 06-02 — inside the trailing 30 days, but outside a "Today" range.
-    const txns = [makeTxn({ date: "2026-06-02", amount: 600000, description: "UPI IN" })];
-    const todayRange: OwnerDateRange = {
-      from: parseISO("2026-06-08"),
-      to: parseISO("2026-06-08"),
-    };
-    const summary = computeOwnerOverview(txns, todayRange, TODAY);
-    expect(summary.parkedNet).toBe(0); // nothing within "Today"
-    expect(summary.maintainedParked).toBe(600000); // within trailing 30 days
-    expect(summary.feeTier.ratePercent).toBe(0.3); // tier holds regardless of range
-  });
-});
-
-describe("computeOwnerOverview – minimum balance + floor", () => {
-  it("ignores blank balances and flags below the ₹1L floor", () => {
-    const txns = [
-      makeTxn({ date: "2026-06-02", amount: 1000, description: "UPI IN", balance: "150000" }),
-      makeTxn({ date: "2026-06-03", amount: -500, description: "fee", balance: "" }),
-      makeTxn({ date: "2026-06-04", amount: 1000, description: "UPI IN", balance: "345.07" }),
-    ];
-
-    const summary = computeOwnerOverview(txns, RANGE, TODAY);
-
-    expect(summary.minimumBalance).toBe(345.07);
-    expect(summary.belowFloor).toBe(true);
-  });
-
-  it("does not flag when every balance stays at or above the floor", () => {
-    const txns = [
-      makeTxn({ date: "2026-06-02", amount: 1000, description: "UPI IN", balance: "150000" }),
-      makeTxn({ date: "2026-06-03", amount: 1000, description: "UPI IN", balance: "200000" }),
-    ];
-
-    const summary = computeOwnerOverview(txns, RANGE, TODAY);
-
-    expect(summary.minimumBalance).toBe(150000);
-    expect(summary.belowFloor).toBe(false);
-  });
-
-  it("returns null minimum when no row carries a balance", () => {
-    const txns = [makeTxn({ date: "2026-06-02", amount: 1000, description: "UPI IN" })];
-    const summary = computeOwnerOverview(txns, RANGE, TODAY);
-    expect(summary.minimumBalance).toBeNull();
-    expect(summary.belowFloor).toBe(false);
-  });
-});
-
-describe("computeOwnerOverview – range filter, daily buckets, signed-amount fallback", () => {
-  it("excludes transactions outside the range from totals", () => {
-    const txns = [
-      makeTxn({ date: "2026-06-03", amount: 1000, description: "UPI IN" }),
-      makeTxn({ date: "2026-05-01", amount: 9999, description: "UPI IN" }), // before range
-    ];
-    const summary = computeOwnerOverview(txns, RANGE, TODAY);
-    expect(summary.creditTotal).toBe(1000);
-  });
-
-  it("buckets multiple same-day transactions together", () => {
-    const txns = [
-      makeTxn({ date: "2026-06-03", amount: 1000, description: "UPI IN" }),
-      makeTxn({ date: "2026-06-03", amount: 500, description: "UPI IN" }),
-      makeTxn({ date: "2026-06-03", amount: -200, description: "fee" }),
-    ];
-    const summary = computeOwnerOverview(txns, RANGE, TODAY);
-    const day = summary.dailyCreditDebit.find((p) => p.date === "2026-06-03");
-    expect(day).toEqual({ date: "2026-06-03", credit: 1500, debit: 200 });
-  });
-
+describe("computeOwnerOverview – signed-amount fallback", () => {
   it("derives a signed amount from credit/debit columns when amount is blank", () => {
     const txns = [
-      makeTxn({ date: "2026-06-02", amount: null, credit: "1200", description: "UPI IN" }),
-      makeTxn({ date: "2026-06-03", amount: null, debit: "300", description: "payout" }),
+      makeTxn({ transaction_id: "c", date: "29/05/2026", amount: null, credit: "1200", description: "UPI IN" }),
+      makeTxn({ transaction_id: "p", date: "03/06/2026", amount: null, debit: "300", description: "payout" }),
     ];
     const summary = computeOwnerOverview(txns, RANGE, TODAY);
-    expect(summary.creditTotal).toBe(1200);
-    expect(summary.payoutTotal).toBe(300);
+    expect(summary.settledSummary.gross).toBe(1200); // the credit cleared in range
+    expect(summary.payouts[0].amount).toBe(300);
   });
 });
