@@ -83,7 +83,7 @@ type PaymentRequestInsert = {
   upi_merchant_name: string;
   upi_uri: string;
   expires_at: string;
-  created_by: string;
+  created_by: string | null;
 };
 
 export async function listPaymentRequests(
@@ -113,7 +113,7 @@ export async function listPaymentRequests(
 export async function createPaymentRequest(args: {
   supabase: SupabaseClient;
   amount: number;
-  createdBy: string;
+  createdBy: string | null;
   reservationId?: string | null;
 }): Promise<PaymentRequest> {
   const { supabase, amount, createdBy, reservationId } = args;
@@ -139,7 +139,7 @@ export async function createPaymentRequest(args: {
     upi_merchant_name: PAYMENT_MERCHANT_NAME,
     upi_uri: upiUri,
     expires_at: expiresAt,
-    created_by: createdBy,
+    created_by: createdBy ?? null,
   };
 
   const { data, error } = await supabase

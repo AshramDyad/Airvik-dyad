@@ -320,6 +320,7 @@ export default function BookingConfirmationPage() {
     return null; // This should not happen due to the check above
   }
 
+  const isConfirmed = reservation.status === "Confirmed";
   const fullGuestName = guest
     ? [guest.firstName, guest.lastName].filter(Boolean).join(" ").trim()
     : "";
@@ -355,15 +356,17 @@ export default function BookingConfirmationPage() {
                 <CheckCircle2 className="h-8 w-8" />
               </div>
               <p className="mt-4 text-xs uppercase tracking-[0.4em] text-primary/80">
-                Reservation received
+                {isConfirmed ? "Booking confirmed" : "Reservation received"}
               </p>
               <h1 className="mt-3 text-4xl font-serif font-bold text-foreground">
-                We&apos;ve received your booking at {property.name}
+                {isConfirmed
+                  ? `Your booking at ${property.name} is confirmed`
+                  : `We've received your booking at ${property.name}`}
               </h1>
               <p className="mt-3 text-lg text-muted-foreground">
-                Thanks, {customerDetails.fullName}. We&apos;ve held your rooms.
-                Our reception team will call shortly to confirm the booking and
-                collect payment.
+                {isConfirmed
+                  ? `Thanks, ${customerDetails.fullName}. We've received your payment and your rooms are confirmed. A confirmation has been sent to your email.`
+                  : `Thanks, ${customerDetails.fullName}. We've held your rooms. Please complete your UPI payment to confirm — your booking is confirmed automatically once we receive it.`}
               </p>
               <div className="mx-auto mt-5 inline-flex items-center gap-3 rounded-full border border-border/60 bg-background/70 px-4 py-2 text-sm text-muted-foreground">
                 <span className="font-medium text-foreground">
@@ -397,7 +400,7 @@ export default function BookingConfirmationPage() {
                         </p>
                       </div>
                       <p className="border-t border-primary/10 pt-4">
-                        Our team will contact you shortly to confirm the payment. If you do not receive a call from our side within 30 minutes, you are requested to contact the booking representative at <a href="tel:+918511151708" className="whitespace-nowrap font-bold text-primary hover:underline">+91 8511151708</a> or <a href="tel:+919411109999" className="whitespace-nowrap font-bold text-primary hover:underline">+91 9411109999</a>.
+                        Your booking is confirmed automatically once we receive your UPI payment. If it still shows pending after a few minutes, please contact the booking representative at <a href="tel:+918511151708" className="whitespace-nowrap font-bold text-primary hover:underline">+91 8511151708</a> or <a href="tel:+919411109999" className="whitespace-nowrap font-bold text-primary hover:underline">+91 9411109999</a>.
                       </p>
                     </div>
                   </div>
@@ -423,7 +426,7 @@ export default function BookingConfirmationPage() {
                         </p>
                       </div>
                       <p className="border-t border-primary/10 pt-4">
-                        हमारी टीम भुगतान की पुष्टि करने के लिए आपसे शीघ्र ही संपर्क करेगी। यदि आपको 30 मिनट के भीतर हमारी ओर से कोई कॉल प्राप्त नहीं होती है, तो आपसे अनुरोध है कि बुकिंग प्रतिनिधि से <a href="tel:+918511151708" className="whitespace-nowrap font-bold text-primary hover:underline">+91 8511151708</a> या <a href="tel:+919411109999" className="whitespace-nowrap font-bold text-primary hover:underline">+91 9411109999</a> पर संपर्क करें।
+                        आपका भुगतान प्राप्त होते ही आपकी बुकिंग स्वतः पुष्ट हो जाती है। यदि कुछ मिनटों के बाद भी यह लंबित दिखती है, तो कृपया बुकिंग प्रतिनिधि से <a href="tel:+918511151708" className="whitespace-nowrap font-bold text-primary hover:underline">+91 8511151708</a> या <a href="tel:+919411109999" className="whitespace-nowrap font-bold text-primary hover:underline">+91 9411109999</a> पर संपर्क करें।
                       </p>
                     </div>
                   </div>
@@ -807,11 +810,11 @@ export default function BookingConfirmationPage() {
                       </div>
                       <div>
                         <p className="font-medium text-foreground">
-                          Reception call for payment
+                          Payment confirmed online
                         </p>
                         <p className="text-muted-foreground">
-                          Our reception team will call shortly to complete your
-                          UPI transaction and answer any final questions.
+                          Your booking is confirmed automatically once we receive
+                          your UPI payment — no phone call needed.
                         </p>
                       </div>
                     </li>

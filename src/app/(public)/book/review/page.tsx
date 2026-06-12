@@ -570,8 +570,28 @@ function BookingReviewContent() {
         customRoomTotals,
       });
 
-      // Redirect to the confirmation page of the first reservation in the group
-      router.push(`/book/confirmation/${newReservations[0].id}`);
+      const newReservationId = newReservations[0].id;
+
+      // Payment is mandatory: create the UPI payment request now so the held
+      // rooms are promoted to the auto-expiring Room Hold immediately, then send
+      // the guest to the payment screen. If this best-effort call fails, the
+      // payment page recreates the request idempotently, so we continue either
+      // way rather than block the guest.
+      try {
+        const paymentResponse = await fetch("/api/book/payment-request", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reservationId: newReservationId }),
+        });
+        if (!paymentResponse.ok) {
+          throw new Error(`Payment setup failed (${paymentResponse.status})`);
+        }
+      } catch (paymentError) {
+        console.error("Failed to initialize payment request", paymentError);
+      }
+
+      // Redirect to the mandatory payment screen for this booking
+      router.push(`/book/payment/${newReservationId}`);
     } catch (error: unknown) {
       console.error("Booking failed:", error);
 
