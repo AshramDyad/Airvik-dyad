@@ -22,7 +22,7 @@ interface ReservationActivityTimelineProps {
   reservationId: string;
 }
 
-const MANAGER_ROLES = new Set(["Hotel Owner", "Hotel Manager"]);
+const MANAGER_ROLES = new Set(["Administration", "Hotel Owner", "Hotel Manager"]);
 
 export function ReservationActivityTimeline({
   reservationId,

@@ -47,6 +47,7 @@ import {
 
 const ROLE_OPTIONS = [
   "all",
+  "Administration",
   "Hotel Owner",
   "Hotel Manager",
   "Receptionist",
