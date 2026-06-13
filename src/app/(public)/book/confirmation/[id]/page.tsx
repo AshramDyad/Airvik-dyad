@@ -402,6 +402,9 @@ export default function BookingConfirmationPage() {
                       <p className="border-t border-primary/10 pt-4">
                         Your booking is confirmed automatically once we receive your UPI payment. If it still shows pending after a few minutes, please contact the booking representative at <a href="tel:+918511151708" className="whitespace-nowrap font-bold text-primary hover:underline">+91 8511151708</a> or <a href="tel:+919411109999" className="whitespace-nowrap font-bold text-primary hover:underline">+91 9411109999</a>.
                       </p>
+                      <p className="border-t border-primary/10 pt-4">
+                        <strong className="font-semibold text-foreground">Cancellation Policy:</strong> Cancel 7 or more days before check-in for a 50% refund of the total booking amount. Cancellations made less than 7 days before check-in, and no-shows, are not eligible for a refund. Requests must be made in writing via your booking confirmation email or by contacting support.
+                      </p>
                     </div>
                   </div>
 
@@ -427,6 +430,9 @@ export default function BookingConfirmationPage() {
                       </div>
                       <p className="border-t border-primary/10 pt-4">
                         आपका भुगतान प्राप्त होते ही आपकी बुकिंग स्वतः पुष्ट हो जाती है। यदि कुछ मिनटों के बाद भी यह लंबित दिखती है, तो कृपया बुकिंग प्रतिनिधि से <a href="tel:+918511151708" className="whitespace-nowrap font-bold text-primary hover:underline">+91 8511151708</a> या <a href="tel:+919411109999" className="whitespace-nowrap font-bold text-primary hover:underline">+91 9411109999</a> पर संपर्क करें।
+                      </p>
+                      <p className="border-t border-primary/10 pt-4">
+                        <strong className="font-semibold text-foreground">रद्दीकरण नीति:</strong> चेक-इन से 7 या अधिक दिन पहले रद्द करने पर कुल बुकिंग राशि का 50% वापस किया जाएगा। चेक-इन से 7 दिन से कम समय पहले किए गए रद्दीकरण और नो-शो की स्थिति में कोई धनवापसी नहीं होगी। रद्दीकरण का अनुरोध लिखित रूप में बुकिंग पुष्टिकरण ईमेल के माध्यम से या सहायता से संपर्क करके किया जाना चाहिए।
                       </p>
                     </div>
                   </div>

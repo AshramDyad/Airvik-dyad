@@ -20,11 +20,11 @@ export function BookingPolicies() {
           </AccordionTrigger>
           <AccordionContent className="pb-4">
             <div className="space-y-3 pl-8 text-sm text-gray-600">
-              <p><strong className="text-gray-900">Free cancellation</strong> until 48 hours before check-in</p>
-              <p>Cancel within 48 hours: 50% refund of total booking amount</p>
+              <p><strong className="text-gray-900">Cancel 7 or more days before check-in:</strong> 50% refund of total booking amount</p>
+              <p>Cancel less than 7 days before check-in: No refund</p>
               <p>No-show: No refund</p>
               <p className="text-xs text-gray-500 mt-2">
-                Cancellation requests must be made through your booking confirmation email or by contacting support.
+                Cancellation requests must be made in writing through your booking confirmation email or by contacting support.
               </p>
             </div>
           </AccordionContent>
