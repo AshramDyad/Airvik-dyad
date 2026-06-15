@@ -24,6 +24,7 @@ import {
   pickAvailablePaymentRequestAmount,
   type PendingPaymentRequestMatch,
 } from "@/lib/payments/payment-request-matching";
+import { sendBookingConfirmation } from "@/lib/whatsapp/notifications";
 
 const IDENTIFIER_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
 const STATEMENT_CODE_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -283,7 +284,16 @@ export async function markPaymentRequestPaidManually(args: {
     throw new Error(error.message);
   }
 
-  return toPaymentRequest(data as unknown as DbPaymentRequest);
+  const paymentRequest = toPaymentRequest(data as unknown as DbPaymentRequest);
+
+  // Fire-and-forget WhatsApp confirmation. Self-guarded (never throws) so it can
+  // never affect the payment result; no-op until the number is onboarded and the
+  // template approved.
+  if (paymentRequest.reservationId) {
+    void sendBookingConfirmation(paymentRequest.reservationId);
+  }
+
+  return paymentRequest;
 }
 
 async function listUsedPaymentReferences(
