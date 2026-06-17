@@ -132,6 +132,7 @@ export interface Property {
   trust_date?: string;
   pan_no?: string;
   certificate_no?: string;
+  whatsapp_otp_phone?: string;
 }
 
 export type UnitsViewMode = 'remaining' | 'booked';

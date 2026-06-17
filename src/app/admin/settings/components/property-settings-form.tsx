@@ -69,6 +69,7 @@ const propertySchema = z.object({
   trust_date: z.string().optional(),
   pan_no: z.string().optional(),
   certificate_no: z.string().optional(),
+  whatsapp_otp_phone: z.string().optional(),
 }).superRefine((data, ctx) => {
   if (data.tax_enabled && data.tax_percentage <= 0) {
     ctx.addIssue({
@@ -101,6 +102,7 @@ export function PropertySettingsForm() {
       trust_date: property.trust_date || "",
       pan_no: property.pan_no || "",
       certificate_no: property.certificate_no || "",
+      whatsapp_otp_phone: property.whatsapp_otp_phone || "",
     },
   });
 
@@ -123,6 +125,7 @@ export function PropertySettingsForm() {
       trust_date: property.trust_date || "",
       pan_no: property.pan_no || "",
       certificate_no: property.certificate_no || "",
+      whatsapp_otp_phone: property.whatsapp_otp_phone || "",
     });
   }, [property, form]);
 
@@ -140,6 +143,7 @@ export function PropertySettingsForm() {
       trust_date: values.trust_date || undefined,
       pan_no: values.pan_no || undefined,
       certificate_no: values.certificate_no || undefined,
+      whatsapp_otp_phone: values.whatsapp_otp_phone?.trim() || "",
     };
     updateProperty(updatedData);
     toast.success("Property details updated successfully!");
@@ -417,7 +421,32 @@ export function PropertySettingsForm() {
               </div>
             </div>
 
-
+            <div className="border rounded-lg p-4 space-y-4">
+              <div>
+                <h3 className="text-lg font-semibold">Discount Approval (WhatsApp OTP)</h3>
+                <p className="text-sm text-muted-foreground">
+                  When an admin discounts a room&apos;s nightly rate beyond the limit, an OTP is
+                  sent to this number for approval before the booking is created.
+                </p>
+              </div>
+              <FormField<PropertyFormValues, "whatsapp_otp_phone">
+                control={form.control}
+                name="whatsapp_otp_phone"
+                render={({ field }) => (
+                  <FormItem className="w-full md:w-72">
+                    <FormLabel>Approval WhatsApp number</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="e.g. 919876543210" />
+                    </FormControl>
+                    <FormDescription>
+                      Owner number that receives approval OTPs (with country code, no +). Leave
+                      blank to disable approvals.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
             <Button type="submit">Save Changes</Button>
           </form>
