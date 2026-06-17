@@ -63,6 +63,15 @@ import {
   NEW_RESERVATION_PAYMENT_METHODS,
   validateReservationPaymentAmount,
 } from "@/lib/payments/reservation-payment-policy";
+import {
+  computeBookingAmounts,
+  maxNightlyDiscount,
+  requiresApproval,
+} from "@/lib/reservations/discount-approval";
+import {
+  DiscountApprovalDialog,
+  type DiscountApprovalContext,
+} from "./otp-approval-dialog";
 
 const paymentMethodOptions =
   NEW_RESERVATION_PAYMENT_METHODS satisfies readonly ReservationPaymentMethod[];
@@ -539,16 +548,13 @@ export default function CreateReservationPage() {
     [customRatesValue, roomMap, roomTypeMap, adminCheckInDate, seasonalPrices]
   );
 
-  const onSubmit = async (values: ReservationFormValues) => {
+  const [otpDialogOpen, setOtpDialogOpen] = React.useState(false);
+  const [otpContext, setOtpContext] = React.useState<DiscountApprovalContext | null>(null);
+  const [pendingValues, setPendingValues] = React.useState<ReservationFormValues | null>(null);
+
+  const performCreate = async (values: ReservationFormValues) => {
     if (!defaultRatePlan) {
       toast.error("No rate plan configured yet.");
-      return;
-    }
-
-    if (!hasCapacityForGuests) {
-      toast.error("Selected rooms cannot accommodate all guests.", {
-        description: "Add more rooms or reduce guest count to proceed.",
-      });
       return;
     }
 
@@ -693,6 +699,65 @@ export default function CreateReservationPage() {
             : (error as Error).message,
         },
       );
+    }
+  };
+
+  const onSubmit = async (values: ReservationFormValues) => {
+    if (!defaultRatePlan) {
+      toast.error("No rate plan configured yet.");
+      return;
+    }
+
+    if (!hasCapacityForGuests) {
+      toast.error("Selected rooms cannot accommodate all guests.", {
+        description: "Add more rooms or reduce guest count to proceed.",
+      });
+      return;
+    }
+
+    // A steep per-night discount needs owner approval (WhatsApp OTP) before we create.
+    const discount = maxNightlyDiscount({
+      roomTypes: uniqueSelectedRoomTypes,
+      overrides: nightlyOverrides ?? {},
+      ratePlan: defaultRatePlan,
+    });
+    if (requiresApproval(discount)) {
+      const stayNights = Math.max(
+        differenceInDays(values.dateRange.to, values.dateRange.from),
+        1
+      );
+      const roomTypesPerRoom = values.roomIds
+        .map((roomId) => {
+          const room = roomMap.get(roomId);
+          if (!room) return null;
+          return roomTypeMap.get(room.roomTypeId) ?? null;
+        })
+        .filter((type): type is RoomType => Boolean(type));
+      const amounts = computeBookingAmounts({
+        roomTypesPerRoom,
+        overrides: nightlyOverrides ?? {},
+        ratePlan: defaultRatePlan,
+        nights: stayNights,
+      });
+      setOtpContext({
+        guestName: selectedGuest ? formatGuestName(selectedGuest) : "Guest",
+        customAmount: amounts.customAmount,
+        originalAmount: amounts.originalAmount,
+      });
+      setPendingValues(values);
+      setOtpDialogOpen(true);
+      return;
+    }
+
+    await performCreate(values);
+  };
+
+  const handleOtpVerified = () => {
+    setOtpDialogOpen(false);
+    const values = pendingValues;
+    setPendingValues(null);
+    if (values) {
+      void performCreate(values);
     }
   };
 
@@ -1239,6 +1304,13 @@ export default function CreateReservationPage() {
             </div>
           </form>
         </Form>
+
+        <DiscountApprovalDialog
+          open={otpDialogOpen}
+          context={otpContext}
+          onOpenChange={setOtpDialogOpen}
+          onVerified={handleOtpVerified}
+        />
       </div>
     </PermissionGate>
   );
