@@ -274,8 +274,8 @@ export function PaymentsClient() {
     <div className="space-y-6">
       <div className="flex justify-end">
         <div className="flex flex-col items-stretch gap-2 sm:items-end">
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <Button asChild variant="outline" className="w-full sm:w-auto">
+          <div className="flex flex-row gap-2">
+            <Button asChild variant="outline" className="flex-1 sm:flex-none">
               <a
                 href="/Sahajanand-wellness-qr.png"
                 download="Sahajanand-wellness-qr.png"
@@ -286,7 +286,7 @@ export function PaymentsClient() {
             </Button>
             <Button
               variant="outline"
-              className="w-full sm:w-auto"
+              className="flex-1 sm:flex-none"
               onClick={() => void loadTransactions({ force: true })}
               disabled={isInitialLoading || isRefreshing}
             >
@@ -378,7 +378,7 @@ export function PaymentsClient() {
           ) : showNoSearchResults ? (
             <EmptyState title="No matching transactions" />
           ) : (
-            <Table className="table-fixed">
+            <Table className="table-fixed min-w-[860px]">
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[110px]">Date</TableHead>
