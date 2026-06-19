@@ -5,6 +5,17 @@ unofficial **GOWA** bridge with the **official Meta WhatsApp Cloud API**, and us
 **Coexistence** so one number runs the API (automation + a guest bot) *and* the
 WhatsApp Business app (staff chatting by hand) at the same time.
 
+### Goal (why we do Tech Provider onboarding)
+
+**Run the WhatsApp Cloud API and manual WhatsApp chatting on the same number at the
+same time — without losing existing chat history.** This is **Coexistence**. The whole
+point of Tech Provider onboarding + App Review is to unlock this: API automation
+running side-by-side with staff chatting by hand, on the real number, with recent
+conversations preserved. (Onboarding syncs up to ~6 months of 1:1 chats + all
+contacts — see "Chat history" below.) **Caveat:** the dependable manual interface
+under Coexistence is the **WhatsApp Business phone app**, not WhatsApp **Web/Desktop**
+(the Web/Desktop companion auto-unlinks under Coexistence).
+
 ---
 
 ## 1. Why this design
@@ -126,9 +137,34 @@ Params sent, in order: `{{1}}` guest name, `{{2}}` booking id, `{{3}}` check-in 
 **Progress status (updated 2026-06-15):**
 - ✅ Tech Provider onboarding started ("Onboard without a partner").
 - ✅ **Business Verification — Approved.**
-- 🔄 **App Review — In review.** This is the only remaining gate. Sub-steps: review app
-  settings → record two videos → submit (see step 5 below).
-- ⬜ Embedded Signup run, webhooks, template submit — pending App Review approval.
+- 🔄 **App Review — fully staged, pending one auto-registering indicator, then final submit.**
+  The submission flow (Review → Submit for App Review) has 5 checklist sections; current state:
+  - ✅ **Verification** — complete.
+  - ✅ **App settings** — complete (app icon, Privacy Policy URL, app category all set).
+  - 🔄 **Allowed usage** — `whatsapp_business_messaging` card done (Video A uploaded + description
+    + agree + API call shows **Completed**); `public_profile` done (agree only);
+    `whatsapp_business_management` card has Video B + description + agree, BUT its **"1 of 1 API
+    call required"** indicator was still grey. **This is the ONLY thing blocking submission.**
+  - ✅ **Data handling** — complete (processors = Vercel Inc. + Supabase Inc.; data controller =
+    Sahajanand Wellness Trust; public-authority-request policies = all four checked).
+  - ✅ **Reviewer instructions** — complete (Website platform added in App Settings → Basic;
+    instructions describe it as an internal admin tool, functionality shown in videos, no login
+    required). Used **Option A** (no live admin creds handed over; site has a separate admin login URL).
+  - **Action taken to clear the blocker:** ran 3 successful `whatsapp_business_management` read
+    calls via curl using the test-number creds in `.env.local` (GET WABA info, GET
+    message_templates, GET phone_numbers) — all 200 OK. Plus the two `POST /message_templates`
+    done in Graph API Explorer. The required call IS satisfied; Meta's backend "can take up to 24h
+    to show." **Next: revisit Allowed usage; once the management API line flips to green, the
+    "Submit for review" button unlocks → click it.** Then 1–3 business days for Meta's review.
+  - **Templates already created on the (test) WABA `887144991074880`:** `booking_confirmation`
+    (PENDING), `booking_confirmation_demo` (PENDING, throwaway for Video B), `hello_world` (APPROVED).
+- ⬜ Embedded Signup run, webhooks, real-number template submit — pending App Review approval.
+
+**Test-number creds in `.env.local` (for recording only; not the real number):**
+`WHATSAPP_PHONE_NUMBER_ID=1151582444706889`, `WHATSAPP_WABA_ID=887144991074880`,
+`WHATSAPP_ACCESS_TOKEN=<temp 24h token from API Setup — refresh if expired>`. Test number's
+display number is `+1 555-659-4017`. `getNumberConfig()` (`src/lib/whatsapp/config.ts`) falls back
+to these env vars because the `whatsapp_config` table doesn't exist yet (migration not applied).
 
 0. **Protect history:** ensure the number is on the **WhatsApp Business app** (switch from
    personal WhatsApp if needed — that keeps your chats) and take a chat **backup**.
@@ -157,6 +193,15 @@ Params sent, in order: `{{1}}` guest name, `{{2}}` booking id, `{{3}}` check-in 
      "make **API test calls** and record... creating a message template" — so Graph API
      Explorer `POST <WABA_ID>/message_templates` (creating `booking_confirmation`) is exactly
      what is asked for. Sanctioned; also creates the real template (step 9).
+   - **Where videos + descriptions are uploaded:** inside the submission flow's **"Allowed
+     usage"** step (each permission card has Describe + Upload screencast + API-call check +
+     Agree). NOT in "Reviewer instructions" (that step only needs a registered platform + a
+     text note). **Don't** use Meta's "AI Content Suggestion" boilerplate — it overclaims
+     (marketing, managing "onboarded customers'" assets) and invites scrutiny; use tight,
+     transactional, own-assets-only descriptions.
+   - ✅ **Both videos recorded + uploaded** (Video A = invoice send to test number; Video B =
+     template create in Graph Explorer). Status now: see the Progress block above — staged,
+     awaiting the management API-call indicator to flip green, then **Submit for review**.
    - Then **Submit documentation for App Review** → typically 1–3 business days; the review
      itself cannot be skipped.
 6. **WhatsApp Business app** v2.24.17+ active on the number.
