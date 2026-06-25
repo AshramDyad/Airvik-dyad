@@ -4,11 +4,20 @@ import { createHash, randomInt } from "node:crypto";
 
 import { createServerSupabaseClient } from "@/integrations/supabase/server";
 import { HttpError, requirePermissions } from "@/lib/server/auth";
-import { sendWhatsAppMessage } from "@/lib/whatsapp";
+import { sendWhatsAppTemplate } from "@/lib/whatsapp";
 import { DISCOUNT_OTP_THRESHOLD } from "@/lib/reservations/discount-approval";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+// Approved UTILITY template that carries the approval context + code to the owner.
+// Sending a template (not free-form) is required: the owner is a passive recipient
+// with no open 24h window, and Meta mandates a pre-approved template for any message
+// outside that window. Body params, in order: guest name, booking amount, original
+// amount, discount, OTP code. See whatsapp-api-implementation.md §6 for the exact
+// template body to create in WhatsApp Manager.
+const APPROVAL_TEMPLATE = "reservation_discount_approval";
+const APPROVAL_LANGUAGE = "en_US";
 
 const RequestSchema = z.object({
   guestName: z.string().min(1).max(120),
@@ -82,16 +91,21 @@ export async function POST(request: Request) {
       throw new Error(insertError?.message ?? "Could not create the approval request.");
     }
 
-    const message = [
-      "Reservation approval needed",
-      `Guest: ${guestName}`,
-      `Booking amount: ₹${formatAmount(customAmount)}`,
-      `Original amount: ₹${formatAmount(originalAmount)}`,
-      `Discount: ₹${formatAmount(discount)}`,
-      `OTP: ${code} (valid 10 min)`,
-    ].join("\n");
+    // Params fill {{1}}..{{5}} in the approved template, in order.
+    const params = [
+      guestName,
+      formatAmount(customAmount),
+      formatAmount(originalAmount),
+      formatAmount(discount),
+      code,
+    ];
 
-    const sendResult = await sendWhatsAppMessage(recipient, message);
+    const sendResult = await sendWhatsAppTemplate(
+      recipient,
+      APPROVAL_TEMPLATE,
+      APPROVAL_LANGUAGE,
+      params,
+    );
     if (!sendResult.success) {
       // The code never reached anyone — drop the row so a retry isn't rate-limited.
       await supabase.from("reservation_otp_codes").delete().eq("id", inserted.id);
