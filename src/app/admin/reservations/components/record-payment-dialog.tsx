@@ -32,7 +32,6 @@ import type { Reservation } from "@/data/types";
 import { authorizedFetch } from "@/lib/auth/client-session";
 import {
   calculateReservationFinancials,
-  resolveReservationTaxConfig,
   type ReservationTaxConfig,
 } from "@/lib/reservations/calculate-financials";
 import { useCurrencyFormatter } from "@/hooks/use-currency";
@@ -51,8 +50,11 @@ const paymentSchema = z.object({
 interface RecordPaymentDialogProps {
   reservationId: string;
   children: React.ReactNode;
-  billingSource?: Pick<Reservation, "folio" | "totalAmount">;
-  taxConfig?: ReservationTaxConfig;
+  // The parent (BillingCard) owns the booking's financials and passes them in.
+  // The dialog never looks the reservation up itself, so it works for any
+  // booking regardless of the capped in-memory list.
+  billingSource: Pick<Reservation, "folio" | "totalAmount">;
+  taxConfig: ReservationTaxConfig;
 }
 
 export function RecordPaymentDialog({
@@ -66,29 +68,13 @@ export function RecordPaymentDialog({
     loadBookingDetails,
     refreshReservations,
     notifyReservationsChanged,
-    reservations,
-    property,
   } = useDataContext();
   const formatCurrency = useCurrencyFormatter();
 
-  const reservation = React.useMemo(
-    () => reservations.find((res) => res.id === reservationId),
-    [reservations, reservationId]
+  const { balance } = React.useMemo(
+    () => calculateReservationFinancials(billingSource, taxConfig),
+    [billingSource, taxConfig]
   );
-
-  const derivedTaxConfig = React.useMemo<ReservationTaxConfig>(
-    () =>
-      taxConfig ?? resolveReservationTaxConfig(reservation ?? undefined, property),
-    [property, reservation, taxConfig]
-  );
-
-  const { balance } = React.useMemo(() => {
-    const financialSource = billingSource ?? reservation;
-    if (!financialSource) {
-      return { balance: 0 };
-    }
-    return calculateReservationFinancials(financialSource, derivedTaxConfig);
-  }, [billingSource, reservation, derivedTaxConfig]);
 
   const outstandingBalance = Math.max(balance, 0);
 
@@ -173,11 +159,9 @@ export function RecordPaymentDialog({
   }, [normalizedPercentage, outstandingBalance, form, isPercentageMode]);
 
   async function onSubmit(values: z.infer<typeof paymentSchema>) {
-    if (!reservation) {
-      toast.error("Reservation not found.");
-      return;
-    }
-
+    // Existence is confirmed by the server on submit: the cash-payment route
+    // returns a 404 ("Reservation not found.") that the !response.ok branch
+    // below surfaces. The client no longer pre-checks against any cached list.
     if (outstandingBalance <= 0) {
       toast.error("This reservation is already fully paid.");
       return;

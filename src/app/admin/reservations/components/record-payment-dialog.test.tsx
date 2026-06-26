@@ -4,7 +4,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useDataContext } from "@/context/data-context";
 import { authorizedFetch } from "@/lib/auth/client-session";
-import { buildReservation, resetBuilderSequences } from "@/test/builders";
 import { RecordPaymentDialog } from "./record-payment-dialog";
 
 vi.mock("@/context/data-context", () => ({
@@ -22,9 +21,26 @@ vi.mock("@/hooks/use-currency", () => ({
 const mockedUseDataContext = vi.mocked(useDataContext);
 const mockedAuthorizedFetch = vi.mocked(authorizedFetch);
 
+// The dialog reads booking financials from props, not from the context list.
+// Mock the context with an EMPTY `reservations` array so these tests double as a
+// regression guard: a booking absent from the capped in-memory list must still pay.
+function mockContext() {
+  const refreshReservations = vi.fn().mockResolvedValue(undefined);
+  const loadBookingDetails = vi.fn().mockResolvedValue(undefined);
+  const notifyReservationsChanged = vi.fn();
+
+  mockedUseDataContext.mockReturnValue({
+    reservations: [],
+    refreshReservations,
+    loadBookingDetails,
+    notifyReservationsChanged,
+  } as unknown as ReturnType<typeof useDataContext>);
+
+  return { refreshReservations, loadBookingDetails, notifyReservationsChanged };
+}
+
 describe("RecordPaymentDialog", () => {
   beforeEach(() => {
-    resetBuilderSequences();
     mockedAuthorizedFetch.mockResolvedValue(
       new Response(JSON.stringify({ folioItem: { id: "folio-1" } }), {
         status: 201,
@@ -33,27 +49,17 @@ describe("RecordPaymentDialog", () => {
     );
   });
 
-  it("records cash through the cash-payment API route", async () => {
+  it("records cash through the cash-payment API route for any booking, even one missing from the context list", async () => {
     const user = userEvent.setup();
-    const reservation = buildReservation({
-      id: "reservation-1",
-      totalAmount: 100,
-      folio: [],
-    });
-    const refreshReservations = vi.fn().mockResolvedValue(undefined);
-    const loadBookingDetails = vi.fn().mockResolvedValue(undefined);
-    const notifyReservationsChanged = vi.fn();
-
-    mockedUseDataContext.mockReturnValue({
-      reservations: [reservation],
-      property: { tax_enabled: false, tax_percentage: 0 },
-      refreshReservations,
-      loadBookingDetails,
-      notifyReservationsChanged,
-    } as unknown as ReturnType<typeof useDataContext>);
+    const { refreshReservations, loadBookingDetails, notifyReservationsChanged } =
+      mockContext();
 
     render(
-      <RecordPaymentDialog reservationId="reservation-1">
+      <RecordPaymentDialog
+        reservationId="reservation-1"
+        billingSource={{ totalAmount: 100, folio: [] }}
+        taxConfig={{ enabled: false, percentage: 0 }}
+      >
         <button type="button">Open cash dialog</button>
       </RecordPaymentDialog>
     );
@@ -81,22 +87,14 @@ describe("RecordPaymentDialog", () => {
 
   it("forwards the optional remark in the request body", async () => {
     const user = userEvent.setup();
-    const reservation = buildReservation({
-      id: "reservation-1",
-      totalAmount: 100,
-      folio: [],
-    });
-
-    mockedUseDataContext.mockReturnValue({
-      reservations: [reservation],
-      property: { tax_enabled: false, tax_percentage: 0 },
-      refreshReservations: vi.fn().mockResolvedValue(undefined),
-      loadBookingDetails: vi.fn().mockResolvedValue(undefined),
-      notifyReservationsChanged: vi.fn(),
-    } as unknown as ReturnType<typeof useDataContext>);
+    mockContext();
 
     render(
-      <RecordPaymentDialog reservationId="reservation-1">
+      <RecordPaymentDialog
+        reservationId="reservation-1"
+        billingSource={{ totalAmount: 100, folio: [] }}
+        taxConfig={{ enabled: false, percentage: 0 }}
+      >
         <button type="button">Open cash dialog</button>
       </RecordPaymentDialog>
     );
