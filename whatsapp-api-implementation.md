@@ -27,8 +27,11 @@ direct result of an admin action.
   until the owner approves via a WhatsApp OTP. Admin-triggered end to end:
   `POST /api/admin/reservations/otp/request` (guarded by `create:reservation`) sends the
   code, `POST /api/admin/reservations/otp/verify` checks it, then the booking is created.
-- **OTP delivery uses a UTILITY template** (`reservation_discount_approval`), **not**
-  free-form text — see §6b for the why and the exact template to create.
+- **OTP delivery uses a free-form text message** (`sendWhatsAppMessage`) carrying the
+  guest, amounts, discount and code. Free-form text only delivers inside an **open 24h
+  Customer Service Window**, so the owner must have messaged the business number first —
+  otherwise the send fails with **error 131047**. See §6b for the rationale and the
+  operational requirement.
 - Bonus fix: the existing admin **"send invoice"** and **"send payment QR"** buttons now
   go over the Cloud API too (they were broken once GOWA died). Still admin-click only.
 - Migration `20260617000000_reservation_otp.sql` (the `reservation_otp_codes` table +
@@ -135,7 +138,7 @@ Files marked **(this branch)** ship on `feat/discount-otp-gate`; the rest are de
 | `src/lib/whatsapp/cloud-api.ts` | Graph API send helpers: `sendWhatsAppMessage/Image/File`, `sendWhatsAppButtons`, `sendWhatsAppTemplate`, `normalizePhone`. | ✅ this branch |
 | `src/lib/whatsapp/config.ts` | Resolves number config (DB → env) + app secret / verify token / app id. | ✅ this branch |
 | `src/lib/whatsapp/types.ts` | `WhatsAppResult`, `ReplyButton`. | ✅ this branch |
-| `src/app/api/admin/reservations/otp/request/route.ts` | Generates the OTP, sends the `reservation_discount_approval` UTILITY template to the owner. | ✅ this branch |
+| `src/app/api/admin/reservations/otp/request/route.ts` | Generates the OTP, sends it to the owner as a free-form WhatsApp text message (`sendWhatsAppMessage`). | ✅ this branch |
 | `src/app/api/admin/reservations/otp/verify/route.ts` | Verifies the code (sha256, constant-time, attempt-limited, single-use). | ✅ this branch |
 | `src/lib/reservations/discount-approval.ts` | `requiresApproval` / `maxNightlyDiscount` / `computeBookingAmounts` (pure, tested). | ✅ this branch |
 | `src/app/admin/reservations/new/otp-approval-dialog.tsx` | Admin dialog: request code → enter code → verify → create. | ✅ this branch |
@@ -184,48 +187,41 @@ Params sent, in order: `{{1}}` guest name, `{{2}}` booking id, `{{3}}` check-in 
 
 ---
 
-## 6b. The `reservation_discount_approval` UTILITY template (required by this branch)
+## 6b. OTP delivery: free-form text (no template)
 
-The discount-approval OTP is sent with this template, **not** free-form text. Why a
-template is mandatory here:
+The discount-approval OTP is sent as a **free-form WhatsApp text message** via
+`sendWhatsAppMessage` — templates were dropped after every pre-approved/library
+template attempt failed in the live account (132001 name/language mismatch, no
+authentication template provisioned, named-vs-positional variable issues).
 
-- The recipient is the **owner/approver** — a passive party who has not messaged the
-  business number, so there is **no open 24h Customer Service Window**. A free-form send
-  therefore fails with **error 131047** ("re-engagement / outside window"), and the OTP
-  route then deletes the code row and returns 502 → the admin can't finish the booking.
-- Meta policy **requires** OTP/verification messages to use a pre-approved template;
-  sending verification codes as free-form text risks **account suspension** even inside
-  the window. (See §5: "Outside the 24h window free-form fails with 131047 → use a template.")
-
-We use a **UTILITY** template (not an AUTHENTICATION template) on purpose: this is an
-*approval* gate, so the owner must see the booking context — guest, amounts, discount —
-to decide, which an authentication template's locked "`<CODE>` is your verification code"
-body cannot carry. A UTILITY template sends outside the window just the same.
-
-**Create in WhatsApp Manager** — category **UTILITY**, language **English (US) / en_US**,
-name **`reservation_discount_approval`**:
+The body the owner receives:
 
 ```
-Body:
-Reservation approval needed.
-
-Guest: {{1}}
-Booking amount: ₹{{2}}
-Original amount: ₹{{3}}
-Discount: ₹{{4}}
-
-Approval code: {{5}} (valid 10 minutes)
+Reservation approval needed
+Guest: Ramesh Patel
+Booking amount: ₹4,200
+Original amount: ₹6,000
+Discount: ₹1,800
+OTP: 482915 (valid 10 min)
 ```
 
-Params sent by `POST /api/admin/reservations/otp/request`, in order: `{{1}}` guest name,
-`{{2}}` booking amount, `{{3}}` original amount, `{{4}}` discount, `{{5}}` the 6-digit code.
-Amounts are pre-formatted (Indian grouping, no `₹` — the symbol lives in the template body).
+Amounts are formatted with Indian grouping; the `₹` symbol is added in the route.
 
-**Sample values for the approval-example step Meta asks for:**
-`{{1}}=Ramesh Patel`, `{{2}}=4,200`, `{{3}}=6,000`, `{{4}}=1,800`, `{{5}}=482915`.
+**The catch — the 24h window.** Free-form text (`type: "text"`) only delivers
+inside an **open 24h Customer Service Window**. The owner/approver is normally a
+passive party with no open window, so:
+
+- The **owner must message the business number first** (any message) to open the
+  window. While it's open, the OTP text delivers.
+- If the window is closed the send fails with **error 131047**; the route then
+  deletes the code row and returns 502, so the admin can't finish the booking.
+
+This window dependency is the accepted operational tradeoff for not using
+templates. (Meta's policy preference is templates for verification codes; this
+branch ships free-form text per the product decision.)
 
 **Operational prerequisites for the gate to work:**
-- The template above is **APPROVED** on the live WABA.
+- The owner has an **open 24h window** (messaged the business number recently).
 - Admin **Settings → `whatsapp_otp_phone`** holds the owner's number (E.164, e.g.
   `9198…`); without it the request route returns "Set the WhatsApp approval number in
   Settings first."
@@ -325,9 +321,10 @@ Apply the Supabase migration by hand in the Supabase dashboard (no local CLI).
 1. **OTP gate fires:** create a reservation, discount a room's nightly rate by more than
    `NEXT_PUBLIC_DISCOUNT_OTP_THRESHOLD` (default ₹300) → the approval dialog opens instead
    of creating immediately. A discount ≤ threshold creates the booking with no dialog.
-2. **OTP delivers:** with `reservation_discount_approval` APPROVED and `whatsapp_otp_phone`
-   set, "request code" reaches the owner's WhatsApp **even with no open window** (no 131047),
-   and shows guest/amounts/discount + code.
+2. **OTP delivers:** with `whatsapp_otp_phone` set **and the owner's 24h window open**
+   (owner messaged the business number first), "request code" reaches the owner's WhatsApp
+   as a free-form text showing guest/amounts/discount + code. With the window closed the
+   send returns 502 (131047) — confirming the window dependency is the only gap.
 3. **Verify + create:** entering the correct code creates the booking; wrong/expired/used
    codes are rejected (5-attempt lock, 10-min TTL, single-use).
 4. **Regression:** existing admin "send invoice / payment QR" still send via the new Cloud
