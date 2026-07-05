@@ -89,12 +89,21 @@ async function resolveReservationId(
   bookingId: string
 ): Promise<string | null> {
   const column = isReservationUuid(bookingId) ? "id" : "booking_id";
-  const { data, error } = await supabase
-    .from("reservations")
-    .select("id")
-    .eq(column, bookingId)
-    .limit(1)
-    .maybeSingle();
+  let query = supabase.from("reservations").select("id").eq(column, bookingId);
+
+  // A booking code (A####) is shared by every room in the booking, including any
+  // rooms auto-cancelled when the booking was modified. Without this guard an
+  // unordered limit(1) can land on a dead reservation, and the RPC then rejects
+  // the whole attach with "Cannot attach a payment to a Cancelled or No-show
+  // booking." Prefer a live room; order deterministically toward the current stay.
+  if (column === "booking_id") {
+    query = query
+      .not("status", "in", "(Cancelled,No-show)")
+      .order("check_out_date", { ascending: false })
+      .order("id", { ascending: true });
+  }
+
+  const { data, error } = await query.limit(1).maybeSingle();
 
   if (error) {
     throw new Error(error.message);
