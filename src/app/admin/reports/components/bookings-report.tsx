@@ -84,8 +84,8 @@ export function BookingsReport() {
               Bookings Report
             </CardTitle>
             <CardDescription>
-              Pick an arrival date and a dispatch date. The PDF will show
-              arrivals first, then dispatches — one section per page.
+              Pick an arrival date and a departure date. The PDF will show
+              arrivals first, then departures — one section per page.
             </CardDescription>
           </div>
 
@@ -131,7 +131,7 @@ export function BookingsReport() {
             {/* Dispatch Date picker */}
             <div className="flex flex-col gap-1">
               <span className="text-xs font-medium text-muted-foreground">
-                Dispatch Date
+                Departure Date
               </span>
               <Popover open={dispatchOpen} onOpenChange={setDispatchOpen}>
                 <PopoverTrigger asChild>

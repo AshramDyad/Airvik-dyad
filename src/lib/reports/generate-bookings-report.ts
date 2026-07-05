@@ -223,12 +223,12 @@ function renderSection(doc: jsPDF, opts: SectionOptions): void {
 
   // Table
   const head: string[][] = [
-    ["Booking ID", "Guest", "Check-in", "Check-out", "Nights", "Rooms", "Total", "Paid", "Balance", "Status"],
+    ["Booking ID", "Guest", "Mobile", "Check-in", "Check-out", "Nights", "Rooms", "Total", "Paid", "Balance", "Status", "Notes"],
   ];
 
   const body: string[][] =
     bookings.length === 0
-      ? [["", "", "", "", "", "", "", "", "", ""]]
+      ? [["", "", "", "", "", "", "", "", "", "", "", ""]]
       : bookings.map((b) => {
           const nights = differenceInDays(
             parseISO(b.checkOutDate),
@@ -238,14 +238,16 @@ function renderSection(doc: jsPDF, opts: SectionOptions): void {
           return [
             b.bookingId,
             b.guestName,
-            format(parseISO(b.checkInDate), "dd MMM yyyy"),
-            format(parseISO(b.checkOutDate), "dd MMM yyyy"),
+            b.guestSnapshot.phone ?? "",
+            format(parseISO(b.checkInDate), "dd/MM/yy"),
+            format(parseISO(b.checkOutDate), "dd/MM/yy"),
             String(nights),
             String(b.roomCount),
             formatCurrency(displayAmount),
             formatCurrency(paid),
             formatCurrency(balance),
             b.status,
+            "", // Notes — left blank for hand-written status/timing on the printout
           ];
         });
 
@@ -259,22 +261,28 @@ function renderSection(doc: jsPDF, opts: SectionOptions): void {
       textColor: [255, 255, 255],
       fontSize: 8,
       fontStyle: "bold",
+      halign: "left",
     },
     bodyStyles: {
       fontSize: 8,
       textColor: [51, 51, 51],
     },
+    // Every column left-aligned for a clean left-to-right read. Narrow columns get
+    // a fixed width; Guest (1) and Notes (11) stay auto so they absorb the remaining
+    // width and the 12-column table always fits landscape A4 (usable ≈ 267mm).
     columnStyles: {
-      0: { halign: "left" },
-      1: { halign: "left" },
-      2: { halign: "center" },
-      3: { halign: "center" },
-      4: { halign: "right" },
-      5: { halign: "right" },
-      6: { halign: "right" },
-      7: { halign: "right" },
-      8: { halign: "right" },
-      9: { halign: "center" },
+      0: { halign: "left", cellWidth: 18 },  // Booking ID
+      1: { halign: "left" },                 // Guest (auto)
+      2: { halign: "left", cellWidth: 26 },  // Mobile
+      3: { halign: "left", cellWidth: 16 },  // Check-in
+      4: { halign: "left", cellWidth: 16 },  // Check-out
+      5: { halign: "left", cellWidth: 14 },  // Nights
+      6: { halign: "left", cellWidth: 14 },  // Rooms
+      7: { halign: "left", cellWidth: 22 },  // Total
+      8: { halign: "left", cellWidth: 22 },  // Paid
+      9: { halign: "left", cellWidth: 22 },  // Balance
+      10: { halign: "left", cellWidth: 22 }, // Status
+      11: { halign: "left" },                // Notes (auto)
     },
     styles: {
       cellPadding: 2,
@@ -335,7 +343,7 @@ export async function generateBookingsReport(input: BookingsReportInput): Promis
   doc.setTextColor(COLORS.PRIMARY);
   doc.setFontSize(20);
   doc.setFont("helvetica", "bold");
-  doc.text("Arrivals & Dispatches Report", pageWidth - MARGIN, yPos + 8, { align: "right" });
+  doc.text("Arrivals & Departures Report", pageWidth - MARGIN, yPos + 8, { align: "right" });
 
   doc.setTextColor(COLORS.TEXT_LIGHT);
   doc.setFontSize(9);
@@ -383,7 +391,7 @@ export async function generateBookingsReport(input: BookingsReportInput): Promis
   doc.setTextColor(COLORS.TEXT_LIGHT);
   doc.setFontSize(9);
   doc.setFont("helvetica", "normal");
-  doc.text("Arrivals & Dispatches Report", pageWidth - MARGIN, y2, { align: "right" });
+  doc.text("Arrivals & Departures Report", pageWidth - MARGIN, y2, { align: "right" });
 
   y2 += 7;
 
@@ -394,8 +402,8 @@ export async function generateBookingsReport(input: BookingsReportInput): Promis
 
   // ── SECTION 2: DISPATCHES ────────────────────────────────────────────────────
   renderSection(doc, {
-    sectionTitle: `Dispatches — ${dispatchLabel}`,
-    emptyMessage:  `No dispatches found on ${dispatchLabel}`,
+    sectionTitle: `Departure — ${dispatchLabel}`,
+    emptyMessage:  `No departures found on ${dispatchLabel}`,
     bookings:      dispatches,
     property,
     startY:        y2,
@@ -408,7 +416,7 @@ export async function generateBookingsReport(input: BookingsReportInput): Promis
 
   const arrivalFormatted  = dates.arrival.replace(/-/g, "");
   const dispatchFormatted = dates.dispatch.replace(/-/g, "");
-  const fileName = `BookingsReport_ARR${arrivalFormatted}_DSP${dispatchFormatted}.pdf`;
+  const fileName = `BookingsReport_ARR${arrivalFormatted}_DEP${dispatchFormatted}.pdf`;
 
   doc.setProperties({ title: fileName });
 
