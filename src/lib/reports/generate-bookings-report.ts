@@ -182,7 +182,11 @@ interface SectionOptions {
 /** Draws one section (title + summary line + table) onto `doc` starting at `startY`. */
 function renderSection(doc: jsPDF, opts: SectionOptions): void {
   const pageWidth = doc.internal.pageSize.getWidth();
-  const { sectionTitle, emptyMessage, bookings, property, startY } = opts;
+  const { sectionTitle, emptyMessage, property, startY } = opts;
+
+  // Cancelled bookings are not real arrivals/departures, so hide them from the
+  // daily ops sheet. This filters the summary counts and the table together.
+  const bookings = opts.bookings.filter((b) => b.status !== "Cancelled");
 
   let yPos = startY;
 
