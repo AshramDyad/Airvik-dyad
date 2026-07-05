@@ -7,7 +7,7 @@ import * as z from "zod";
 import { toast } from "sonner";
 import { ArrowLeft, FileText, Send, Loader2 } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -110,14 +110,45 @@ const defaultValues: NewReceiptValues = {
 // ── Page ───────────────────────────────────────────────────────────────────
 
 export default function NewManualReceiptPage() {
+  return (
+    <React.Suspense fallback={null}>
+      <NewManualReceiptForm />
+    </React.Suspense>
+  );
+}
+
+function NewManualReceiptForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { property } = useDataContext();
   const [downloading, setDownloading] = React.useState(false);
   const [sending, setSending] = React.useState(false);
 
+  // When opened from the Payments page, the amount, transaction number and UPI
+  // payment mode are pre-filled from the bank transaction and locked.
+  const locked = searchParams?.get("lock") === "1";
+  const amountParam = Number(searchParams?.get("amount"));
+  const transactionIdParam = searchParams?.get("transactionId") ?? "";
+  const paymentModeParam = searchParams?.get("paymentMode");
+  const lockedPaymentMode = PAYMENT_MODES.find(
+    (mode) => mode === paymentModeParam,
+  );
+
+  const initialValues = React.useMemo<NewReceiptValues>(
+    () => ({
+      ...defaultValues,
+      ...(Number.isFinite(amountParam) && amountParam > 0
+        ? { amount: amountParam }
+        : {}),
+      ...(transactionIdParam ? { transactionId: transactionIdParam } : {}),
+      ...(lockedPaymentMode ? { paymentMode: lockedPaymentMode } : {}),
+    }),
+    [amountParam, transactionIdParam, lockedPaymentMode],
+  );
+
   const form = useForm<NewReceiptValues>({
     resolver: zodResolver(newReceiptSchema),
-    defaultValues,
+    defaultValues: initialValues,
   });
 
   const selectedTrust = form.watch("trust");
@@ -141,6 +172,8 @@ export default function NewManualReceiptPage() {
   // Auto-select/deselect Cash payment mode based on donation-in selection
   const selectedDonationIn = form.watch("donationIn");
   React.useEffect(() => {
+    // In locked (payment-linked) mode the payment mode is fixed to UPI, so leave it alone.
+    if (locked) return;
     if (selectedDonationIn === "CASH NVCS" || selectedDonationIn === "Cash SWT") {
       form.setValue("paymentMode", "Cash");
     } else if (selectedDonationIn) {
@@ -148,7 +181,7 @@ export default function NewManualReceiptPage() {
       form.setValue("paymentMode", undefined);
     }
     // Empty string (trust reset) — leave paymentMode untouched
-  }, [selectedDonationIn, form]);
+  }, [selectedDonationIn, form, locked]);
 
   // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -503,6 +536,8 @@ export default function NewManualReceiptPage() {
                           type="number"
                           min={1}
                           placeholder="0"
+                          readOnly={locked}
+                          className={locked ? "bg-muted" : undefined}
                           {...field}
                         />
                       </FormControl>
@@ -555,7 +590,12 @@ export default function NewManualReceiptPage() {
                     <FormItem>
                       <FormLabel>Transaction No</FormLabel>
                       <FormControl>
-                        <Input placeholder="Transaction / reference number" {...field} />
+                        <Input
+                          placeholder="Transaction / reference number"
+                          readOnly={locked}
+                          className={locked ? "bg-muted" : undefined}
+                          {...field}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -573,6 +613,7 @@ export default function NewManualReceiptPage() {
                         <RadioGroup
                           onValueChange={field.onChange}
                           value={field.value ?? ""}
+                          disabled={locked}
                           className="flex flex-wrap gap-4 pt-1"
                         >
                           {PAYMENT_MODES.map((mode) => (

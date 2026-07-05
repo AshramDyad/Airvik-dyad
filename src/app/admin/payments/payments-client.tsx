@@ -47,6 +47,7 @@ import { useDataContext } from "@/context/data-context";
 import type {
   GoogleSheetTransaction,
   GoogleSheetTransactionsApiResponse,
+  ManualReceipt,
 } from "@/data/types";
 import { authorizedFetch } from "@/lib/auth/client-session";
 import type { StatementBookingLink } from "@/lib/payments/statement-links";
@@ -68,12 +69,16 @@ type LoadOptions = {
 
 export function PaymentsClient() {
   const { property } = useDataContext();
-  const { hasPermission } = useAuthContext();
+  const { hasPermission, hasFeatureAccess } = useAuthContext();
   const [payload, setPayload] =
     React.useState<GoogleSheetTransactionsApiResponse | null>(null);
   const [bookingLinks, setBookingLinks] = React.useState<
     Map<string, StatementBookingLink>
   >(() => new Map());
+  // Maps a transaction reference to the slip number of the manual receipt issued for it.
+  const [receiptSlips, setReceiptSlips] = React.useState<Map<string, number>>(
+    () => new Map()
+  );
   const [query, setQuery] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
   const [isInitialLoading, setIsInitialLoading] = React.useState(true);
@@ -89,6 +94,7 @@ export function PaymentsClient() {
   const currency = property?.currency || "INR";
   const timeZone = property?.timezone || DEFAULT_TIME_ZONE;
   const canAttachPayment = hasPermission("update:payment");
+  const canCreateReceipt = hasFeatureAccess("donationsCreate");
 
   React.useEffect(() => {
     payloadRef.current = payload;
@@ -116,6 +122,34 @@ export function PaymentsClient() {
       setBookingLinks(nextMap);
     } catch {
       // A failed link lookup just hides booking columns; the statement still loads.
+    }
+  }, []);
+
+  const loadReceiptSlips = React.useCallback(async () => {
+    try {
+      const response = await authorizedFetch("/api/admin/manual-receipts", {
+        cache: "no-store",
+      });
+      const body: unknown = await response.json();
+      if (!response.ok) {
+        console.warn(
+          "Failed to load manual receipts:",
+          readMessage(body) ?? response.status
+        );
+        return;
+      }
+
+      const receipts = (body as { data?: ManualReceipt[] }).data ?? [];
+      const nextMap = new Map<string, number>();
+      for (const receipt of receipts) {
+        const reference = receipt.transactionId?.trim().toLowerCase();
+        if (reference) {
+          nextMap.set(reference, receipt.slipNo);
+        }
+      }
+      setReceiptSlips(nextMap);
+    } catch {
+      // A failed lookup just hides the receipt column; the statement still loads.
     }
   }, []);
 
@@ -149,6 +183,8 @@ export function PaymentsClient() {
         setError(null);
         // Show booking links from already-recorded payments right away.
         await loadBookingLinks();
+        // Show receipt slips (transactions that already have a manual receipt).
+        await loadReceiptSlips();
         // Reconcile in the background, then refresh links once new matches land,
         // so the statement table never waits behind the Google Sheet match.
         void authorizedFetch("/api/admin/payment-requests/reconcile", {
@@ -170,7 +206,7 @@ export function PaymentsClient() {
         }
       }
     },
-    [loadBookingLinks]
+    [loadBookingLinks, loadReceiptSlips]
   );
 
   function openAttachDialog(row: GoogleSheetTransaction) {
@@ -393,6 +429,11 @@ export function PaymentsClient() {
                 {filteredRows.map((row) => {
                   const transactionStatus = getTransactionStatus(row);
                   const bookingLink = getBookingLink(row, bookingLinks);
+                  const reference = row.reference?.trim() ?? "";
+                  const receiptSlipNo = reference
+                    ? receiptSlips.get(reference.toLowerCase())
+                    : undefined;
+                  const receiptHref = `/admin/manual-receipt/new?amount=${row.amount ?? ""}&transactionId=${encodeURIComponent(reference)}&paymentMode=UPI&lock=1`;
 
                   return (
                     <TableRow key={row.rowNumber}>
@@ -440,16 +481,40 @@ export function PaymentsClient() {
                           >
                             {formatBookingCode(bookingLink.bookingId)}
                           </Link>
-                        ) : canAttachPayment ? (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-7 shrink-0 px-2 text-xs"
-                            onClick={() => openAttachDialog(row)}
+                        ) : receiptSlipNo !== undefined ? (
+                          <Link
+                            href="/admin/manual-receipt"
+                            className="font-mono text-xs text-primary hover:underline"
                           >
-                            <Link2 className="h-3.5 w-3.5" />
-                            Attach
-                          </Button>
+                            MR-{receiptSlipNo}
+                          </Link>
+                        ) : canAttachPayment || canCreateReceipt ? (
+                          <div className="flex items-center gap-2">
+                            {canAttachPayment && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 shrink-0 px-2 text-xs"
+                                onClick={() => openAttachDialog(row)}
+                              >
+                                <Link2 className="h-3.5 w-3.5" />
+                                Attach
+                              </Button>
+                            )}
+                            {canCreateReceipt && reference && (
+                              <Button
+                                asChild
+                                size="sm"
+                                variant="outline"
+                                className="h-7 shrink-0 px-2 text-xs"
+                              >
+                                <Link href={receiptHref}>
+                                  <ReceiptText className="h-3.5 w-3.5" />
+                                  Receipt
+                                </Link>
+                              </Button>
+                            )}
+                          </div>
                         ) : (
                           "-"
                         )}

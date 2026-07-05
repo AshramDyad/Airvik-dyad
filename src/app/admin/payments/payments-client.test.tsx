@@ -40,6 +40,7 @@ describe("PaymentsClient", () => {
     } as unknown as ReturnType<typeof useDataContext>);
     mockedUseAuthContext.mockReturnValue({
       hasPermission: (permission: Permission) => permission === "update:payment",
+      hasFeatureAccess: (feature: string) => feature === "donationsCreate",
     } as unknown as ReturnType<typeof useAuthContext>);
   });
 
@@ -95,11 +96,48 @@ describe("PaymentsClient", () => {
       reference: "UTR-2",
     });
   });
+
+  it("shows a Receipt link to the prefilled manual-receipt form for an unmatched transaction", async () => {
+    mockFetch({
+      rows: [buildTransaction({ reference: "UTR-3", amount: 1500 })],
+      links: [],
+    });
+
+    render(<PaymentsClient />);
+
+    const receiptLink = await screen.findByRole("link", { name: "Receipt" });
+    const href = receiptLink.getAttribute("href") ?? "";
+    expect(href).toContain("/admin/manual-receipt/new");
+    expect(href).toContain("amount=1500");
+    expect(href).toContain("transactionId=UTR-3");
+    expect(href).toContain("paymentMode=UPI");
+    expect(href).toContain("lock=1");
+  });
+
+  it("renders a clickable slip-no link and hides both buttons when a receipt exists", async () => {
+    mockFetch({
+      rows: [buildTransaction({ reference: "UTR-4" })],
+      links: [],
+      receipts: [{ transactionId: "UTR-4", slipNo: 42 }],
+    });
+
+    render(<PaymentsClient />);
+
+    const slipLink = await screen.findByRole("link", { name: "MR-42" });
+    expect(slipLink).toHaveAttribute("href", "/admin/manual-receipt");
+    expect(
+      screen.queryByRole("button", { name: "Attach" })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Receipt" })
+    ).not.toBeInTheDocument();
+  });
 });
 
 function mockFetch(options: {
   rows: GoogleSheetTransaction[];
   links: StatementBookingLink[];
+  receipts?: Array<{ transactionId: string; slipNo: number }>;
 }) {
   mockedAuthorizedFetch.mockImplementation((input: RequestInfo | URL) => {
     const url = typeof input === "string" ? input : input.toString();
@@ -111,6 +149,9 @@ function mockFetch(options: {
     }
     if (url.startsWith("/api/admin/payment-statement/links")) {
       return Promise.resolve(jsonResponse({ links: options.links }));
+    }
+    if (url.startsWith("/api/admin/manual-receipts")) {
+      return Promise.resolve(jsonResponse({ data: options.receipts ?? [] }));
     }
     if (url.startsWith("/api/admin/payment-statement/attach")) {
       return Promise.resolve(jsonResponse({ reservationId: "res-1" }, { status: 201 }));
