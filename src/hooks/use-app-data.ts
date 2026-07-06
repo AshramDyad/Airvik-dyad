@@ -5,6 +5,7 @@ import type {
   RealtimeChannel,
   RealtimePostgresChangesPayload,
 } from "@supabase/supabase-js";
+import { format } from "date-fns";
 import { useSessionContext } from "@/context/session-context";
 import { useActivityLogger } from "@/hooks/use-activity-logger";
 import { toast } from "sonner";
@@ -1153,9 +1154,39 @@ export function useAppData() {
   };
 
   const updateReservationStatus = async (reservationId: string, status: ReservationStatus) => {
-    const { error } = await api.updateReservationStatus(reservationId, status);
+    // Early checkout: if a guest leaves before their booked check-out (on or
+    // after their check-in day), record today as the actual departure date so
+    // the room frees up for the remaining nights. Availability everywhere keys
+    // off check_out_date. When today equals the check-in day (a same-day stay),
+    // this makes an empty [check_in, check_out) range, which frees the room for
+    // the whole day. The charge (total_amount) is left unchanged.
+    let earlyCheckOutDate: string | undefined;
+    if (status === "Checked-out") {
+      const reservation = reservations.find((r) => r.id === reservationId);
+      const today = format(new Date(), "yyyy-MM-dd");
+      if (
+        reservation &&
+        today >= reservation.checkInDate &&
+        today < reservation.checkOutDate
+      ) {
+        earlyCheckOutDate = today;
+      }
+    }
+
+    const { error } = earlyCheckOutDate
+      ? await api.updateReservation(reservationId, {
+          status,
+          checkOutDate: earlyCheckOutDate,
+        })
+      : await api.updateReservationStatus(reservationId, status);
     if (error) throw error;
-    setReservations(prev => prev.map(r => r.id === reservationId ? { ...r, status } : r));
+    setReservations(prev =>
+      prev.map(r =>
+        r.id === reservationId
+          ? { ...r, status, ...(earlyCheckOutDate ? { checkOutDate: earlyCheckOutDate } : {}) }
+          : r
+      )
+    );
     notifyReservationsChanged({ reservationId });
     recordActivity({
       section: "reservations",
