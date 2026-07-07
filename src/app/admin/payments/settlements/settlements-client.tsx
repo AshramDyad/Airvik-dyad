@@ -89,9 +89,6 @@ export function SettlementsClient() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-serif font-semibold">Settlements</h1>
-          <p className="text-sm text-muted-foreground">
-            Each payout and the settled bookings it covered (oldest first).
-          </p>
         </div>
         <Button
           variant="outline"
