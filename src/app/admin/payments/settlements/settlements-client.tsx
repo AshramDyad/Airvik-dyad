@@ -84,8 +84,6 @@ export function SettlementsClient() {
     });
   };
 
-  const summary = view?.summary;
-
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -130,7 +128,8 @@ export function SettlementsClient() {
             <EmptyState label="No payouts recorded yet." />
           ) : (
             <div className="space-y-3">
-              {view.payouts.map((payout) => (
+              {/* Allocation runs oldest-first (FIFO); display newest-first like the statement page. */}
+              {[...view.payouts].reverse().map((payout) => (
                 <PayoutRow
                   key={payout.id}
                   payout={payout}
@@ -143,24 +142,6 @@ export function SettlementsClient() {
           )}
         </CardContent>
       </Card>
-
-      {/* Settled but not yet paid out */}
-      {summary && summary.pendingLines.length > 0 && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>
-              Pending payout — settled money not yet paid out (
-              {summary.pendingLines.length})
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="pt-4">
-            <AllocationTable
-              lines={summary.pendingLines}
-              formatCurrency={formatCurrency}
-            />
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }
