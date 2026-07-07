@@ -20,6 +20,12 @@ export interface OwnerLedgerEntry {
   kind: OwnerLedgerKind;
   /** For credits: the working-day date this clears into "Settled". Null for payouts. */
   settledOn: string | null;
+  /**
+   * True when the sheet's marker column (the "hide" column) holds the word "refund" —
+   * i.e. this payout is a guest refund, not an owner payout. Only meaningful for payouts;
+   * always false for credits.
+   */
+  isRefund: boolean;
 }
 
 export interface OwnerSettledSummary {

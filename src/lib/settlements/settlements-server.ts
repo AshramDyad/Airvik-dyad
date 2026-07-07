@@ -53,6 +53,8 @@ export async function getSettlementView(): Promise<SettlementView> {
     }
   }
 
+  // FIFO-allocate payouts to settled credits. Payouts tagged "refund" in the sheet are
+  // flagged (isRefund) with their FIFO lines dropped inside allocatePayouts.
   const view = allocatePayouts(summary.settled, summary.payouts);
   return {
     payouts: view.payouts.map((payout) => ({

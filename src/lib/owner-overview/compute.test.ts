@@ -163,6 +163,23 @@ describe("computeOwnerOverview – payouts", () => {
     const summary = computeOwnerOverview(txns, narrow, TODAY);
     expect(summary.payouts).toHaveLength(0);
   });
+
+  it("flags a payout as a refund when a cell holds the word 'refund'", () => {
+    const txns = [
+      makeTxn({
+        transaction_id: "refund",
+        date: "07/06/2026",
+        amount: -5000,
+        description: "payout to guest",
+        cells: ["07/06/2026", "payout to guest", "-5000", "Refund"],
+      }),
+      makeTxn({ transaction_id: "plain", date: "06/06/2026", amount: -100, description: "payout" }),
+    ];
+    const summary = computeOwnerOverview(txns, RANGE, TODAY);
+    const byId = new Map(summary.payouts.map((e) => [e.id, e]));
+    expect(byId.get("refund")?.isRefund).toBe(true);
+    expect(byId.get("plain")?.isRefund).toBe(false);
+  });
 });
 
 describe("computeOwnerOverview – signed-amount fallback", () => {

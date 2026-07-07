@@ -15,6 +15,11 @@ export const SETTLEMENT_FEE_PERCENT = 1;
 // Bank statement days and "today" are read on the property's clock.
 export const DEFAULT_TIME_ZONE = "Asia/Kolkata";
 const PAYOUT_PATTERN = /payout/i;
+// A payout tagged with the single word "refund" in the sheet's marker column (the same
+// last column used for "hide") is a guest refund, not an owner payout. We scan the whole
+// row for a cell that is exactly that word: "hide"/"refund" never appear as a full cell
+// anywhere else, and Google omits trailing empty cells so a fixed index is unreliable.
+const REFUND_MARKER = "refund";
 
 export interface OwnerDateRange {
   from: Date;
@@ -152,6 +157,11 @@ function isPayout(transaction: GoogleSheetTransaction, signedAmount: number): bo
   return signedAmount < 0 && PAYOUT_PATTERN.test(transaction.description ?? "");
 }
 
+/** True when any cell in the row is exactly the word "refund" (case-insensitive). */
+function isRefundTagged(transaction: GoogleSheetTransaction): boolean {
+  return transaction.cells.some((cell) => cell.trim().toLowerCase() === REFUND_MARKER);
+}
+
 function toLedgerEntry(
   transaction: GoogleSheetTransaction,
   dateKey: string,
@@ -171,6 +181,7 @@ function toLedgerEntry(
     netAmount: round2(amount - feeAmount),
     kind,
     settledOn,
+    isRefund: isRefundTagged(transaction),
   };
 }
 

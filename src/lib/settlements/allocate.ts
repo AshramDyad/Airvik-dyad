@@ -93,7 +93,10 @@ export function allocatePayouts(
       amount: round2(payout.amount),
       allocatedTotal,
       unmatchedAmount: round2(Math.max(payout.amount - allocatedTotal, 0)),
-      lines,
+      // A guest refund still draws down the pool above (kept in pool, so totals are
+      // unchanged), but we hide its FIFO lines — they would be the wrong booking ids.
+      lines: payout.isRefund ? [] : lines,
+      isRefund: payout.isRefund,
     });
   }
 

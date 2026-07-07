@@ -20,6 +20,7 @@ function settled(
     netAmount: net,
     kind: "credit",
     settledOn,
+    isRefund: false,
   };
 }
 
@@ -34,7 +35,13 @@ function payout(id: string, date: string, amount: number): OwnerLedgerEntry {
     netAmount: amount,
     kind: "payout",
     settledOn: null,
+    isRefund: false,
   };
+}
+
+/** A payout tagged as a guest refund (the "refund" marker was in the sheet). */
+function refundPayout(id: string, date: string, amount: number): OwnerLedgerEntry {
+  return { ...payout(id, date, amount), isRefund: true };
 }
 
 describe("allocatePayouts", () => {
@@ -123,5 +130,53 @@ describe("allocatePayouts", () => {
     const view = allocatePayouts(credits, [payout("P1", "2026-06-10", 5000)]);
     // Oldest credit (A1) is drawn first.
     expect(view.payouts[0].lines[0].settledEntryId).toBe("A1");
+  });
+
+  it("defaults every payout to not-a-refund", () => {
+    const view = allocatePayouts(
+      [settled("A1", "2026-06-01", 5000)],
+      [payout("P1", "2026-06-02", 5000)],
+    );
+    expect(view.payouts[0].isRefund).toBe(false);
+  });
+});
+
+describe("refund payouts", () => {
+  const credits = [
+    settled("A1201", "2026-06-05", 22000),
+    settled("A1188", "2026-06-06", 31500),
+  ];
+
+  it("flags a refund payout and hides its FIFO booking lines", () => {
+    const view = allocatePayouts(credits, [
+      refundPayout("P1", "2026-06-12", 40000),
+    ]);
+    const p = view.payouts[0];
+    expect(p.isRefund).toBe(true);
+    expect(p.lines).toEqual([]);
+  });
+
+  it("still draws a refund down the pool (kept in pool — totals match FIFO)", () => {
+    // Same amount as an ordinary payout: the outstanding figure must be identical whether
+    // the payout is a refund or not, so only the display differs.
+    const asRefund = allocatePayouts(credits, [refundPayout("P1", "2026-06-12", 40000)]);
+    const asPayout = allocatePayouts(credits, [payout("P1", "2026-06-12", 40000)]);
+
+    expect(asRefund.summary.totalSettledNet).toBe(asPayout.summary.totalSettledNet);
+    expect(asRefund.summary.totalPaidOut).toBe(asPayout.summary.totalPaidOut);
+    expect(asRefund.summary.outstanding).toBe(asPayout.summary.outstanding);
+    expect(asRefund.summary.pendingLines).toEqual(asPayout.summary.pendingLines);
+  });
+
+  it("only hides the refund's lines, leaving other payouts as FIFO computed them", () => {
+    const view = allocatePayouts(credits, [
+      payout("P1", "2026-06-12", 20000),
+      refundPayout("P2", "2026-06-13", 20000),
+    ]);
+
+    expect(view.payouts[0].isRefund).toBe(false);
+    expect(view.payouts[0].lines.length).toBeGreaterThan(0);
+    expect(view.payouts[1].isRefund).toBe(true);
+    expect(view.payouts[1].lines).toEqual([]);
   });
 });

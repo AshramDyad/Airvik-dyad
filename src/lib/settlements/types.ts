@@ -38,6 +38,12 @@ export interface PayoutWithAllocations {
   /** Payout amount not covered by any settled money (should be ~0 normally). */
   unmatchedAmount: number;
   lines: PayoutAllocationLine[];
+  /**
+   * True when this payout is a guest refund (tagged "refund" in the bank sheet's marker
+   * column). Refunds still draw down the settled pool, but their FIFO lines are hidden
+   * (they would be the wrong booking ids) and the client shows a plain "Refund" label.
+   */
+  isRefund: boolean;
 }
 
 /** The three headline numbers plus the still-unpaid settled money. */

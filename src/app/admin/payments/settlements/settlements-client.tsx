@@ -176,6 +176,7 @@ function PayoutRow({
   onToggle: () => void;
   formatCurrency: (value: number) => string;
 }) {
+  const isRefund = payout.isRefund;
   return (
     <div className="rounded-lg border border-border/60">
       <button
@@ -190,19 +191,27 @@ function PayoutRow({
           <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
         )}
         <div className="min-w-0 flex-1">
-          <p className="font-medium">
+          <div className="flex items-center gap-2 font-medium">
             {format(parseISO(payout.date), "dd MMM yyyy")}
-          </p>
+            {isRefund && (
+              <Badge variant="outline" className="text-xs font-normal">
+                Refund
+              </Badge>
+            )}
+          </div>
           <p className="truncate text-xs text-muted-foreground" title={payout.description}>
-            {payout.description || "Payout"} · {payout.lines.length} booking
-            {payout.lines.length === 1 ? "" : "s"}
+            {isRefund
+              ? payout.description || "Payout"
+              : `${payout.description || "Payout"} · ${payout.lines.length} booking${
+                  payout.lines.length === 1 ? "" : "s"
+                }`}
           </p>
         </div>
         <div className="text-right">
           <p className="font-semibold text-destructive whitespace-nowrap">
             −{formatCurrency(payout.amount)}
           </p>
-          {payout.unmatchedAmount > 0 && (
+          {payout.unmatchedAmount > 0 && !isRefund && (
             <p className="text-xs text-muted-foreground whitespace-nowrap">
               {formatCurrency(payout.unmatchedAmount)} unmatched
             </p>
@@ -211,7 +220,14 @@ function PayoutRow({
       </button>
       {isOpen && (
         <div className="border-t border-border/60 px-4 py-3">
-          <AllocationTable lines={payout.lines} formatCurrency={formatCurrency} />
+          {isRefund ? (
+            <div className="text-sm">
+              <span className="font-medium">Refund</span>
+              <span className="text-muted-foreground"> · {payout.description || "Guest refund"}</span>
+            </div>
+          ) : (
+            <AllocationTable lines={payout.lines} formatCurrency={formatCurrency} />
+          )}
         </div>
       )}
     </div>
