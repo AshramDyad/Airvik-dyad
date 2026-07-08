@@ -79,6 +79,12 @@ export function PaymentsClient() {
   const [receiptSlips, setReceiptSlips] = React.useState<Map<string, number>>(
     () => new Map()
   );
+  // Maps a receipt slip number to the full receipt, so an existing receipt can be
+  // looked up by number and attached to a transaction. Covers all receipts,
+  // including ones not yet attached to any transaction.
+  const [receiptsBySlip, setReceiptsBySlip] = React.useState<
+    Map<number, ManualReceipt>
+  >(() => new Map());
   const [query, setQuery] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
   const [isInitialLoading, setIsInitialLoading] = React.useState(true);
@@ -88,6 +94,11 @@ export function PaymentsClient() {
   const [attachBookingId, setAttachBookingId] = React.useState("");
   const [attachError, setAttachError] = React.useState<string | null>(null);
   const [isAttaching, setIsAttaching] = React.useState(false);
+  const [receiptTarget, setReceiptTarget] =
+    React.useState<GoogleSheetTransaction | null>(null);
+  const [receiptSlipInput, setReceiptSlipInput] = React.useState("");
+  const [receiptError, setReceiptError] = React.useState<string | null>(null);
+  const [isAttachingReceipt, setIsAttachingReceipt] = React.useState(false);
   const payloadRef =
     React.useRef<GoogleSheetTransactionsApiResponse | null>(null);
 
@@ -95,6 +106,7 @@ export function PaymentsClient() {
   const timeZone = property?.timezone || DEFAULT_TIME_ZONE;
   const canAttachPayment = hasPermission("update:payment");
   const canCreateReceipt = hasFeatureAccess("donationsCreate");
+  const canManageReceipt = hasFeatureAccess("donationsManage");
 
   React.useEffect(() => {
     payloadRef.current = payload;
@@ -141,13 +153,16 @@ export function PaymentsClient() {
 
       const receipts = (body as { data?: ManualReceipt[] }).data ?? [];
       const nextMap = new Map<string, number>();
+      const nextBySlip = new Map<number, ManualReceipt>();
       for (const receipt of receipts) {
+        nextBySlip.set(receipt.slipNo, receipt);
         const reference = receipt.transactionId?.trim().toLowerCase();
         if (reference) {
           nextMap.set(reference, receipt.slipNo);
         }
       }
       setReceiptSlips(nextMap);
+      setReceiptsBySlip(nextBySlip);
     } catch {
       // A failed lookup just hides the receipt column; the statement still loads.
     }
@@ -261,6 +276,69 @@ export function PaymentsClient() {
       );
     } finally {
       setIsAttaching(false);
+    }
+  }
+
+  function openReceiptDialog(row: GoogleSheetTransaction) {
+    setReceiptTarget(row);
+    setReceiptSlipInput("");
+    setReceiptError(null);
+  }
+
+  async function handleAttachReceipt() {
+    if (!receiptTarget) {
+      return;
+    }
+
+    const reference = receiptTarget.reference?.trim() ?? "";
+    if (!reference) {
+      setReceiptError("This transaction has no reference to attach.");
+      return;
+    }
+
+    // Accept "42" or "MR-42" (case-insensitive), tolerate surrounding spaces.
+    const rawSlip = receiptSlipInput.trim().replace(/^mr-?/i, "").trim();
+    const slipNo = Number(rawSlip);
+    if (!rawSlip || !Number.isInteger(slipNo) || slipNo <= 0) {
+      setReceiptError("Enter a valid receipt number.");
+      return;
+    }
+
+    const receipt = receiptsBySlip.get(slipNo);
+    if (!receipt) {
+      setReceiptError(
+        `Receipt MR-${slipNo} does not exist. Create a new receipt instead.`
+      );
+      return;
+    }
+
+    setIsAttachingReceipt(true);
+    setReceiptError(null);
+    try {
+      const response = await authorizedFetch(
+        `/api/admin/manual-receipts/${receipt.id}`,
+        {
+          method: "PATCH",
+          cache: "no-store",
+          body: JSON.stringify({ transactionId: reference }),
+        }
+      );
+      const body: unknown = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(readMessage(body) ?? "Unable to attach receipt.");
+      }
+
+      setReceiptTarget(null);
+      await loadReceiptSlips();
+      toast.success(`Receipt MR-${slipNo} attached.`);
+    } catch (attachException) {
+      setReceiptError(
+        attachException instanceof Error
+          ? attachException.message
+          : "Unable to attach receipt."
+      );
+    } finally {
+      setIsAttachingReceipt(false);
     }
   }
 
@@ -433,7 +511,6 @@ export function PaymentsClient() {
                   const receiptSlipNo = reference
                     ? receiptSlips.get(reference.toLowerCase())
                     : undefined;
-                  const receiptHref = `/admin/manual-receipt/new?amount=${row.amount ?? ""}&transactionId=${encodeURIComponent(reference)}&paymentMode=UPI&lock=1`;
 
                   return (
                     <TableRow key={row.rowNumber}>
@@ -488,7 +565,9 @@ export function PaymentsClient() {
                           >
                             MR-{receiptSlipNo}
                           </Link>
-                        ) : canAttachPayment || canCreateReceipt ? (
+                        ) : canAttachPayment ||
+                          canCreateReceipt ||
+                          canManageReceipt ? (
                           <div className="flex items-center gap-2">
                             {canAttachPayment && (
                               <Button
@@ -501,19 +580,18 @@ export function PaymentsClient() {
                                 Attach
                               </Button>
                             )}
-                            {canCreateReceipt && reference && (
-                              <Button
-                                asChild
-                                size="sm"
-                                variant="outline"
-                                className="h-7 shrink-0 px-2 text-xs"
-                              >
-                                <Link href={receiptHref}>
+                            {(canCreateReceipt || canManageReceipt) &&
+                              reference && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 shrink-0 px-2 text-xs"
+                                  onClick={() => openReceiptDialog(row)}
+                                >
                                   <ReceiptText className="h-3.5 w-3.5" />
                                   Receipt
-                                </Link>
-                              </Button>
-                            )}
+                                </Button>
+                              )}
                           </div>
                         ) : (
                           "-"
@@ -597,6 +675,105 @@ export function PaymentsClient() {
                 <Link2 className="h-4 w-4" />
               )}
               Attach Booking
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={receiptTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setReceiptTarget(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-[460px]">
+          <DialogHeader>
+            <DialogTitle>Attach receipt to transaction</DialogTitle>
+            <DialogDescription>
+              Attach an existing manual receipt by its number, or create a new
+              one for this transaction.
+            </DialogDescription>
+          </DialogHeader>
+
+          {receiptTarget && (
+            <div className="space-y-4">
+              <div className="rounded-md border border-border/60 bg-muted/30 p-3 text-sm">
+                <div className="flex justify-between gap-3">
+                  <span className="text-muted-foreground">Amount</span>
+                  <span className="font-medium">
+                    {getAmountDisplay(receiptTarget, currency)}
+                  </span>
+                </div>
+                <div className="mt-1 flex justify-between gap-3">
+                  <span className="text-muted-foreground">Reference</span>
+                  <span className="break-all text-right font-mono text-xs">
+                    {receiptTarget.reference ?? "-"}
+                  </span>
+                </div>
+              </div>
+
+              {canManageReceipt && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="attach-receipt-no">Receipt number</Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      id="attach-receipt-no"
+                      value={receiptSlipInput}
+                      onChange={(event) =>
+                        setReceiptSlipInput(event.target.value)
+                      }
+                      placeholder="e.g. 42 or MR-42"
+                      autoComplete="off"
+                    />
+                    <Button
+                      className="shrink-0"
+                      onClick={() => void handleAttachReceipt()}
+                      disabled={isAttachingReceipt}
+                    >
+                      {isAttachingReceipt ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <ReceiptText className="h-4 w-4" />
+                      )}
+                      Attach
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {receiptError && (
+                <Alert variant="destructive">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>{receiptError}</AlertDescription>
+                </Alert>
+              )}
+
+              {canCreateReceipt && (
+                <Button asChild variant="outline" className="w-full">
+                  <Link
+                    href={`/admin/manual-receipt/new?amount=${
+                      receiptTarget.amount ?? ""
+                    }&transactionId=${encodeURIComponent(
+                      receiptTarget.reference?.trim() ?? ""
+                    )}&paymentMode=UPI&lock=1`}
+                  >
+                    <ReceiptText className="h-4 w-4" />
+                    Create new receipt
+                  </Link>
+                </Button>
+              )}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setReceiptTarget(null)}
+              disabled={isAttachingReceipt}
+            >
+              Cancel
             </Button>
           </DialogFooter>
         </DialogContent>

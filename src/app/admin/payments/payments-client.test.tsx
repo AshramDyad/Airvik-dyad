@@ -97,7 +97,8 @@ describe("PaymentsClient", () => {
     });
   });
 
-  it("shows a Receipt link to the prefilled manual-receipt form for an unmatched transaction", async () => {
+  it("opens the receipt popup with a Create-new link to the prefilled form", async () => {
+    const user = userEvent.setup();
     mockFetch({
       rows: [buildTransaction({ reference: "UTR-3", amount: 1500 })],
       links: [],
@@ -105,13 +106,56 @@ describe("PaymentsClient", () => {
 
     render(<PaymentsClient />);
 
-    const receiptLink = await screen.findByRole("link", { name: "Receipt" });
-    const href = receiptLink.getAttribute("href") ?? "";
+    const receiptButton = await screen.findByRole("button", { name: "Receipt" });
+    await user.click(receiptButton);
+
+    const createLink = await screen.findByRole("link", {
+      name: /create new receipt/i,
+    });
+    const href = createLink.getAttribute("href") ?? "";
     expect(href).toContain("/admin/manual-receipt/new");
     expect(href).toContain("amount=1500");
     expect(href).toContain("transactionId=UTR-3");
     expect(href).toContain("paymentMode=UPI");
     expect(href).toContain("lock=1");
+  });
+
+  it("attaches an existing receipt by its slip number", async () => {
+    const user = userEvent.setup();
+    mockedUseAuthContext.mockReturnValue({
+      hasPermission: (permission: Permission) => permission === "update:payment",
+      hasFeatureAccess: (feature: string) =>
+        feature === "donationsCreate" || feature === "donationsManage",
+    } as unknown as ReturnType<typeof useAuthContext>);
+    mockFetch({
+      rows: [buildTransaction({ reference: "UTR-5", amount: 1500 })],
+      links: [],
+      receipts: [{ id: "rcpt-5", slipNo: 42, transactionId: null }],
+    });
+
+    render(<PaymentsClient />);
+
+    const receiptButton = await screen.findByRole("button", { name: "Receipt" });
+    await user.click(receiptButton);
+
+    const input = await screen.findByLabelText("Receipt number");
+    await user.type(input, "MR-42");
+    await user.click(screen.getByRole("button", { name: /^attach$/i }));
+
+    await waitFor(() => {
+      expect(mockedAuthorizedFetch).toHaveBeenCalledWith(
+        "/api/admin/manual-receipts/rcpt-5",
+        expect.objectContaining({ method: "PATCH" })
+      );
+    });
+
+    const patchCall = mockedAuthorizedFetch.mock.calls.find(
+      ([url]) => url === "/api/admin/manual-receipts/rcpt-5"
+    );
+    const requestBody = JSON.parse(
+      (patchCall?.[1]?.body as string | undefined) ?? "{}"
+    );
+    expect(requestBody).toEqual({ transactionId: "UTR-5" });
   });
 
   it("renders a clickable slip-no link and hides both buttons when a receipt exists", async () => {
@@ -137,7 +181,11 @@ describe("PaymentsClient", () => {
 function mockFetch(options: {
   rows: GoogleSheetTransaction[];
   links: StatementBookingLink[];
-  receipts?: Array<{ transactionId: string; slipNo: number }>;
+  receipts?: Array<{
+    id?: string;
+    transactionId: string | null;
+    slipNo: number;
+  }>;
 }) {
   mockedAuthorizedFetch.mockImplementation((input: RequestInfo | URL) => {
     const url = typeof input === "string" ? input : input.toString();
