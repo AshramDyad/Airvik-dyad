@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import type { ReservationStatus } from "@/data/types"
 import { getReservationStatusLabel } from "@/lib/reservations/status"
+import { useDebouncedValue } from "@/hooks/use-debounced-value"
 
 // The three statuses the team filters by every day. Kept minimal on purpose.
 const STATUS_CHIPS: { value: ReservationStatus; label: string }[] = [
@@ -43,11 +44,32 @@ export function DataTableToolbar<TData>({
   const fallbackCount = table.getCoreRowModel().rows.length
   const badgeCount = typeof totalCount === "number" ? totalCount : fallbackCount
 
-  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const value = event.target.value
-    table.setGlobalFilter(value)
+  // Keep the input instant while debouncing the actual search so we fire one
+  // refetch after typing settles instead of one per keystroke.
+  const [inputValue, setInputValue] = React.useState(searchValue)
+  const debouncedValue = useDebouncedValue(inputValue, 300)
+  // Tracks the last value we synced with the table, so we can tell our own
+  // debounced writes apart from an external reset (e.g. a programmatic clear).
+  const lastSyncedValue = React.useRef(searchValue)
+
+  React.useEffect(() => {
+    if (debouncedValue === lastSyncedValue.current) return
+    lastSyncedValue.current = debouncedValue
+    table.setGlobalFilter(debouncedValue)
     table.getColumn("guestName")?.setFilterValue(undefined)
     table.getColumn("bookingId")?.setFilterValue(undefined)
+  }, [debouncedValue, table])
+
+  React.useEffect(() => {
+    // Adopt external changes to the filter without clobbering in-progress typing.
+    if (searchValue !== lastSyncedValue.current) {
+      lastSyncedValue.current = searchValue
+      setInputValue(searchValue)
+    }
+  }, [searchValue])
+
+  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setInputValue(event.target.value)
   }
 
   const handleChipClick = (status: ReservationStatus) => {
@@ -62,7 +84,7 @@ export function DataTableToolbar<TData>({
           <Input
             placeholder="Search guest or booking ID..."
             aria-label="Search by guest name or booking ID"
-            value={searchValue}
+            value={inputValue}
             onChange={handleSearchChange}
             className="w-full sm:w-[280px] lg:w-[340px]"
           />

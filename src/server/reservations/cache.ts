@@ -128,10 +128,21 @@ const fetchReservationPage = async (params: Required<ReservationPageParams>) => 
     .select("*", { count: "exact" });
 
   if (params.query) {
-    const searchTerm = `%${params.query}%`;
-    queryBuilder = queryBuilder.or(
-      `booking_id.ilike.${searchTerm},guest_name.ilike.${searchTerm},guest_email.ilike.${searchTerm}`
-    );
+    // Strip characters that would break the PostgREST or()/ilike filter grammar.
+    const term = params.query.replace(/[,()*%\\]/g, " ").trim();
+    if (term) {
+      // Booking IDs are unique "A<digits>" codes, so match them exactly: a full id
+      // returns just that booking. Anything else searches the guest fields.
+      if (/^A\d+$/i.test(term)) {
+        queryBuilder = queryBuilder.eq("booking_id", term.toUpperCase());
+      } else {
+        queryBuilder = queryBuilder.or(
+          `booking_id.ilike.%${term}%,guest_name.ilike.%${term}%,` +
+            `guest_first_name.ilike.%${term}%,guest_last_name.ilike.%${term}%,` +
+            `guest_email.ilike.%${term}%,guest_phone.ilike.%${term}%`
+        );
+      }
+    }
   }
 
   if (params.statuses.length > 0) {
