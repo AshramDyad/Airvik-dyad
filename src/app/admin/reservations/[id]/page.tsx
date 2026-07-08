@@ -10,6 +10,7 @@ import { GuestDetailsCard } from "./components/GuestDetailsCard";
 import { StayDetailsCard } from "./components/StayDetailsCard";
 import { BillingCard } from "./components/BillingCard";
 import { LinkedReservationsCard } from "./components/LinkedReservationsCard";
+import { AddRoomSegmentCard } from "./components/AddRoomSegmentCard";
 import { ReservationActivityTimeline } from "./components/ReservationActivityTimeline";
 import type { ReservationWithDetails } from "@/app/admin/reservations/components/columns";
 import { calculateReservationTaxAmount } from "@/lib/reservations/calculate-financials";
@@ -282,6 +283,24 @@ export default function ReservationDetailsPage() {
             <StayDetailsCard reservation={stayDetailsReservation} />
             <LinkedReservationsCard
               reservations={groupSummary.reservations}
+            />
+            <AddRoomSegmentCard
+              bookingId={reservation.bookingId}
+              guestId={reservation.guestId}
+              ratePlanId={reservation.ratePlanId}
+              paymentMethod={reservation.paymentMethod}
+              source={reservation.source}
+              bookingDate={reservation.bookingDate}
+              taxEnabledSnapshot={reservation.taxEnabledSnapshot}
+              taxRateSnapshot={reservation.taxRateSnapshot}
+              currentStatus={reservation.status}
+              adultCount={reservation.adultCount}
+              childCount={reservation.childCount}
+              latestCheckOutDate={displayBookingReservations.reduce(
+                (latest, entry) =>
+                  entry.checkOutDate > latest ? entry.checkOutDate : latest,
+                reservation.checkOutDate
+              )}
             />
           </div>
           <div className="min-w-0 space-y-6">
