@@ -229,7 +229,10 @@ function AllocationTable({
         </TableRow>
       </TableHeader>
       <TableBody>
-        {lines.map((line, index) => (
+        {/* Allocation runs oldest-first (FIFO); display newest-first like the payout
+            list, so a split credit's two partial halves sit adjacent across the
+            payout boundary and dates read top-to-bottom newest → oldest. */}
+        {[...lines].reverse().map((line, index) => (
           <TableRow key={`${line.settledEntryId}-${index}`}>
             <TableCell className="whitespace-nowrap text-muted-foreground">
               {format(parseISO(line.settledOn), "dd MMM yyyy")}
