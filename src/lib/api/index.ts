@@ -264,7 +264,7 @@ type RoomTypeWithAmenitiesRow = DbRoomType & {
 
 type UpdateUserProfilePayload = Partial<{
   name: string;
-  roleId: string;
+  roleId: string | null;
 }>;
 
 const toDbRolePayload = (roleData: Partial<Role>): Record<string, unknown> => {

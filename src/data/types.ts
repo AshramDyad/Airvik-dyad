@@ -108,7 +108,7 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  roleId: string;
+  roleId: string | null;
   avatarUrl?: string;
 }
 

@@ -17,8 +17,13 @@ import { useAuthContext } from "@/context/auth-context"
 import { UserFormDialog } from "./user-form-dialog"
 import { canManageRole, findRoleById } from "@/lib/roles"
 
-function UserRoleCell({ roleId }: { roleId: string }) {
+function UserRoleCell({ roleId }: { roleId: string | null }) {
   const { roles } = useDataContext()
+
+  if (!roleId) {
+    return <span className="text-muted-foreground">No role</span>
+  }
+
   const role = roles.find((item) => item.id === roleId)
 
   return <span>{role?.name || "Unknown"}</span>
@@ -34,7 +39,9 @@ function UserActionsCell({
   const { hasPermission, userRole } = useAuthContext()
   const { roles } = useDataContext()
   const targetRole = findRoleById(roles, user.roleId)
-  const canManage = canManageRole(userRole, targetRole)
+  // Unassigned (no role) users sit below everyone: any actor that has a role can manage them.
+  const isUnassigned = !user.roleId
+  const canManage = canManageRole(userRole, targetRole) || (isUnassigned && !!userRole)
 
   return (
     <DropdownMenu>
@@ -79,7 +86,7 @@ export const columns: ColumnDef<User>[] = [
     accessorKey: "roleId",
     header: "Role",
     cell: ({ row }) => (
-      <UserRoleCell roleId={row.getValue("roleId") as string} />
+      <UserRoleCell roleId={row.getValue("roleId") as string | null} />
     ),
   },
   {
