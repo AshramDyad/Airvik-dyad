@@ -1129,6 +1129,23 @@ export const addFolioItem = (itemData: FolioItemInsertPayload) =>
     .select()
     .single();
 
+// Move folio items to another reservation. Used when a room is removed from a
+// booking during an edit: its payment folio rows are re-homed to a surviving
+// room in the same booking so the money is not stranded on a cancelled room.
+export const reassignFolioItems = (
+  folioItemIds: string[],
+  toReservationId: string
+) => {
+  if (folioItemIds.length === 0) {
+    return Promise.resolve({ data: [] as unknown[], error: null });
+  }
+  return supabase
+    .from('folio_items')
+    .update({ reservation_id: toReservationId })
+    .in('id', folioItemIds)
+    .select();
+};
+
 // Reservation Activity Logs (compat helpers)
 export const getReservationActivityLogs = async (reservationId: string) =>
   getAdminActivityLogs({

@@ -50,6 +50,7 @@ import {
   isActiveReservationStatus,
 } from "@/lib/reservations/status";
 import { markReservationAsRemoved } from "@/lib/reservations/filters";
+import { collectPaymentFolioToReassign } from "@/lib/reservations/reassign-payments";
 import { isReservationUuid } from "@/lib/reservations/identifiers";
 import { useCurrencyFormatter } from "@/hooks/use-currency";
 import type { Reservation, RoomType } from "@/data/types";
@@ -145,6 +146,7 @@ export function ReservationEditForm({
   const {
     updateReservation,
     addRoomsToBooking,
+    reassignFolioItems,
     reservations,
     rooms,
     roomTypes,
@@ -730,6 +732,9 @@ export function ReservationEditForm({
       "MMM d, yyyy"
     )}`;
     const revertStack: Array<() => Promise<unknown> | void> = [];
+    // Fallback survivor for re-homed payments when every existing room was
+    // swapped out (no kept room): the first newly created room of the booking.
+    let firstCreatedReservationId: string | null = null;
 
     try {
       const availabilityResults = await Promise.all(
@@ -873,6 +878,7 @@ export function ReservationEditForm({
         });
 
         if (createdReservations.length) {
+          firstCreatedReservationId = createdReservations[0].id;
           revertStack.push(() =>
             Promise.all(
               createdReservations.map((createdReservation) =>
@@ -899,6 +905,27 @@ export function ReservationEditForm({
               holdExpiresAt: null,
             });
           }
+        }
+      }
+
+      // Re-home payments from any removed rooms onto a surviving room so the
+      // money stays with the booking instead of being stranded on a cancelled
+      // room. Charges stay behind with the removed room; only payments move.
+      const paymentReassignments = collectPaymentFolioToReassign(reservationsToCancel);
+      if (paymentReassignments.length > 0) {
+        const survivorReservationId =
+          assignments[0]?.reservation.id ?? firstCreatedReservationId;
+        if (survivorReservationId) {
+          await reassignFolioItems(
+            paymentReassignments.map((entry) => entry.folioItemId),
+            survivorReservationId
+          );
+          revertStack.push(async () => {
+            // Move each payment back to the room it came from.
+            for (const { folioItemId, fromReservationId } of paymentReassignments) {
+              await reassignFolioItems([folioItemId], fromReservationId);
+            }
+          });
         }
       }
 

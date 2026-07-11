@@ -193,6 +193,10 @@ interface DataContextType {
     reservationId: string,
     item: Omit<FolioItem, "id" | "timestamp">
   ) => Promise<void>;
+  reassignFolioItems: (
+    folioItemIds: string[],
+    toReservationId: string
+  ) => Promise<void>;
   assignHousekeeper: (assignment: { roomId: string; userId: string }) => void;
   updateAssignmentStatus: (
     roomId: string,

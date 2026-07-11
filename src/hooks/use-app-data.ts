@@ -1354,6 +1354,24 @@ export function useAppData() {
     });
   };
 
+  // Move folio items (used to re-home a removed room's payments onto a
+  // surviving room). State is refreshed by the caller afterwards, so this only
+  // performs the server-side move and surfaces any error.
+  const reassignFolioItems = async (
+    folioItemIds: string[],
+    toReservationId: string
+  ) => {
+    if (folioItemIds.length === 0) return;
+    const { error } = await api.reassignFolioItems(folioItemIds, toReservationId);
+    if (error) {
+      const message =
+        typeof error === "object" && error && "message" in error
+          ? String((error as { message?: string }).message || "")
+          : "";
+      throw new Error(message || "Failed to move payment to another room.");
+    }
+  };
+
   const addRoomType = async (roomTypeData: Omit<RoomType, "id">) => {
     const { data, error } = await api.upsertRoomType({
       ...roomTypeData,
@@ -1969,6 +1987,7 @@ export function useAppData() {
     updateReservationStatus,
     updateBookingReservationStatus,
     addFolioItem,
+    reassignFolioItems,
     assignHousekeeper,
     updateAssignmentStatus,
     addRoom,
