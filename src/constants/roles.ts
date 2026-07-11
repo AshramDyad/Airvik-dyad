@@ -5,6 +5,7 @@ export const ROLE_NAMES = {
   RECEPTIONIST: "Receptionist",
   HOUSEKEEPER: "Housekeeper",
   RISHIRAJ: "Rishiraj-ji",
+  ACCOUNTANT: "Accountant",
   GUEST: "Guest",
 } as const;
 
@@ -19,11 +20,13 @@ export const ADMIN_ROLES = [
 ] as const;
 
 // Roles allowed into the admin shell UI. Superset of ADMIN_ROLES that also
-// includes view-only roles (like Rishiraj-ji) which are then confined to their
-// own pages by per-page permission gates. Used only by the UI entry gates.
+// includes view-only roles (like Rishiraj-ji and Accountant) which are then
+// confined to their own pages by per-page permission gates. Used only by the
+// UI entry gates.
 export const ADMIN_SHELL_ROLES = [
   ...ADMIN_ROLES,
   ROLE_NAMES.RISHIRAJ,
+  ROLE_NAMES.ACCOUNTANT,
 ] as const;
 
 export type RoleName = typeof ROLE_NAMES[keyof typeof ROLE_NAMES];
