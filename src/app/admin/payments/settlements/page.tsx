@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 };
 
 export default async function AdminPaymentSettlementsPage() {
-  await requirePageFeature("ownerOverview");
+  await requirePageFeature("settlements");
 
   return <SettlementsClient />;
 }

@@ -127,7 +127,7 @@ const navItems: SidebarNavItem[] = [
       {
         label: "Settlements",
         href: "/admin/payments/settlements",
-        feature: "ownerOverview",
+        feature: "settlements",
       },
     ],
   },

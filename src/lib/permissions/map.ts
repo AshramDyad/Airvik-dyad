@@ -30,6 +30,7 @@ export const FEATURE_PERMISSIONS = {
   settings: ["update:setting"],
   users: ["read:user"],
   ownerOverview: ["read:owner_overview"],
+  settlements: ["read:settlement"],
 } as const satisfies Record<string, readonly Permission[]>;
 
 export type PermissionFeature = keyof typeof FEATURE_PERMISSIONS;

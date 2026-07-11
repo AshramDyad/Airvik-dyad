@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   try {
-    await requireFeature(request, "ownerOverview");
+    await requireFeature(request, "settlements");
   } catch (error) {
     if (error instanceof HttpError) {
       return noStoreJson({ message: error.message }, { status: error.status });

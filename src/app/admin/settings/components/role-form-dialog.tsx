@@ -62,6 +62,7 @@ const resourceLabels: Partial<Record<PermissionResource, string>> = {
   review: "Guest Reviews",
   donation: "Donations",
   payment: "Payments",
+  settlement: "Settlements",
 };
 
 export function RoleFormDialog({
