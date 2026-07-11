@@ -1,11 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import {
-  CircleUser,
-  Menu,
-} from "lucide-react";
+import { CircleUser, Menu } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
+import * as React from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -17,48 +15,22 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { SidebarNavContent } from "@/components/layout/sidebar-nav-content";
+import { getAdminNavTitle } from "@/data/admin-nav";
 import { useDataContext } from "@/context/data-context";
 import { useAuthContext } from "@/context/auth-context";
 import { ThemeToggle } from "../theme-toggle";
 import { signOutUser } from "@/context/session-context";
-import type { Permission } from "@/data/types";
-import { getPermissionsForFeature, type PermissionFeature } from "@/lib/permissions/map";
 import Image from "next/image";
 
-type HeaderNavItem = {
-  href: string;
-  label: string;
-  feature?: PermissionFeature;
-  permissions?: Permission[];
-};
-
-const navItems: HeaderNavItem[] = [
-  { href: "/admin", label: "Dashboard", feature: "dashboard" },
-  { href: "/admin/reservations", label: "Reservations", feature: "reservations" },
-  { href: "/admin/calendar", label: "Calendar", feature: "calendar" },
-  { href: "/admin/housekeeping", label: "Housekeeping", feature: "housekeeping" },
-  { href: "/admin/guests", label: "Guests", feature: "guests" },
-  { href: "/admin/feedback", label: "Feedback", feature: "feedback" },
-  { href: "/admin/reports", label: "Reports", feature: "reports" },
-  { href: "/admin/payments", label: "Payments", feature: "payments" },
-] satisfies HeaderNavItem[];
-
 export function Header() {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "";
   const router = useRouter();
   const { property, roles } = useDataContext();
-  const { currentUser, hasAnyPermission } = useAuthContext();
-  const accessibleNavItems = navItems.filter(({ feature, permissions }) => {
-    const featurePermissions = feature ? getPermissionsForFeature(feature) : [];
-    const required = [...featurePermissions, ...(permissions ?? [])];
-    if (required.length === 0) {
-      return true;
-    }
-    return hasAnyPermission(required);
-  });
-  const activeNavItem = accessibleNavItems.find((item) => item.href === pathname);
-  const pageTitle = activeNavItem?.label || "Dashboard";
-  const userRole = roles.find(r => r.id === currentUser?.roleId);
+  const { currentUser } = useAuthContext();
+  const [isMenuOpen, setIsMenuOpen] = React.useState(false);
+  const pageTitle = getAdminNavTitle(pathname);
+  const userRole = roles.find((r) => r.id === currentUser?.roleId);
 
   const handleLogout = async () => {
     await signOutUser();
@@ -67,7 +39,7 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b border-border/50 px-4 shadow-sm lg:h-24 lg:px-8">
-      <Sheet>
+      <Sheet open={isMenuOpen} onOpenChange={setIsMenuOpen}>
         <SheetTrigger asChild>
           <Button
             variant="ghost"
@@ -80,12 +52,12 @@ export function Header() {
         </SheetTrigger>
         <SheetContent
           side="left"
-          className="flex flex-col gap-6 overflow-y-auto rounded-r-3xl border-border/50 bg-card/95 p-0 pb-8 pl-6 pr-4 shadow-lg backdrop-blur"
+          className="flex h-full flex-col gap-0 rounded-r-3xl border-border/50 bg-card/95 p-0 shadow-lg backdrop-blur"
         >
-          <nav className="flex flex-col gap-4">
-            <div className="flex items-center gap-3 border-b border-border/50 p-2">
-              <Link
+          <div className="flex shrink-0 items-center gap-3 border-b border-border/50 px-6 py-2">
+            <Link
               href="/"
+              onClick={() => setIsMenuOpen(false)}
               className="flex items-center gap-3 overflow-hidden text-foreground transition-colors focus-visible:outline-none"
             >
               <Image
@@ -96,19 +68,8 @@ export function Header() {
                 quality={100}
               />
             </Link>
-            </div>
-            <div className="flex flex-col gap-2">
-              {accessibleNavItems.map(({ href, label }) => (
-                <Link
-                  key={href}
-                  href={href}
-                  className="flex items-center gap-3 rounded-2xl px-3 py-2.5 text-base font-medium text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-0"
-                >
-                  {label}
-                </Link>
-              ))}
-            </div>
-          </nav>
+          </div>
+          <SidebarNavContent onNavigate={() => setIsMenuOpen(false)} />
         </SheetContent>
       </Sheet>
 
