@@ -45,15 +45,16 @@ const AshramLinks = [
 type SocialLink = {
   href: string;
   icon: React.ComponentType<{ className?: string }>;
+  label: string;
 };
 
 const socialLinks: SocialLink[] = [
-  { href: "https://facebook.com/Rishikeshdhamofficial", icon: Facebook },
-  { href: "https://instagram.com/rishikeshdhamofficial", icon: Instagram },
-  { href: "https://www.youtube.com/@rishikeshdham", icon: Youtube },
-  { href: "https://x.com/Rishikeshdham", icon: FaXTwitter },
-  { href: "https://www.threads.net/@rishikeshdhamofficial", icon: BsThreads },
-  { href: "https://linkedin.com/company/rishikeshdham", icon: Linkedin },
+  { href: "https://facebook.com/Rishikeshdhamofficial", icon: Facebook, label: "Facebook" },
+  { href: "https://instagram.com/rishikeshdhamofficial", icon: Instagram, label: "Instagram" },
+  { href: "https://www.youtube.com/@rishikeshdham", icon: Youtube, label: "YouTube" },
+  { href: "https://x.com/Rishikeshdham", icon: FaXTwitter, label: "X (Twitter)" },
+  { href: "https://www.threads.net/@rishikeshdhamofficial", icon: BsThreads, label: "Threads" },
+  { href: "https://linkedin.com/company/rishikeshdham", icon: Linkedin, label: "LinkedIn" },
 ];
 
 /**
@@ -110,9 +111,10 @@ export function Footer({ propertyLocation }: FooterProps) {
                     href={link.href}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-muted-foreground hover:text-primary bg-card lg:size-10 size-8 rounded-full flex items-center flex-shrink-0 justify-center transition-colors focus-visible:outline-none"
+                    aria-label={`Visit us on ${link.label}`}
+                    className="text-muted-foreground hover:text-primary bg-card lg:size-10 size-8 rounded-full flex items-center flex-shrink-0 justify-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   >
-                    <link.icon className="lg:size-5 size-4" />
+                    <link.icon className="lg:size-5 size-4" aria-hidden="true" />
                   </a>
                 ))}
               </div>

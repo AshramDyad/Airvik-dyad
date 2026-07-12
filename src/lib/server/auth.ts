@@ -1,6 +1,6 @@
 import type { Permission } from "@/data/types";
 import { createServerSupabaseClient } from "@/integrations/supabase/server";
-import { ADMIN_ROLES, ROLE_NAMES } from "@/constants/roles";
+import { ADMIN_ROLES } from "@/constants/roles";
 import { getPermissionsForFeatures, type PermissionFeature } from "@/lib/permissions/map";
 
 export class HttpError extends Error {
@@ -94,7 +94,7 @@ export async function requireAdminProfile(
   request: Request
 ): Promise<AuthorizedProfile> {
   const context = await resolveProfileContext(request);
-  const allowedRoles = new Set<string>([...ADMIN_ROLES, ROLE_NAMES.GUEST]);
+  const allowedRoles = new Set<string>(ADMIN_ROLES);
 
   if (!context.roleName || !allowedRoles.has(context.roleName)) {
     throw new HttpError(403, "Insufficient permissions");

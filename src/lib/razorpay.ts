@@ -4,7 +4,27 @@ import Razorpay from "razorpay";
 let client: Razorpay | null = null;
 
 export function isRazorpayMockMode(): boolean {
-  return String(process.env.RAZORPAY_MOCK_MODE).toLowerCase() === "true";
+  const enabled = String(process.env.RAZORPAY_MOCK_MODE).toLowerCase() === "true";
+  // Mock mode makes every signature check pass and marks payments "paid" without
+  // money moving. It must never be active in production. Fail hard the first time
+  // it is consulted rather than silently accepting forged payments. See finding M3.
+  if (enabled && process.env.NODE_ENV === "production") {
+    throw new Error(
+      "RAZORPAY_MOCK_MODE must not be enabled in production.",
+    );
+  }
+  return enabled;
+}
+
+// Constant-time comparison of two hex signature strings to avoid a timing
+// side-channel (finding L1). Length mismatch short-circuits to false.
+function signaturesMatch(expected: string, actual: string): boolean {
+  const expectedBuffer = Buffer.from(expected, "utf8");
+  const actualBuffer = Buffer.from(actual, "utf8");
+  if (expectedBuffer.length !== actualBuffer.length) {
+    return false;
+  }
+  return crypto.timingSafeEqual(expectedBuffer, actualBuffer);
 }
 
 function getKeyConfig() {
@@ -53,7 +73,7 @@ export function verifyCheckoutSignature(params: {
   const { keySecret } = getKeyConfig();
   const payload = `${params.orderId}|${params.paymentId}`;
   const expectedSignature = crypto.createHmac("sha256", keySecret).update(payload).digest("hex");
-  return expectedSignature === params.signature;
+  return signaturesMatch(expectedSignature, params.signature);
 }
 
 export function verifyWebhookSignature(body: string, signature: string): boolean {
@@ -66,5 +86,5 @@ export function verifyWebhookSignature(body: string, signature: string): boolean
   }
 
   const computed = crypto.createHmac("sha256", secret).update(body).digest("hex");
-  return computed === signature;
+  return signaturesMatch(computed, signature);
 }

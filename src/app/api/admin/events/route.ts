@@ -1,4 +1,5 @@
 import { createSessionClient } from "@/integrations/supabase/server";
+import { getServerProfile } from "@/lib/server/page-auth";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -23,6 +24,13 @@ export async function POST(request: Request) {
         { error: "Access denied: Unauthenticated user" },
         { status: 401 }
       );
+    }
+
+    // 2b. Explicit permission gate (defense-in-depth beyond RLS). Event banners
+    // are a settings-level surface, matching the admin/uploads route. Finding M4.
+    const profile = await getServerProfile();
+    if (!profile || !profile.permissions.includes("update:setting")) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     // 3. Parse and validate request body

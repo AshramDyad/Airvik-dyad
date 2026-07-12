@@ -216,7 +216,8 @@ export function Header({ propertyLocation }: HeaderProps) {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="text-primary-hover focus-visible:outline-none"
+                  aria-label="Open navigation menu"
+                  className="text-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 >
                   <Menu className="h-6 w-6" />
                 </Button>

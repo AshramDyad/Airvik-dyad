@@ -15,6 +15,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: "Donation not found" }, { status: 404 });
     }
 
+    // Bind the verified order to THIS donation. A valid signature only proves the
+    // (order, payment) pair is genuine on our Razorpay account — without this check
+    // a valid triple from any other order could be replayed to mark an unrelated
+    // (larger) donation as paid. See audit finding H2.
+    if (!donation.razorpayOrderId || donation.razorpayOrderId !== razorpay_order_id) {
+      return NextResponse.json(
+        { message: "Payment does not match this donation." },
+        { status: 400 },
+      );
+    }
+
     const isValid = verifyCheckoutSignature({
       orderId: razorpay_order_id,
       paymentId: razorpay_payment_id,
