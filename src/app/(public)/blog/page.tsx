@@ -1,11 +1,20 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 import { format } from "date-fns";
 import { getPosts } from "@/lib/server/posts";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { buildMetadata } from "@/lib/seo/metadata";
 
 export const dynamic = 'force-dynamic';
+
+export const metadata: Metadata = buildMetadata({
+  title: "News & Stories from the Ashram",
+  description:
+    "Updates, stories and spiritual insights from Sahajanand Wellness ashram on the banks of the Ganges in Rishikesh — yoga, festivals, Ganga Aarti and community seva.",
+  path: "/blog",
+});
 
 export default async function BlogPage() {
   const posts = await getPosts({ status: "published" });
