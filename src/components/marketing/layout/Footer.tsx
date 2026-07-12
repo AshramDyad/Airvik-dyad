@@ -22,7 +22,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { label } from "yet-another-react-lightbox";
 
 const quickLinks = [
   { href: "/book", label: "Rooms" },
@@ -81,9 +80,9 @@ export function Footer({ propertyLocation }: FooterProps) {
       <footer className="border-t shadow-md">
         <div className="container mx-auto px-4 pt-16 pb-5">
           {/* First Row */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 mb-5 gap-10">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 mb-5 gap-x-8 gap-y-10 items-start">
             {/* Column 1: Logo and Subtitle */}
-            <div>
+            <div className="lg:col-span-3">
               <Link
                 href="/"
                 className="flex items-center shrink-0 focus-visible:outline-none"
@@ -120,7 +119,7 @@ export function Footer({ propertyLocation }: FooterProps) {
             </div>
 
             {/* Column 2: Contact Details */}
-            <div className="min-w-0">
+            <div className="min-w-0 lg:col-span-3">
               <h3 className="text-xl font-bold text-foreground mb-6">
                 Contact Us
               </h3>
@@ -130,7 +129,7 @@ export function Footer({ propertyLocation }: FooterProps) {
                   className="flex min-w-0 items-start gap-3 hover:text-primary transition-colors focus-visible:outline-none"
                 >
                   <Mail className="h-5 w-5 text-primary flex-shrink-0" />
-                  <span className="w-full break-all">
+                  <span className="w-full break-words">
                     ashram@swaminarayan.yoga
                   </span>
                 </a>
@@ -139,7 +138,7 @@ export function Footer({ propertyLocation }: FooterProps) {
                   className="flex min-w-0 items-start gap-3 hover:text-primary transition-colors focus-visible:outline-none"
                 >
                   <Phone className="h-5 w-5 text-primary flex-shrink-0" />
-                  <span className="w-full break-all">+91 8511151708</span>
+                  <span className="w-full break-words">+91 8511151708</span>
                 </a>
 
                 <a
@@ -147,7 +146,7 @@ export function Footer({ propertyLocation }: FooterProps) {
                   className="flex min-w-0 items-start gap-3 hover:text-primary transition-colors focus-visible:outline-none"
                 >
                   <div className="h-5 w-5 flex-shrink-0" />
-                  <span className="w-full break-all">+91 9411109999</span>
+                  <span className="w-full break-words">+91 9411109999</span>
                 </a>
 
                 <a
@@ -155,7 +154,7 @@ export function Footer({ propertyLocation }: FooterProps) {
                   className="flex min-w-0 items-start gap-3 hover:text-primary transition-colors focus-visible:outline-none"
                 >
                   <div className="h-5 w-5 flex-shrink-0" />
-                  <span className="w-full break-all">+91 9319825050</span>
+                  <span className="w-full break-words">+91 9319825050</span>
                 </a>
                 {hasLocationMap ? (
                   <button
@@ -177,7 +176,7 @@ export function Footer({ propertyLocation }: FooterProps) {
             </div>
 
             {/* Column 3: Links */}
-            <div>
+            <div className="lg:col-span-2">
               <h3 className="text-xl font-bold text-foreground mb-6">
                 Quick Links
               </h3>
@@ -194,8 +193,8 @@ export function Footer({ propertyLocation }: FooterProps) {
                 ))}
               </ul>
             </div>
-            {/* Column 3: Links */}
-            <div>
+            {/* Column 4: Ashram Links */}
+            <div className="lg:col-span-2">
               <h3 className="text-xl font-bold text-foreground mb-6">
                 Ashram Links
               </h3>
@@ -212,16 +211,16 @@ export function Footer({ propertyLocation }: FooterProps) {
                 ))}
               </ul>
             </div>
-            {/* Column 4: QR Code */}
-            <div>
-              <div className="flex flex-col lg:items-end">
+            {/* Column 5: QR Code */}
+            <div className="sm:col-span-2 lg:col-span-2">
+              <div className="flex flex-col items-center lg:items-end">
                 <Image
                   src="/qr-code-for-website.jpg"
                   alt="Sahajanand Wellness Trust — PNB Scan & Pay QR (UPI: 9313123575m@pnb)"
                   width={1950}
                   height={3816}
                   quality={100}
-                  className="w-full max-w-[280px] h-auto rounded-lg object-contain"
+                  className="w-full max-w-[200px] h-auto rounded-lg object-contain"
                 />
               </div>
             </div>

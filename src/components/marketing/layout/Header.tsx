@@ -4,7 +4,7 @@ import React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Menu, ChevronDown, MapPin } from "lucide-react";
+import { Menu, ChevronDown, MapPin, BookOpen, Eye, Download } from "lucide-react";
 import { FaRegCalendarCheck, FaWhatsapp } from "react-icons/fa6";
 import type { Property } from "@/data/types";
 import {
@@ -34,7 +34,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import { FaRegCalendarAlt } from "react-icons/fa";
 import { FiPhone } from "react-icons/fi";
 
 const navLinks = [
@@ -56,11 +55,13 @@ const navLinks = [
   // { href: "/feedback", label: "Feedback" },
 ];
 
-const whatsappNumber = "919411109999";
+const whatsappNumber = "918511151708";
 const whatsappMessage = encodeURIComponent(
   "Hi! I'd like to know more about staying at Swaminarayan Ashram.",
 );
 const whatsappContactUrl = `https://wa.me/${whatsappNumber}?text=${whatsappMessage}`;
+
+const BROCHURE_PDF_PATH = "/sahajanand-wellness-brochure.pdf";
 
 type HeaderProps = {
   propertyLocation: Pick<Property, "address" | "google_maps_url">;
@@ -68,6 +69,7 @@ type HeaderProps = {
 
 export function Header({ propertyLocation }: HeaderProps) {
   const [isLocationDialogOpen, setIsLocationDialogOpen] = React.useState(false);
+  const [isBrochureDialogOpen, setIsBrochureDialogOpen] = React.useState(false);
   const locationSrc = propertyLocation.google_maps_url?.trim() ?? "";
   const addressText =
     propertyLocation.address?.trim() ||
@@ -114,16 +116,14 @@ export function Header({ propertyLocation }: HeaderProps) {
                 </button>
               ) : null}
 
-              {/* event button */}
+              {/* rooms brochure button */}
               <Button
-                asChild
+                type="button"
+                onClick={() => setIsBrochureDialogOpen(true)}
                 className="bg-primary/40 hover:bg-primary/60 capitalize text-primary-foreground justify-center text-center gap-2"
               >
-                <Link href="/events">
-                  {" "}
-                  <FaRegCalendarAlt />
-                  Events
-                </Link>
+                <BookOpen className="size-4" aria-hidden="true" />
+                Rooms Brochure
               </Button>
             </div>
           </div>
@@ -306,6 +306,44 @@ export function Header({ propertyLocation }: HeaderProps) {
           </div>
         </div>
       </header>
+      <Dialog
+        open={isBrochureDialogOpen}
+        onOpenChange={setIsBrochureDialogOpen}
+      >
+        <DialogContent className="max-w-4xl h-[85vh] flex flex-col gap-0 p-0 overflow-hidden">
+          <DialogHeader className="border-b border-border/40 px-6 py-5">
+            <DialogTitle>Sahajanand Wellness Brochure</DialogTitle>
+            <DialogDescription>
+              View or download our brochure to explore all room types,
+              amenities, and spiritual programs available during your stay.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 min-h-0 px-6 pt-4">
+            <iframe
+              src={BROCHURE_PDF_PATH}
+              className="w-full h-full rounded-xl border border-border/40"
+              title="Sahajanand Wellness Brochure"
+            />
+          </div>
+          <div className="flex flex-col gap-3 px-6 py-4 sm:flex-row sm:justify-end">
+            <Button variant="outline" asChild>
+              <a href={BROCHURE_PDF_PATH} target="_blank" rel="noopener noreferrer">
+                <Eye className="size-4" aria-hidden="true" />
+                Open in New Tab
+              </a>
+            </Button>
+            <Button asChild>
+              <a
+                href={BROCHURE_PDF_PATH}
+                download="sahajanand-wellness-brochure.pdf"
+              >
+                <Download className="size-4" aria-hidden="true" />
+                Download Brochure
+              </a>
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
       {hasLocationMap ? (
         <Dialog
           open={isLocationDialogOpen}
