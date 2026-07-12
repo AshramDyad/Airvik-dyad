@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import { FeedbackForm } from "@/components/feedback/feedback-form";
+import { buildMetadata } from "@/lib/seo/metadata";
 
-export const metadata: Metadata = {
-  title: "Share Feedback | Sahajanand Wellness",
+export const metadata: Metadata = buildMetadata({
+  title: "Share Feedback",
   description:
-    "Send suggestions, praise, complaints, or questions to the Swaminarayan Ashram team.",
-};
+    "Send suggestions, praise, or questions to the Sahajanand Wellness (Swaminarayan Ashram) team in Rishikesh. We value your feedback to improve every guest's stay.",
+  path: "/feedback",
+});
 
 export default function FeedbackPage() {
   return (

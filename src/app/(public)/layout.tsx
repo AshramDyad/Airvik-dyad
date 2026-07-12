@@ -4,6 +4,8 @@ import { Footer } from "@/components/marketing/layout/Footer";
 import { ScrollToTopButton } from "@/components/marketing/layout/ScrollToTopButton";
 import { getServerSupabaseClient } from "@/lib/server/supabase";
 import type { Property } from "@/data/types";
+import { JsonLd } from "@/components/seo/json-ld";
+import { siteGraph } from "@/lib/seo/structured-data";
 
 export default async function PublicLayout({
   children,
@@ -24,6 +26,7 @@ export default async function PublicLayout({
 
   return (
     <>
+      <JsonLd data={siteGraph()} />
       <Header propertyLocation={propertyLocation} />
       <main className="flex-1">{children}</main>
       <Footer propertyLocation={propertyLocation} />

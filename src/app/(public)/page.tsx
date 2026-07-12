@@ -154,7 +154,7 @@ export default function HomePage() {
               variants={itemVariants}
               className="mt-3 text-base sm:text-lg font-medium tracking-wider text-primary-foreground/90 uppercase"
             >
-              WELLNESS - THE BEST GIFT TO YOURSELF
+              Affordable Ashram Stay on the Banks of the Ganges, Rishikesh
             </motion.p>
           </motion.div>
         </div>

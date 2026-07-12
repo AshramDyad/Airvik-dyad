@@ -2,14 +2,18 @@ import Image from "next/image";
 import { format } from "date-fns";
 import { Calendar, MapPin } from "lucide-react";
 
+import type { Metadata } from "next";
 import { getHomepageBanner, getUpcomingEvents } from "@/lib/server/events";
 import { EventCard } from "@/components/marketing/events/EventCard";
 import { Badge } from "@/components/ui/badge";
+import { buildMetadata } from "@/lib/seo/metadata";
 
-export const metadata = {
-  title: "Events | Swaminarayan Ashram",
-  description: "Join us for upcoming spiritual events and celebrations.",
-};
+export const metadata: Metadata = buildMetadata({
+  title: "Events & Festivals",
+  description:
+    "Join upcoming spiritual events, festivals and celebrations at Sahajanand Wellness ashram on the banks of the Ganges in Rishikesh — Ganga Aarti, satsang and community gatherings.",
+  path: "/events",
+});
 
 export default async function EventsPublicPage() {
   const activeEvent = await getHomepageBanner();

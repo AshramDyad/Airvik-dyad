@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import { BrochureDownloadCard } from "@/components/public/brochure-download-card";
+import { buildMetadata } from "@/lib/seo/metadata";
 
-export const metadata: Metadata = {
-  title: "Brochure | Sahajanand Wellness Ashram",
+export const metadata: Metadata = buildMetadata({
+  title: "Brochure",
   description:
-    "Download the Sahajanand Wellness Ashram brochure. Discover rooms, amenities, spiritual programs, and plan your stay in Rishikesh.",
-};
+    "Download the Sahajanand Wellness Ashram brochure. Discover affordable rooms, amenities and spiritual programs, and plan your stay on the banks of the Ganges in Rishikesh.",
+  path: "/brochure",
+});
 
 export default function BrochurePage() {
   return (

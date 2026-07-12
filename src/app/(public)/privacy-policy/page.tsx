@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
+import { buildMetadata } from "@/lib/seo/metadata";
 
-export const metadata: Metadata = {
-  title: "Privacy Policy | Sahajanand Wellness",
+export const metadata: Metadata = buildMetadata({
+  title: "Privacy Policy",
   description:
     "How Sahajanand Wellness (Swaminarayan Ashram) collects, uses, shares, and protects your data, including WhatsApp messaging data.",
-};
+  path: "/privacy-policy",
+  noindex: true,
+});
 
 export default function PrivacyPolicyPage() {
   return (
