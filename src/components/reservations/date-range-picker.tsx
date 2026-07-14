@@ -55,6 +55,8 @@ export function ReservationDateRangePicker({
     setDisplayMonth(new Date());
   }, [value?.from]);
 
+  const popoverOffset = isMobile ? 12 : 40;
+
   const handleSelect = (range: DateRange | undefined) => {
     onChange(range);
     if (range?.from) {
@@ -110,97 +112,86 @@ export function ReservationDateRangePicker({
       <PopoverContent
         side="bottom"
         align="center"
-        sideOffset={4}
-        collisionPadding={12}
-        sticky="always"
-        className="flex max-h-[var(--radix-popover-content-available-height)] w-[calc(100vw-1rem)] max-w-[600px] flex-col overflow-hidden rounded-2xl border border-border/40 bg-white p-0 shadow-xl sm:w-auto sm:max-w-[calc(100vw-1.5rem)]"
+        sideOffset={popoverOffset}
+        className="w-full max-w-[min(100vw-1.5rem,640px)] md:max-w-none border border-border/40 rounded-2xl bg-white shadow-xl px-4 py-4 md:px-5 md:py-4 max-h-[80vh] overflow-y-auto"
       >
-        <div className="flex shrink-0 items-center gap-3 border-b border-border/30 px-4 py-1 text-sm sm:px-5">
-          <div className="grid min-w-0 flex-1 grid-cols-2 gap-3">
-            <div className="min-w-0">
-              <span className="block text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground/80">Check-in</span>
-              <span className="mt-0.5 block truncate text-sm font-medium text-foreground">
-                {value?.from ? format(value.from, "EEE, MMM d") : "Select date"}
-              </span>
-            </div>
-            <div className="min-w-0 text-left sm:text-right">
-              <span className="block text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground/80">Check-out</span>
-              <span className="mt-0.5 block truncate text-sm font-medium text-foreground">
-                {value?.to ? format(value.to, "EEE, MMM d") : "Select date"}
-              </span>
+        <div className="px-5 py-4 border-b border-border/30">
+          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between md:gap-4 text-sm">
+            <div className="flex gap-4 md:flex-row md:flex-1">
+              <div className="flex-1">
+                <span className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground/80">Check-in</span>
+                <span className="mt-1 block text-base font-medium text-foreground">
+                  {value?.from ? format(value.from, "EEE, MMM d") : "Select date"}
+                </span>
+              </div>
+              <div className="flex-1 text-left md:text-right">
+                <span className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground/80">Check-out</span>
+                <span className="mt-1 block text-base font-medium text-foreground">
+                  {value?.to ? format(value.to, "EEE, MMM d") : "Select date"}
+                </span>
+              </div>
             </div>
           </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-8 shrink-0 px-2.5 text-xs text-primary hover:bg-primary/5 hover:text-primary"
-            onClick={handleClear}
-            disabled={!value?.from && !value?.to}
-          >
-            Clear
-          </Button>
         </div>
-        <div className="min-h-0 overflow-y-auto overscroll-contain">
-          <Calendar
-            initialFocus
-            mode="range"
-            month={displayMonth}
-            onMonthChange={setDisplayMonth}
-            selected={value}
-            onSelect={handleSelect}
-            numberOfMonths={isMobile ? 1 : 2}
-            disabled={[
-              ...(allowPastDates
-                ? []
-                : [{ before: new Date(new Date().setHours(0, 0, 0, 0)) }] as Matcher[]),
-              ...blockedRanges
-                .filter((r) => !r.roomTypeId)
-                .map((r) => ({
-                  from: parseISO(r.startDate),
-                  to: parseISO(r.endDate),
-                })) as Matcher[],
-            ]}
-            showOutsideDays
-            className="p-1.5 sm:px-3"
-            classNames={{
-              months: "flex flex-col gap-4 sm:flex-row sm:gap-6 mt-1",
-              month: "space-y-1",
-              caption: "flex h-7 items-center justify-between",
-              caption_label: "text-sm font-semibold text-foreground",
-              nav: "flex items-center gap-1",
-              nav_button:
-                "inline-flex h-6 w-6 items-center justify-center rounded-full border border-border/60 bg-white text-muted-foreground transition-colors hover:border-primary focus-visible:outline-none",
-              nav_button_previous: "order-1",
-              nav_button_next: "order-2",
-              table: "w-full border-collapse",
-              head_row: "flex w-full gap-1",
-              head_cell:
-                "flex h-8 w-8 mt-1 items-center justify-center text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground/70",
-              row: "flex w-full gap-1 mb-1",
-              cell: "relative p-0 text-center text-xs focus-within:relative focus-within:z-20",
-              day: "inline-flex h-8 w-8 items-center justify-center rounded-full border border-transparent text-[0.8125rem] font-medium text-foreground transition-colors hover:border-primary/50 hover:bg-primary/5 focus-visible:border-primary/50 focus-visible:bg-primary/5 aria-selected:hover:bg-primary aria-selected:hover:border-primary",
-              day_selected:
-                "inline-flex h-8 w-8 items-center justify-center rounded-full border border-primary bg-primary text-primary-foreground",
-              day_today:
-                "inline-flex h-8 w-8 items-center justify-center rounded-full border border-dashed border-border/60 text-foreground",
-              day_range_start:
-                "day-range-start inline-flex h-8 w-8 items-center justify-center rounded-full border border-primary bg-primary text-primary-foreground",
-              day_range_end:
-                "day-range-end inline-flex h-8 w-8 items-center justify-center rounded-full border border-primary bg-primary text-primary-foreground",
-              day_range_middle:
-                "day-range-middle inline-flex h-8 w-8 items-center justify-center rounded-full border border-primary/20 bg-primary/10 text-foreground aria-selected:!text-foreground",
-              day_outside: "pointer-events-none select-none opacity-0",
-              day_disabled: "text-muted-foreground opacity-40 hover:border-transparent hover:bg-transparent",
-              day_hidden: "invisible",
-            }}
-          />
-          {(() => {
+        <Calendar
+          initialFocus
+          mode="range"
+          month={displayMonth}
+          onMonthChange={setDisplayMonth}
+          selected={value}
+          onSelect={handleSelect}
+          numberOfMonths={isMobile ? 1 : 2}
+          disabled={[
+            ...(allowPastDates
+              ? []
+              : [{ before: new Date(new Date().setHours(0, 0, 0, 0)) }] as Matcher[]),
+            ...blockedRanges
+              .filter((r) => !r.roomTypeId)
+              .map((r) => ({
+                from: parseISO(r.startDate),
+                to: parseISO(r.endDate),
+              })) as Matcher[],
+          ]}
+          showOutsideDays
+          className="pt-3 pb-4 md:pt-4 md:pb-5 px-1 md:px-5"
+          classNames={{
+            months: "flex flex-col gap-6 sm:flex-row sm:gap-6",
+            month: "space-y-4",
+            caption: "flex items-center justify-between",
+            caption_label: "text-base font-semibold text-foreground",
+            nav: "flex items-center gap-2",
+            nav_button:
+              "inline-flex h-9 w-9 items-center justify-center rounded-full border border-border/60 bg-white text-muted-foreground transition-colors hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30",
+            nav_button_previous: "order-1",
+            nav_button_next: "order-2",
+            table: "w-full border-collapse",
+            head_row: "flex w-full",
+            head_cell:
+              "flex h-11 w-11 items-center justify-center text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground/70",
+            row: "mt-1 flex w-full",
+            cell: "relative p-0 text-center text-sm focus-within:relative focus-within:z-20",
+            day: "inline-flex h-11 w-11 items-center justify-center rounded-full border border-transparent text-sm font-medium text-foreground transition-colors hover:border-primary/50 hover:bg-primary/5 focus-visible:border-primary/50 focus-visible:bg-primary/5 aria-selected:hover:bg-primary aria-selected:hover:border-primary",
+            day_selected:
+              "inline-flex h-11 w-11 items-center justify-center rounded-full bg-primary text-primary-foreground border border-primary",
+            day_today:
+              "inline-flex h-11 w-11 items-center justify-center rounded-full border border-dashed border-border/60 text-foreground",
+            day_range_start:
+              "day-range-start inline-flex h-11 w-11 items-center justify-center rounded-full bg-primary text-primary-foreground border border-primary",
+            day_range_end:
+              "day-range-end inline-flex h-11 w-11 items-center justify-center rounded-full bg-primary text-primary-foreground border border-primary",
+            day_range_middle:
+              "day-range-middle inline-flex h-11 w-11 items-center justify-center rounded-full bg-primary/10 text-foreground aria-selected:!text-foreground border border-primary/20",
+            day_outside: "pointer-events-none opacity-0 select-none",
+            day_disabled: "opacity-40 text-muted-foreground hover:border-transparent hover:bg-transparent",
+            day_hidden: "invisible",
+          }}
+        />
+        {(() => {
           const closures = blockedRanges.filter((r) => !r.roomTypeId);
           if (closures.length === 0) return null;
           return (
-            <div className="mx-3 mb-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-700">
-              <Info aria-hidden="true" className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <div className="flex items-start gap-2 px-5 py-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg mx-1 mb-3">
+              <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
               <div>
                 {closures.length === 1 ? (
                   <span>
@@ -216,7 +207,7 @@ export function ReservationDateRangePicker({
                 ) : (
                   <>
                     <span className="font-medium">Bookings are closed during:</span>
-                    <ul className="mt-1 list-inside list-disc space-y-0.5">
+                    <ul className="mt-1 space-y-0.5 list-disc list-inside">
                       {closures.map((r, i) => (
                         <li key={i}>
                           {format(new Date(r.startDate + "T00:00:00"), "d MMM yyyy")}
@@ -230,7 +221,18 @@ export function ReservationDateRangePicker({
               </div>
             </div>
           );
-          })()}
+        })()}
+        <div className="flex justify-end border-t border-border/20 pt-4 mt-2">
+          <Button
+            type="button"
+            variant="default"
+            size="sm"
+            className="bg-primary text-white hover:bg-primary-hover disabled:opacity-50 text-sm px-4"
+            onClick={handleClear}
+            disabled={!value?.from && !value?.to}
+          >
+            Clear
+          </Button>
         </div>
       </PopoverContent>
     </Popover>
