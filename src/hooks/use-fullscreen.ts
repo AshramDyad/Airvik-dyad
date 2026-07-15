@@ -7,7 +7,7 @@ import * as React from "react";
  * It handles the native Fullscreen API and cross-browser events.
  */
 export function useFullscreen<T extends HTMLElement>() {
-    const [isFullscreen, setIsFullscreen] = React.useState(false);
+    const [fullscreenElement, setFullscreenElement] = React.useState<T | null>(null);
     const elementRef = React.useRef<T>(null);
 
     const toggleFullscreen = React.useCallback(async () => {
@@ -26,7 +26,11 @@ export function useFullscreen<T extends HTMLElement>() {
 
     React.useEffect(() => {
         const handleFullscreenChange = () => {
-            setIsFullscreen(document.fullscreenElement === elementRef.current);
+            setFullscreenElement(
+                document.fullscreenElement === elementRef.current
+                    ? elementRef.current
+                    : null
+            );
         };
 
         document.addEventListener("fullscreenchange", handleFullscreenChange);
@@ -44,7 +48,8 @@ export function useFullscreen<T extends HTMLElement>() {
 
     return {
         elementRef,
-        isFullscreen,
+        fullscreenElement,
+        isFullscreen: fullscreenElement !== null,
         toggleFullscreen,
     };
 }
