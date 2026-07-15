@@ -79,6 +79,44 @@ export function Header({ propertyLocation }: HeaderProps) {
   return (
     <>
       <header className="border-b border-border bg-white sticky top-0 z-40 w-full">
+        {/* Compact mobile topbar */}
+        <div className="bg-primary-hover md:hidden">
+          <nav
+            aria-label="Mobile quick actions"
+            className="container mx-auto flex min-h-14 items-center justify-end px-3 py-2"
+          >
+            <div className="flex items-center justify-end gap-2">
+              <Button
+                type="button"
+                onClick={() => setIsBrochureDialogOpen(true)}
+                className="h-9 gap-1 whitespace-nowrap bg-primary/40 px-3 text-[10px] text-primary-foreground hover:bg-primary/60 sm:h-10 sm:text-xs"
+              >
+                <BookOpen
+                  className="!size-3.5 shrink-0"
+                  aria-hidden="true"
+                />
+                Rooms Brochure
+              </Button>
+              <Button
+                asChild
+                className="h-9 gap-1 whitespace-nowrap bg-[#1ba74e] px-3 text-[10px] font-semibold text-white hover:bg-[#147c39] sm:h-10 sm:text-xs"
+              >
+                <a
+                  href={whatsappContactUrl}
+                  aria-label="Contact us on WhatsApp"
+                  rel="noopener noreferrer"
+                >
+                  <FaWhatsapp
+                    className="!size-3.5 shrink-0"
+                    aria-hidden="true"
+                  />
+                  WhatsApp
+                </a>
+              </Button>
+            </div>
+          </nav>
+        </div>
+
         {/* topbar content */}
         <div className="hidden md:block bg-primary-hover">
           <div className="container mx-auto flex h-14 items-center justify-between px-4">
@@ -310,29 +348,31 @@ export function Header({ propertyLocation }: HeaderProps) {
         open={isBrochureDialogOpen}
         onOpenChange={setIsBrochureDialogOpen}
       >
-        <DialogContent className="max-w-4xl h-[85vh] flex flex-col gap-0 p-0 overflow-hidden">
-          <DialogHeader className="border-b border-border/40 px-6 py-5">
-            <DialogTitle>Sahajanand Wellness Brochure</DialogTitle>
-            <DialogDescription>
+        <DialogContent className="flex h-[calc(100dvh-1.5rem)] w-[calc(100vw-1.5rem)] max-w-4xl flex-col gap-0 overflow-hidden rounded-2xl p-0 sm:h-[85vh] sm:rounded-3xl">
+          <DialogHeader className="shrink-0 border-b border-border/40 px-4 py-4 pr-14 sm:px-6 sm:py-5 sm:pr-16">
+            <DialogTitle className="text-lg leading-tight sm:text-xl">
+              Sahajanand Wellness Brochure
+            </DialogTitle>
+            <DialogDescription className="text-xs leading-relaxed sm:text-sm">
               View or download our brochure to explore all room types,
               amenities, and spiritual programs available during your stay.
             </DialogDescription>
           </DialogHeader>
-          <div className="flex-1 min-h-0 px-6 pt-4">
+          <div className="min-h-0 flex-1 px-4 pt-3 sm:px-6 sm:pt-4">
             <iframe
               src={BROCHURE_PDF_PATH}
-              className="w-full h-full rounded-xl border border-border/40"
+              className="h-full min-h-0 w-full rounded-xl border border-border/40"
               title="Sahajanand Wellness Brochure"
             />
           </div>
-          <div className="flex flex-col gap-3 px-6 py-4 sm:flex-row sm:justify-end">
-            <Button variant="outline" asChild>
+          <div className="flex shrink-0 flex-col gap-2 px-4 py-3 sm:flex-row sm:justify-end sm:gap-3 sm:px-6 sm:py-4">
+            <Button variant="outline" asChild className="w-full sm:w-auto">
               <a href={BROCHURE_PDF_PATH} target="_blank" rel="noopener noreferrer">
                 <Eye className="size-4" aria-hidden="true" />
                 Open in New Tab
               </a>
             </Button>
-            <Button asChild>
+            <Button asChild className="w-full sm:w-auto">
               <a
                 href={BROCHURE_PDF_PATH}
                 download="sahajanand-wellness-brochure.pdf"
