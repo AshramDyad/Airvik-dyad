@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import NextImage from "@/components/ui/cloudflare-image";
 import { useRouter } from "next/navigation";
 import { Users, Bed, Calendar as CalendarIcon } from "lucide-react";
 import { useForm } from "react-hook-form";
@@ -193,10 +194,12 @@ export function RoomDetailsClientPage({
               {photosToShow.map((photo, index) => (
                 <CarouselItem key={index}>
                   <div className="relative aspect-video">
-                    <img
+                    <NextImage
                       src={photo}
                       alt={`${roomType.name} photo ${index + 1}`}
-                      className="absolute inset-0 h-full w-full object-cover"
+                      fill
+                      sizes="(min-width: 768px) 66vw, 100vw"
+                      className="object-cover"
                     />
                   </div>
                 </CarouselItem>

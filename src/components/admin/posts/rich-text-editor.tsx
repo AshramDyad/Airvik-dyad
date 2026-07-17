@@ -98,7 +98,7 @@ export function RichTextEditor({
       const file = (e.target as HTMLInputElement).files?.[0];
       if (file) {
         try {
-          const url = await uploadFile(file);
+          const url = await uploadFile(file, "posts");
           if (url && editor) {
             editor.chain().focus().setImage({ src: url }).run();
           }

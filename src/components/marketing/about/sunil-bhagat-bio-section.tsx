@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import Image from "@/components/ui/cloudflare-image";
 import { motion } from "framer-motion";
 
 export function SunilBhagatBioSection() {
@@ -44,7 +44,6 @@ export function SunilBhagatBioSection() {
               alt="Sunil Bhagat"
               width={500}
               height={600}
-              quality={100}
               className="rounded-lg shadow-xl w-full h-80
                object-cover"
             />

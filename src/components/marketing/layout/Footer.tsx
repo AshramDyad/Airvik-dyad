@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import Image from "next/image";
+import Image from "@/components/ui/cloudflare-image";
 import Link from "next/link";
 import {
   Mail,
@@ -93,7 +93,6 @@ export function Footer({ propertyLocation }: FooterProps) {
                   alt="SahajAnand Wellness Logo"
                   width={360}
                   height={160}
-                  quality={100}
                   priority
                   sizes="(max-width: 640px) 128px, (max-width: 1024px) 176px, (max-width: 1280px) 208px, 240px"
                   className="h-auto w-52 xl:w-56 max-w-full"
@@ -219,7 +218,6 @@ export function Footer({ propertyLocation }: FooterProps) {
                   alt="Sahajanand Wellness Trust — PNB Scan & Pay QR (UPI: 9313123575m@pnb)"
                   width={1950}
                   height={3816}
-                  quality={100}
                   className="w-full max-w-[200px] h-auto rounded-lg object-contain"
                 />
               </div>
@@ -242,7 +240,6 @@ export function Footer({ propertyLocation }: FooterProps) {
                 src="apexture-logo.svg"
                 width={120}
                 height={40}
-                quality={100}
               ></Image>
             </Link>
           </div>

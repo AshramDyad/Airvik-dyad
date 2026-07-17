@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import Image from "@/components/ui/cloudflare-image";
 import Link from "next/link";
 import { Pencil, Trash } from "lucide-react";
 import { useTransition } from "react";

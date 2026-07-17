@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import Image from "@/components/ui/cloudflare-image";
 import { motion, type Variants } from "framer-motion";
 import { MessageSquareHeart, HeartHandshake } from "lucide-react";
 import { FeatureCard } from "@/components/marketing/home/FeatureCard";
@@ -114,7 +114,6 @@ export default function HomePage() {
           alt="Rishikesh temple by the Ganges"
           fill
           style={{ objectFit: "cover" }}
-          quality={100}
           priority
         />
         <div className="absolute inset-0 bg-black/40" />
@@ -134,7 +133,6 @@ export default function HomePage() {
                 alt="Sahajanand Wellness"
                 width={400}
                 height={400}
-                quality={100}
                 className="size-32 sm:size-52 object-contain"
               />
             </motion.div>

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
+import Image from "@/components/ui/cloudflare-image";
 import { format } from "date-fns";
 import { Pencil, Trash, AlertCircle } from "lucide-react";
 import { useTransition } from "react";

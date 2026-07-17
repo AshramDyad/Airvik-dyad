@@ -21,7 +21,7 @@ import { useDataContext } from "@/context/data-context";
 import { useAuthContext } from "@/context/auth-context";
 import { ThemeToggle } from "../theme-toggle";
 import { signOutUser } from "@/context/session-context";
-import Image from "next/image";
+import Image from "@/components/ui/cloudflare-image";
 
 export function Header() {
   const pathname = usePathname() ?? "";
@@ -65,7 +65,6 @@ export function Header() {
                 alt="admin-logo"
                 height={160}
                 width={160}
-                quality={100}
               />
             </Link>
           </div>

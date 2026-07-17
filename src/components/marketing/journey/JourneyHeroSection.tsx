@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import Image from "@/components/ui/cloudflare-image";
 import { motion } from "framer-motion";
 
 export function JourneyHeroSection() {
@@ -11,7 +11,6 @@ export function JourneyHeroSection() {
         alt="Sahajanand Ashram Journey"
         fill
         style={{ objectFit: "cover" }}
-        quality={100}
         priority
       />
       <div className="absolute inset-0 bg-black/40" />

@@ -1,18 +1,20 @@
 "use client";
 
 import * as React from "react";
-import Image from "next/image";
+import Image from "@/components/ui/cloudflare-image";
 import { Upload, X, Star, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { uploadFile } from "@/lib/api";
+import type { UploadCategory } from "@/lib/uploads";
 
 interface MultiImageUploadProps {
   value: string[];
   onChange: (value: string[]) => void;
   mainPhotoUrl?: string;
   onSetMain?: (url: string) => void;
+  category: UploadCategory;
 }
 
 export function MultiImageUpload({
@@ -20,6 +22,7 @@ export function MultiImageUpload({
   onChange,
   mainPhotoUrl,
   onSetMain,
+  category,
 }: MultiImageUploadProps) {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = React.useState(false);
@@ -32,7 +35,7 @@ export function MultiImageUpload({
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       if (file && file.type.startsWith("image/")) {
-        uploadPromises.push(uploadFile(file));
+        uploadPromises.push(uploadFile(file, category));
       } else {
         toast.error("Invalid file type", {
           description: `File "${file.name}" is not an image.`,

@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import Image from "next/image";
+import Image from "@/components/ui/cloudflare-image";
 import { Users } from "lucide-react";
 import { format } from "date-fns";
 import {

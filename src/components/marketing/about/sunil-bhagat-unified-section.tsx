@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import Image from "@/components/ui/cloudflare-image";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useRef, useEffect } from "react";
 
@@ -194,7 +194,6 @@ export function SunilBhagatUnifiedSection() {
                         alt={currentTab.title}
                         fill
                         className="object-cover"
-                        quality={90}
                         sizes="(max-width: 1024px) 100vw, 40vw"
                       />
                     </motion.div>

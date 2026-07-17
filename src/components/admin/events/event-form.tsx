@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import Image from "next/image";
+import Image from "@/components/ui/cloudflare-image";
 import { useRouter } from "next/navigation";
 
 import type { EventBanner } from "@/data/types";
@@ -129,7 +129,7 @@ export function EventForm({ initialData }: Props) {
                 <FormItem>
                   <FormLabel>Banner image</FormLabel>
                   <FormControl>
-                    <ImageUpload value={field.value} onChange={field.onChange} />
+                    <ImageUpload category="events" value={field.value} onChange={field.onChange} />
                   </FormControl>
                   <FormDescription>Use a landscape image for best results.</FormDescription>
                   <FormMessage />

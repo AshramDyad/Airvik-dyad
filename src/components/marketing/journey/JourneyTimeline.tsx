@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import Image from "next/image";
+import Image from "@/components/ui/cloudflare-image";
 import { cn } from "@/lib/utils";
 import { FaArrowRightLong } from "react-icons/fa6";
 

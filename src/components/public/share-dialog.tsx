@@ -20,7 +20,7 @@ import {
 import { Button } from "@/components/ui/button";
 import type { RoomType } from "@/data/types";
 import { getRoomTypeImageUrl } from "@/lib/room-type-images";
-import Image from "next/image";
+import Image from "@/components/ui/cloudflare-image";
 
 interface ShareDialogProps {
   open: boolean;

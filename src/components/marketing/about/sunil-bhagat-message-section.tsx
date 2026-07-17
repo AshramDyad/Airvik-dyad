@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import Image from "@/components/ui/cloudflare-image";
 import { motion } from "framer-motion";
 
 export function SunilBhagatMessageSection() {
@@ -60,7 +60,6 @@ export function SunilBhagatMessageSection() {
               alt="Swami&apos;s Message"
               width={500}
               height={600}
-              quality={100}
               className="rounded-lg shadow-xl w-full h-auto object-cover"
             />
           </motion.div>

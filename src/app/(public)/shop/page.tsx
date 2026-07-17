@@ -1,6 +1,6 @@
 'use client';
 
-import Image from 'next/image';
+import Image from "@/components/ui/cloudflare-image";
 import { useEffect, useMemo, useState } from 'react';
 
 import { ShopFilters } from '@/components/marketing/shop/FiltersSheet';

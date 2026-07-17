@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import Image from "next/image";
+import Image from "@/components/ui/cloudflare-image";
 import { ActivityCard } from "@/components/marketing/home/ActivityCard";
 import { motion, type Variants } from "framer-motion";
 
@@ -174,7 +174,6 @@ export function WelcomeSection() {
                 alt="Sahajanand Wellness"
                 width={40}
                 height={40}
-                quality={100}
                 className="w-10 h-10 object-contain"
               />
             </div>

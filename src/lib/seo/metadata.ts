@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { SITE, SITE_URL, ALL_KEYWORDS, absoluteUrl } from "@/config/site";
+import { absoluteMediaUrl } from "@/lib/cloudflare-images";
 
 type BuildMetadataArgs = {
   /** Page title WITHOUT the brand suffix (template adds it). Omit for the homepage default. */
@@ -28,7 +29,7 @@ export function buildMetadata({
   noindex = false,
 }: BuildMetadataArgs): Metadata {
   const url = absoluteUrl(path);
-  const imageUrl = image.startsWith("http") ? image : absoluteUrl(image);
+  const imageUrl = absoluteMediaUrl(image);
 
   return {
     title,

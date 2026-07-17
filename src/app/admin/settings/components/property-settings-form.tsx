@@ -171,7 +171,11 @@ export function PropertySettingsForm() {
                 <FormItem>
                   <FormLabel>Logo</FormLabel>
                   <FormControl>
-                    <ImageUpload value={field.value || ""} onChange={field.onChange} />
+                    <ImageUpload
+                      category="properties"
+                      value={field.value || ""}
+                      onChange={field.onChange}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
