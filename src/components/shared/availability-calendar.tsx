@@ -140,7 +140,9 @@ export function AvailabilityCalendar() {
   const [useLegacyView, setUseLegacyView] = React.useState(false);
   const [rpcError, setRpcError] = React.useState<Error | null>(null);
   const [visibleMonths, setVisibleMonths] = React.useState(1);
-  const { elementRef, isFullscreen, toggleFullscreen } = useFullscreen<HTMLDivElement>();
+  const { elementRef, fullscreenElement, isFullscreen, toggleFullscreen } =
+    useFullscreen<HTMLDivElement>();
+  const reservationPopoverContainer = fullscreenElement ?? undefined;
 
   const monthSequence = React.useMemo(() => {
     return Array.from({ length: visibleMonths }, (_, index) =>
@@ -315,6 +317,12 @@ export function AvailabilityCalendar() {
                       size="icon"
                       className="hidden h-14 w-14 rounded-xl border border-border/60 bg-card/60 flex-shrink-0 sm:flex"
                       onClick={toggleFullscreen}
+                      aria-label={
+                        isFullscreen
+                          ? "Exit fullscreen calendar"
+                          : "Enter fullscreen calendar"
+                      }
+                      aria-pressed={isFullscreen}
                     >
                       {isFullscreen ? (
                         <Minimize2 className="h-5 w-5" />
@@ -491,6 +499,9 @@ export function AvailabilityCalendar() {
                                 activeReservationCardId={activeReservationCardId}
                                 onActiveReservationCardChange={
                                   setActiveReservationCardId
+                                }
+                                reservationPopoverContainer={
+                                  reservationPopoverContainer
                                 }
                               />
                             ))}

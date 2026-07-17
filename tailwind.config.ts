@@ -25,6 +25,8 @@ export default {
           foreground: "hsl(var(--primary-foreground))",
         },
         "primary-hover": "hsl(var(--primary-hover))",
+        whatsapp: "hsl(var(--whatsapp))",
+        "whatsapp-hover": "hsl(var(--whatsapp-hover))",
         secondary: {
           DEFAULT: "hsl(var(--secondary))",
           foreground: "hsl(var(--secondary-foreground))",

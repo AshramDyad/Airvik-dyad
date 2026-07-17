@@ -106,6 +106,7 @@ interface ReservationHoverCardProps {
   cardId?: string;
   activeCardId?: string | null;
   onActiveCardChange?: (cardId: string | null) => void;
+  portalContainer?: HTMLElement | null;
 }
 
 const BOOKING_ID_VISIBLE_LENGTH = 7 as const;
@@ -248,6 +249,7 @@ export function ReservationHoverCard({
   cardId,
   activeCardId,
   onActiveCardChange,
+  portalContainer,
 }: ReservationHoverCardProps) {
   const { reservations, guests, rooms, roomTypes } = useDataContext();
   const [uncontrolledOpen, setUncontrolledOpen] = React.useState(false);
@@ -678,6 +680,7 @@ export function ReservationHoverCard({
     <Popover open={isOpen} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>{triggerChild}</PopoverTrigger>
       <PopoverContent
+        portalContainer={portalContainer}
         className="w-80 max-w-[calc(100vw-1.5rem)] max-h-[26rem] overflow-hidden rounded-xl p-3 sm:w-96"
         align="start"
         side="bottom"

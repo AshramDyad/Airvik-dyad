@@ -42,6 +42,7 @@ interface RoomTypeRowProps {
   selectedCell?: { roomTypeId: string; date: string } | null;
   activeReservationCardId?: string | null;
   onActiveReservationCardChange?: (cardId: string | null) => void;
+  reservationPopoverContainer?: HTMLElement | null;
 }
 
 export function RoomTypeRow({
@@ -53,6 +54,7 @@ export function RoomTypeRow({
   selectedCell,
   activeReservationCardId,
   onActiveReservationCardChange,
+  reservationPopoverContainer,
 }: RoomTypeRowProps) {
   const [isExpanded, setIsExpanded] = React.useState(false);
   const { roomType, availability } = data;
@@ -310,6 +312,7 @@ export function RoomTypeRow({
                         cardId={reservationCardId}
                         activeCardId={activeReservationCardId}
                         onActiveCardChange={onActiveReservationCardChange}
+                        portalContainer={reservationPopoverContainer}
                       >
                         <button
                           type="button"
