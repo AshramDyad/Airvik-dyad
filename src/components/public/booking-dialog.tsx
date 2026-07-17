@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import NextImage from "@/components/ui/cloudflare-image";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -265,10 +266,12 @@ export function BookingDialog({
                     <div key={rt.id}>
                       <div className="flex gap-4">
                         <div className="w-24 h-16 relative rounded-md overflow-hidden flex-shrink-0">
-                          <img
+                          <NextImage
                             src={getRoomTypeImageUrl(rt)}
                             alt={rt.name}
-                            className="absolute inset-0 h-full w-full object-cover"
+                            fill
+                            sizes="96px"
+                            className="object-cover"
                           />
                         </div>
                         <div className="flex-1">

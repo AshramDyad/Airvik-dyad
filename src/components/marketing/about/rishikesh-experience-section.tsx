@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import { ExperienceCard } from "./experience-card";
 import { Sparkles, Backpack, Landmark } from "lucide-react";
-import Image from "next/image";
+import Image from "@/components/ui/cloudflare-image";
 
 const experiences = [
   {
@@ -53,7 +53,6 @@ export function RishikeshExperienceSection() {
         alt="Ganga river in Rishikesh"
         fill
         className="object-cover"
-        quality={90}
       />
       <div className="absolute inset-0 bg-black/40" />
       <div className="relative container mx-auto px-4">

@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import NextImage from "@/components/ui/cloudflare-image";
 import {
   notFound,
   useParams,
@@ -527,24 +528,30 @@ export default function RoomDetailsPage() {
           {/* Desktop Grid Gallery */}
           <div className="hidden md:grid md:grid-cols-4 md:grid-rows-2 gap-2 h-[80vh] max-h-[500px] overflow-hidden">
             <div className="md:col-span-2 md:row-span-2 relative">
-              <img
+              <NextImage
                 src={photosToShow[0]}
                 alt={`${roomType.name} photo 1`}
-                className="absolute inset-0 w-full h-full object-cover rounded-lg"
+                fill
+                sizes="(min-width: 768px) 50vw, 100vw"
+                className="object-cover rounded-lg"
               />
             </div>
             <div className="md:col-span-2 relative">
-              <img
+              <NextImage
                 src={photosToShow[1]}
                 alt={`${roomType.name} photo 2`}
-                className="absolute inset-0 w-full h-full object-cover rounded-lg"
+                fill
+                sizes="(min-width: 768px) 50vw, 100vw"
+                className="object-cover rounded-lg"
               />
             </div>
             <div className="md:col-span-2 relative">
-              <img
+              <NextImage
                 src={photosToShow[2]}
                 alt={`${roomType.name} photo 3`}
-                className="absolute inset-0 w-full h-full object-cover rounded-lg"
+                fill
+                sizes="(min-width: 768px) 50vw, 100vw"
+                className="object-cover rounded-lg"
               />
             </div>
           </div>
@@ -557,10 +564,12 @@ export default function RoomDetailsPage() {
                   {photosToShow.map((photo, index) => (
                     <CarouselItem key={index}>
                       <div className="aspect-video relative rounded-lg overflow-hidden">
-                        <img
+                        <NextImage
                           src={photo}
                           alt={`${roomType.name} photo ${index + 1}`}
-                          className="absolute inset-0 w-full h-full object-cover"
+                          fill
+                          sizes="100vw"
+                          className="object-cover"
                         />
                       </div>
                     </CarouselItem>

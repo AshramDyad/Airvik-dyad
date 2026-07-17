@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import Image from "next/image";
+import Image from "@/components/ui/cloudflare-image";
 import { motion } from "framer-motion";
 
 type VideoItem = {
@@ -136,7 +136,6 @@ export function VideoSection() {
               alt="Meditation symbol"
               width={40}
               height={40}
-              quality={100}
               className="w-10 h-10 object-contain"
             />
           </div>

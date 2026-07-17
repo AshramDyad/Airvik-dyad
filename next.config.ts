@@ -15,6 +15,16 @@ if (supabaseUrl) {
 
 const legacySupabaseHostname = "fflsucsqhjjuozmfwpho.supabase.co";
 const supabasePathname = "/storage/v1/object/public/images/**";
+const cloudflareR2PublicUrl = process.env.NEXT_PUBLIC_CLOUDFLARE_R2_PUBLIC_URL;
+let cloudflareR2Hostname: string | undefined;
+
+if (cloudflareR2PublicUrl) {
+  try {
+    cloudflareR2Hostname = new URL(cloudflareR2PublicUrl).hostname;
+  } catch {
+    cloudflareR2Hostname = undefined;
+  }
+}
 
 const buildSupabasePattern = (hostname: string): RemotePattern => ({
   protocol: "https",
@@ -33,6 +43,15 @@ if (!supabaseHostname || supabaseHostname !== legacySupabaseHostname) {
   imageRemotePatterns.push(buildSupabasePattern(legacySupabaseHostname));
 }
 
+if (cloudflareR2Hostname) {
+  imageRemotePatterns.push({
+    protocol: "https",
+    hostname: cloudflareR2Hostname,
+    port: "",
+    pathname: "/**",
+  });
+}
+
 imageRemotePatterns.push({
   protocol: "https",
   hostname: "i.ytimg.com",
@@ -47,7 +66,9 @@ const nextConfig: NextConfig = {
   },
   images: {
     remotePatterns: imageRemotePatterns,
-    unoptimized: true,
+    deviceSizes: [320, 480, 640, 768, 960, 1200, 1600, 1920],
+    imageSizes: [32, 48, 64, 96, 128, 256],
+    qualities: [75],
   },
   webpack: (config) => {
     if (process.env.NODE_ENV === "development") {

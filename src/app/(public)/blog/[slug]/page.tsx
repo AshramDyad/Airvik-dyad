@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import Image from "next/image";
+import Image from "@/components/ui/cloudflare-image";
 import { format } from "date-fns";
 import { getPostBySlug } from "@/lib/server/posts";
 import { Badge } from "@/components/ui/badge";

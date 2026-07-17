@@ -601,9 +601,13 @@ type UploadResponse = {
   url: string;
 };
 
-export const uploadFile = async (file: File): Promise<string> => {
+export const uploadFile = async (
+  file: File,
+  category: import("@/lib/uploads").UploadCategory,
+): Promise<string> => {
   const formData = new FormData();
   formData.append("file", file);
+  formData.append("category", category);
 
   const response = await fetch("/api/admin/uploads", {
     method: "POST",

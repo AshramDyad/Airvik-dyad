@@ -10,6 +10,7 @@ import { SessionProvider } from "@/context/session-context";
 import { AuthProvider } from "@/context/auth-context";
 import { DataProvider } from "@/context/data-context";
 import { StickyBookingButton } from "@/components/sticky-booking-button";
+import { absoluteMediaUrl } from "@/lib/cloudflare-images";
 
 const fontSans = Inter({
   subsets: ["latin"],
@@ -63,7 +64,7 @@ export const metadata: Metadata = {
       "Budget-friendly ashram & dharmshala stays on the banks of the Ganges in Rishikesh. Daily yoga, meditation, Ganga Aarti and vegetarian meals.",
     url: SITE_URL,
     locale: "en_IN",
-    images: [{ url: SITE.ogImage, width: 1200, height: 630, alt: SITE.name }],
+    images: [{ url: absoluteMediaUrl(SITE.ogImage), width: 1200, height: 630, alt: SITE.name }],
   },
   twitter: {
     card: "summary_large_image",
@@ -71,7 +72,7 @@ export const metadata: Metadata = {
       "Affordable Ashram & Hotel in Rishikesh | Sahajanand Wellness",
     description:
       "Budget-friendly ashram & dharmshala stays on the banks of the Ganges in Rishikesh. Daily yoga, meditation & Ganga Aarti.",
-    images: [SITE.ogImage],
+    images: [absoluteMediaUrl(SITE.ogImage)],
   },
   icons: {
     icon: "/favicon.ico",

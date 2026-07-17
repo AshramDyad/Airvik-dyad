@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import Image from "@/components/ui/cloudflare-image";
 
 /**
  * Renders a static amenities hero with an image overlay, headline, and subtitle.
@@ -18,7 +18,6 @@ export function AmenitiesHeroSection() {
           alt="Handpicked pieces for mindful living"
           fill
           priority
-          quality={100}
           className="object-cover"
         />
       </div>

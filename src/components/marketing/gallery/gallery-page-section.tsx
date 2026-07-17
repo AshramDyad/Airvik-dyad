@@ -6,7 +6,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import Image from "next/image";
+import Image from "@/components/ui/cloudflare-image";
 import { motion } from "framer-motion";
 import Lightbox, { type Slide } from "yet-another-react-lightbox";
 import DownloadPlugin from "yet-another-react-lightbox/plugins/download";

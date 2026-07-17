@@ -96,7 +96,7 @@ export function ReviewForm({ initialData }: ReviewFormProps) {
                 <FormItem>
                   <FormLabel>Reviewer image</FormLabel>
                   <FormControl>
-                    <ImageUpload value={field.value} onChange={field.onChange} />
+                    <ImageUpload category="reviews" value={field.value} onChange={field.onChange} />
                   </FormControl>
                   <FormDescription>Square photos work best.</FormDescription>
                   <FormMessage />

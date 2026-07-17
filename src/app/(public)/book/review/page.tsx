@@ -12,7 +12,7 @@ import {
   parseISO,
 } from "date-fns";
 import { toast } from "sonner";
-import Image from "next/image";
+import Image from "@/components/ui/cloudflare-image";
 import { Bed, Loader2, Moon, Users } from "lucide-react";
 
 import { useDataContext } from "@/context/data-context";

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Image from "next/image";
+import Image from "@/components/ui/cloudflare-image";
 import { X } from "lucide-react";
 
 import type { EventBanner } from "@/data/types";

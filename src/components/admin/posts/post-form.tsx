@@ -30,7 +30,7 @@ import { Category, Post } from "@/data/types";
 import { createPost, updatePost, uploadFile } from "@/lib/api";
 import { useAuthContext } from "@/context/auth-context";
 import { Image as ImageIcon, Loader2, X } from "lucide-react";
-import Image from "next/image";
+import Image from "@/components/ui/cloudflare-image";
 import { Textarea } from "@/components/ui/textarea";
 
 const postSchema = z.object({
@@ -88,7 +88,7 @@ export function PostForm({
 
     setIsUploading(true);
     try {
-      const url = await uploadFile(file);
+      const url = await uploadFile(file, "posts");
       form.setValue("featured_image", url);
     } catch (error) {
       console.error("Upload failed:", error);

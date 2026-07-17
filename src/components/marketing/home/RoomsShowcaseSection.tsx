@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import Image from "next/image";
+import Image from "@/components/ui/cloudflare-image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { useDataContext } from "@/context/data-context";

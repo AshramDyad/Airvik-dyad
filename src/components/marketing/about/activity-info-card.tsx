@@ -1,4 +1,4 @@
-import Image from "next/image";
+import Image from "@/components/ui/cloudflare-image";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 

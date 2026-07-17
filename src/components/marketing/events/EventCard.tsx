@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import Image from "@/components/ui/cloudflare-image";
 import { format } from "date-fns";
 import { Calendar, Clock } from "lucide-react";
 import type { EventBanner } from "@/data/types";

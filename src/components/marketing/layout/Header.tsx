@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import Image from "next/image";
+import Image from "@/components/ui/cloudflare-image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Menu, ChevronDown, MapPin, BookOpen, Eye, Download } from "lucide-react";
@@ -179,7 +179,6 @@ export function Header({ propertyLocation }: HeaderProps) {
               alt="SahajAnand Wellness Logo"
               width={360}
               height={160}
-              quality={100}
               priority
               sizes="(max-width: 640px) 128px, (max-width: 1024px) 176px, (max-width: 1280px) 208px, 240px"
               className="h-auto w-44 xl:w-56 max-w-full"

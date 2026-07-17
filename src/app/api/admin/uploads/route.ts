@@ -2,7 +2,12 @@ import { NextResponse } from "next/server";
 
 import { createSessionClient } from "@/integrations/supabase/server";
 import { getServerProfile } from "@/lib/server/page-auth";
-import { uploadToImagesBucket } from "@/lib/server/storage";
+import { uploadImageToR2 } from "@/lib/server/r2-storage";
+import {
+  isAllowedImageMimeType,
+  isUploadCategory,
+  MAX_ADMIN_IMAGE_BYTES,
+} from "@/lib/uploads";
 
 const unauthorized = NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -30,17 +35,29 @@ export async function POST(request: Request) {
 
   const formData = await request.formData();
   const rawFile = formData.get("file");
+  const rawCategory = formData.get("category");
 
   if (!rawFile || !(rawFile instanceof File)) {
     return NextResponse.json({ error: "Missing file" }, { status: 400 });
   }
 
-  if (!rawFile.type?.startsWith("image/")) {
-    return NextResponse.json({ error: "Only image uploads are allowed" }, { status: 400 });
+  if (!isUploadCategory(rawCategory)) {
+    return NextResponse.json({ error: "Invalid upload category" }, { status: 400 });
+  }
+
+  if (!isAllowedImageMimeType(rawFile.type)) {
+    return NextResponse.json(
+      { error: "Only JPEG, PNG, WebP, and GIF uploads are allowed" },
+      { status: 400 },
+    );
+  }
+
+  if (rawFile.size > MAX_ADMIN_IMAGE_BYTES) {
+    return NextResponse.json({ error: "Image must be 5 MB or smaller" }, { status: 413 });
   }
 
   try {
-    const url = await uploadToImagesBucket(rawFile, { prefix: "event-banners" });
+    const url = await uploadImageToR2(rawFile, rawCategory);
     return NextResponse.json({ url });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Upload failed";

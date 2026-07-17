@@ -204,6 +204,7 @@ export function RoomFormDialog({
                   <FormLabel>Room-Specific Photos</FormLabel>
                   <FormControl>
                     <MultiImageUpload
+                      category="rooms"
                       value={field.value || []}
                       onChange={field.onChange}
                     />

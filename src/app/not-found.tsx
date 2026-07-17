@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
+import Image from "@/components/ui/cloudflare-image";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 
@@ -12,7 +12,6 @@ export default function NotFound() {
         src="/shajanad.png"
         alt=""
         fill
-        quality={100}
         priority
         className="object-cover"
       />

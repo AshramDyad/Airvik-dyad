@@ -11,6 +11,7 @@ import {
   SOCIAL_PROFILES,
   absoluteUrl,
 } from "@/config/site";
+import { absoluteMediaUrl } from "@/lib/cloudflare-images";
 
 const ORG_ID = `${SITE_URL}/#organization`;
 const LODGING_ID = `${SITE_URL}/#lodging`;
@@ -40,8 +41,8 @@ export function organizationSchema() {
     legalName: SITE.legalName,
     alternateName: SITE.alternateNames,
     url: SITE_URL,
-    logo: absoluteUrl("/logo.png"),
-    image: absoluteUrl(SITE.ogImage),
+    logo: absoluteMediaUrl("/logo.png"),
+    image: absoluteMediaUrl(SITE.ogImage),
     email: SITE.email,
     telephone: SITE.primaryPhone,
     foundingDate: SITE.foundingYear,
@@ -60,11 +61,11 @@ export function lodgingBusinessSchema() {
     description: SITE.description,
     url: SITE_URL,
     image: [
-      absoluteUrl("/home-img.png"),
-      absoluteUrl("/rishikesh-ahsram.jpeg"),
-      absoluteUrl(SITE.ogImage),
+      absoluteMediaUrl("/home-img.png"),
+      absoluteMediaUrl("/rishikesh-ahsram.jpeg"),
+      absoluteMediaUrl(SITE.ogImage),
     ],
-    logo: absoluteUrl("/logo.png"),
+    logo: absoluteMediaUrl("/logo.png"),
     telephone: SITE.primaryPhone,
     email: SITE.email,
     priceRange: SITE.priceRange,
@@ -150,7 +151,7 @@ export function productSchema(product: {
     "@type": "Product",
     name: product.name,
     description: product.description,
-    image: product.image ? absoluteUrl(product.image) : undefined,
+    image: product.image ? absoluteMediaUrl(product.image) : undefined,
     sku: product.sku,
     brand: { "@type": "Brand", name: SITE.name },
     ...offer,
@@ -172,7 +173,7 @@ export function blogPostingSchema(post: {
     "@type": "BlogPosting",
     headline: post.title,
     description: post.description,
-    image: post.image ? absoluteUrl(post.image) : absoluteUrl(SITE.ogImage),
+    image: post.image ? absoluteMediaUrl(post.image) : absoluteMediaUrl(SITE.ogImage),
     datePublished: post.datePublished,
     dateModified: post.dateModified ?? post.datePublished,
     author: { "@type": "Organization", name: post.authorName ?? SITE.name, "@id": ORG_ID },

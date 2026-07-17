@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import Image from "next/image";
+import Image from "@/components/ui/cloudflare-image";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 
@@ -78,7 +78,6 @@ export function GallerySection() {
               alt="Sahajanand Wellness"
               width={40}
               height={40}
-              quality={100}
               className="w-10 h-10 object-contain"
             />
           </div>

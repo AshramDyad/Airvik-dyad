@@ -21,7 +21,7 @@ import {
   isNavPathActive,
   isNavSubItemActive,
 } from "@/data/admin-nav";
-import Image from "next/image";
+import Image from "@/components/ui/cloudflare-image";
 
 interface SidebarProps {
   isCollapsed: boolean;
@@ -55,7 +55,6 @@ export function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
                 alt="admin-logo"
                 height={200}
                 width={200}
-                quality={100}
               />
             </Link>
           )}

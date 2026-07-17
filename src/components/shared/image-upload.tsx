@@ -1,19 +1,21 @@
 "use client";
 
 import * as React from "react";
-import Image from "next/image";
+import Image from "@/components/ui/cloudflare-image";
 import { Upload, X, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { uploadFile } from "@/lib/api";
+import type { UploadCategory } from "@/lib/uploads";
 
 interface ImageUploadProps {
   value: string;
   onChange: (value: string) => void;
+  category: UploadCategory;
 }
 
-export function ImageUpload({ value, onChange }: ImageUploadProps) {
+export function ImageUpload({ value, onChange, category }: ImageUploadProps) {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
@@ -22,7 +24,7 @@ export function ImageUpload({ value, onChange }: ImageUploadProps) {
     if (file && file.type.startsWith("image/")) {
       setIsLoading(true);
       try {
-        const permanentUrl = await uploadFile(file);
+        const permanentUrl = await uploadFile(file, category);
         onChange(permanentUrl);
       } catch (error) {
         toast.error("Upload failed", {

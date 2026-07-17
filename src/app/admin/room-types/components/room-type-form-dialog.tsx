@@ -260,6 +260,7 @@ export function RoomTypeFormDialog({
                   <FormLabel>Photos</FormLabel>
                   <FormControl>
                     <MultiImageUpload
+                      category="room-types"
                       value={field.value || []}
                       onChange={field.onChange}
                       mainPhotoUrl={form.watch("mainPhotoUrl")}

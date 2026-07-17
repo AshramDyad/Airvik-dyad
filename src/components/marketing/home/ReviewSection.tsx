@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import Image from "@/components/ui/cloudflare-image";
 import React from "react";
 import Autoplay from "embla-carousel-autoplay";
 import {
