@@ -99,7 +99,7 @@ export function Header({ propertyLocation }: HeaderProps) {
               </Button>
               <Button
                 asChild
-                className="h-9 gap-1 whitespace-nowrap bg-[#1ba74e] px-3 text-[10px] font-semibold text-white hover:bg-[#147c39] sm:h-10 sm:text-xs"
+                className="h-9 gap-1 whitespace-nowrap bg-whatsapp px-3 text-[10px] font-semibold text-white hover:bg-whatsapp-hover sm:h-10 sm:text-xs"
               >
                 <a
                   href={whatsappContactUrl}
@@ -235,7 +235,7 @@ export function Header({ propertyLocation }: HeaderProps) {
             </Button>
             <Button
               asChild
-              className="bg-[#1ba74e] text-white hover:bg-[#147c39] font-semibold capitalize gap-2"
+              className="bg-whatsapp text-white hover:bg-whatsapp-hover font-semibold capitalize gap-2"
             >
               <a
                 href={whatsappContactUrl}
@@ -326,7 +326,7 @@ export function Header({ propertyLocation }: HeaderProps) {
                   <SheetClose asChild>
                     <Button
                       asChild
-                      className="bg-[#1ba74e] text-white hover:bg-[#147c39] font-semibold capitalize gap-2"
+                      className="bg-whatsapp text-white hover:bg-whatsapp-hover font-semibold capitalize gap-2"
                     >
                       <a
                         href={whatsappContactUrl}

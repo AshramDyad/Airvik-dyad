@@ -8,6 +8,16 @@ const { portalContainerSpy } = vi.hoisted(() => ({
 vi.mock("@radix-ui/react-popover", async () => {
   const React = await import("react");
 
+  const Content = React.forwardRef<
+    HTMLDivElement,
+    React.HTMLAttributes<HTMLDivElement>
+  >(({ children, ...props }, ref) => (
+    <div ref={ref} {...props}>
+      {children}
+    </div>
+  ));
+  Content.displayName = "Content";
+
   return {
     Root: ({ children }: { children: React.ReactNode }) => children,
     Trigger: ({ children }: { children: React.ReactNode }) => children,
@@ -22,14 +32,7 @@ vi.mock("@radix-ui/react-popover", async () => {
       portalContainerSpy(container);
       return children;
     },
-    Content: React.forwardRef<
-      HTMLDivElement,
-      React.HTMLAttributes<HTMLDivElement>
-    >(({ children, ...props }, ref) => (
-      <div ref={ref} {...props}>
-        {children}
-      </div>
-    )),
+    Content,
   };
 });
 

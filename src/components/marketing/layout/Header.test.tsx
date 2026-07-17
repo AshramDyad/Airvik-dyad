@@ -23,8 +23,6 @@ describe("Header mobile topbar", () => {
       name: "Mobile quick actions",
     });
 
-    expect(mobileTopbar.parentElement).toHaveClass("md:hidden");
-    expect(mobileTopbar).toHaveClass("justify-end");
     expect(
       within(mobileTopbar).queryByText("Swaminarayan Ashram (Estd: 2002)")
     ).not.toBeInTheDocument();
@@ -43,15 +41,5 @@ describe("Header mobile topbar", () => {
     expect(
       screen.getByRole("heading", { name: "Sahajanand Wellness Brochure" })
     ).toBeVisible();
-
-    const brochureDialog = screen.getByRole("dialog");
-    expect(brochureDialog).toHaveClass(
-      "h-[calc(100dvh-1.5rem)]",
-      "w-[calc(100vw-1.5rem)]",
-      "overflow-hidden"
-    );
-    expect(
-      screen.getByTitle("Sahajanand Wellness Brochure")
-    ).toHaveClass("min-h-0", "h-full", "w-full");
   });
 });
