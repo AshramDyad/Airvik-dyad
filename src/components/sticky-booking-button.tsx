@@ -13,6 +13,7 @@ import { CalendarCheck, Bed, ChevronRight } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { useDataContext } from "@/context/data-context";
 import { cn } from "@/lib/utils";
+import { trackEvent } from "@/lib/analytics";
 
 const featuredRoomMatchers = [
   {
@@ -120,7 +121,13 @@ export function StickyBookingButton() {
                   <React.Fragment key={room.name}>
                     <Link
                       href={room.href}
-                      onClick={() => setIsOpen(false)}
+                      onClick={() => {
+                        trackEvent("book_click", {
+                          location: "sticky_room",
+                          room: room.name,
+                        });
+                        setIsOpen(false);
+                      }}
                       className="group flex items-center justify-between gap-3 p-3 rounded-xl hover:bg-primary/5 border border-transparent hover:border-primary/40 transition-all duration-200 outline-none focus:outline-none focus-visible:outline-none"
                     >
                       <div className="flex items-center gap-3 min-w-0">
@@ -152,7 +159,13 @@ export function StickyBookingButton() {
                 size="lg" 
                 className="w-full font-semibold"
               >
-                <Link href="/book" onClick={() => setIsOpen(false)}>
+                <Link
+                  href="/book"
+                  onClick={() => {
+                    trackEvent("book_click", { location: "sticky_all_rooms" });
+                    setIsOpen(false);
+                  }}
+                >
                   View All Rooms
                 </Link>
               </Button>

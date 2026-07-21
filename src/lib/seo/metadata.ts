@@ -41,7 +41,7 @@ export function buildMetadata({
     openGraph: {
       type: "website",
       siteName: SITE.name,
-      title: title ? `${title} | ${SITE.titleSuffix}` : `${SITE.shortName} | Rishikesh`,
+      title: title ? `${title} | ${SITE.titleSuffix}` : SITE.shortName,
       description,
       url,
       locale: "en_IN",
@@ -49,7 +49,7 @@ export function buildMetadata({
     },
     twitter: {
       card: "summary_large_image",
-      title: title ? `${title} | ${SITE.titleSuffix}` : `${SITE.shortName} | Rishikesh`,
+      title: title ? `${title} | ${SITE.titleSuffix}` : SITE.shortName,
       description,
       images: [imageUrl],
     },

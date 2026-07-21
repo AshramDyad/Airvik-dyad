@@ -10,21 +10,35 @@ export const SITE_URL = "https://www.swaminarayan.yoga";
 
 /** Brand / organization identity */
 export const SITE = {
-  /** Legal / primary name */
+  /**
+   * Legal / organization name (used as schema.org `name` on the NGO/Organization
+   * node and as the OG siteName). The public-facing SEARCH brand people actually
+   * use — "Shree Swaminarayan Ashram Rishikesh" — is foregrounded in titles/H1s
+   * via `titleSuffix`/`shortName` and leads the `alternateName` list below.
+   */
   name: "Sahajanand Wellness",
-  /** Common short name used in titles */
-  shortName: "Sahajanand Ashram",
-  /** Alternate names people search for */
+  /** Search brand — foregrounded in page titles/H1s (the name with the review equity) */
+  shortName: "Shree Swaminarayan Ashram Rishikesh",
+  /**
+   * Alternate names people search for. The market/Google identity
+   * "Shree Swaminarayan Ashram Rishikesh" (1,300+ reviews) leads intentionally.
+   */
   alternateNames: [
+    "Shree Swaminarayan Ashram Rishikesh",
+    "Swaminarayan Ashram Rishikesh",
     "Sahajanand Ashram",
     "Sahajanand Wellness Ashram",
     "Rishikesh Dham",
-    "Swaminarayan Ashram Rishikesh",
   ],
   legalName: "Sahajanand Wellness (Registered Religious Trust)",
   url: SITE_URL,
-  /** Title suffix applied to every page via the metadata template (kept short to avoid SERP truncation) */
-  titleSuffix: "Sahajanand Wellness",
+  /**
+   * Brand tail appended to every page title via the metadata template
+   * (`%s | ${titleSuffix}`). Kept to the searched ashram name but WITHOUT the
+   * "Rishikesh" geo (page titles already carry the locality) to avoid doubling
+   * and SERP truncation.
+   */
+  titleSuffix: "Shree Swaminarayan Ashram",
   description:
     "Sahajanand Wellness is an affordable spiritual ashram and dharmshala on the banks of the Ganges at Muni Ki Reti, Rishikesh. Simple, budget-friendly stays with daily yoga, meditation, Ganga Aarti, langar and Vedic classes for pilgrims and travellers.",
   email: "ashram@swaminarayan.yoga",
@@ -73,6 +87,8 @@ export const KEYWORDS = {
     "affordable ashram in Rishikesh",
     "ashram in Rishikesh",
     "budget ashram Rishikesh",
+    // Both spellings — GSC + JustDial's category use "dharamshala"; keep "dharmshala" too.
+    "dharamshala in Rishikesh",
     "dharmshala in Rishikesh",
     "ashram stay Rishikesh",
     "yoga ashram Rishikesh",

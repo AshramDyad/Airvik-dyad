@@ -10,6 +10,7 @@ import { SessionProvider } from "@/context/session-context";
 import { AuthProvider } from "@/context/auth-context";
 import { DataProvider } from "@/context/data-context";
 import { StickyBookingButton } from "@/components/sticky-booking-button";
+import { GoogleAnalytics } from "@next/third-parties/google";
 
 const fontSans = Inter({
   subsets: ["latin"],
@@ -26,12 +27,16 @@ const fontMono = JetBrains_Mono({
   variable: "--font-mono",
 });
 
+// GA stays OFF until NEXT_PUBLIC_GA_ID is set in the Vercel Production env.
+const GA_ID = process.env.NEXT_PUBLIC_GA_ID;
+
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
     // Homepage default (the `/` route is a client component and inherits this).
+    // Foregrounds the searched brand "Shree Swaminarayan Ashram Rishikesh".
     default:
-      "Affordable Ashram & Hotel in Rishikesh | Sahajanand Wellness, Muni Ki Reti",
+      "Shree Swaminarayan Ashram Rishikesh | Budget Ganga-Side Stay",
     // Every child page that sets a short title gets the brand suffix appended.
     template: `%s | ${SITE.titleSuffix}`,
   },
@@ -58,9 +63,9 @@ export const metadata: Metadata = {
     type: "website",
     siteName: SITE.name,
     title:
-      "Affordable Ashram & Hotel in Rishikesh | Sahajanand Wellness, Muni Ki Reti",
+      "Shree Swaminarayan Ashram Rishikesh | Budget Ganga-Side Stay",
     description:
-      "Budget-friendly ashram & dharmshala stays on the banks of the Ganges in Rishikesh. Daily yoga, meditation, Ganga Aarti and vegetarian meals.",
+      "Budget-friendly ashram & dharamshala stays on the banks of the Ganges in Rishikesh. Daily yoga, meditation, Ganga Aarti and vegetarian meals.",
     url: SITE_URL,
     locale: "en_IN",
     images: [{ url: SITE.ogImage, width: 1200, height: 630, alt: SITE.name }],
@@ -68,9 +73,9 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title:
-      "Affordable Ashram & Hotel in Rishikesh | Sahajanand Wellness",
+      "Shree Swaminarayan Ashram Rishikesh | Budget Ganga-Side Stay",
     description:
-      "Budget-friendly ashram & dharmshala stays on the banks of the Ganges in Rishikesh. Daily yoga, meditation & Ganga Aarti.",
+      "Budget-friendly ashram & dharamshala stays on the banks of the Ganges in Rishikesh. Daily yoga, meditation & Ganga Aarti.",
     images: [SITE.ogImage],
   },
   icons: {
@@ -105,6 +110,7 @@ export default function RootLayout({
             </AuthProvider>
           </SessionProvider>
         </ThemeProvider>
+        {GA_ID ? <GoogleAnalytics gaId={GA_ID} /> : null}
       </body>
     </html>
   );

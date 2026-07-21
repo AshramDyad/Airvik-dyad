@@ -7,7 +7,13 @@
 > This repo (`Airvik-dyad`, Next.js App Router on Vercel) **is** the source of
 > https://www.swaminarayan.yoga. All SEO fixes below are real code in this repo.
 
-**Last updated:** 2026-07-12 · **Branch:** `seo/on-site-foundation`
+**Last updated:** 2026-07-21 · **Branch:** `seo/on-site-foundation` → growth program starting on a new branch
+
+> **2026-07-21 update:** First GSC data is in and a full 6-agent research pass produced a
+> phased growth program. See the **"2026-07-21 — GSC baseline + growth program"** section
+> near the bottom and the full plan at `~/.claude/plans/prancy-dancing-octopus.md`.
+> **Note:** the GA4 wiring described in section D below was *never committed and has been lost* —
+> it is being redone as the first step of the new program.
 
 ---
 
@@ -155,6 +161,61 @@ Defined in `src/config/site.ts` → `KEYWORDS`.
 - **No FAQPage / HowTo schema.** Titles ≤ ~60 chars where possible.
 - Keep this file updated: append an "Iteration log" entry each time you change SEO based on data.
 
+---
+
+## 2026-07-21 — GSC baseline + growth program (6-agent research pass)
+
+**First GSC export** (`~/Downloads/swaminarayan.yoga-Performance-on-Search-2026-07-21.xlsx`,
+Jul 11–19, a 9-day day-zero baseline): **216 clicks · 3,391 impr · 6.4% CTR · pos 9.0**,
+~97% India / ~92% mobile. Branded is won (89% of clicks); non-branded is the whole growth gap
+(49% of impressions, 11% of clicks, stuck on page 2). Full baseline saved to agent memory
+`gsc-baseline-jul-2026.md`.
+
+**Already fixed:** non-www → www is now a **308 permanent redirect** (Vercel platform-level,
+verified on the wire). Index consolidation expected over 2–4 weeks.
+
+### Owner-confirmed decisions (thread through everything)
+- **Brand naming = FOREGROUND the Ashram name.** Titles/H1s/schema lead with
+  **"Shree Swaminarayan Ashram Rishikesh"** (the name with 1,303+ JustDial reviews);
+  "Sahajanand Wellness" stays as the trust/legal name (`legalName` + schema `name`, but the
+  Ashram name goes FIRST in `alternateName` and in visible titles/H1s). `titleSuffix` in
+  `site.ts` changes accordingly.
+- **Domains:** `swaminarayanyoga.com` = OURS, ranks for "swaminarayan ashram rishikesh" →
+  **301-redirect to `www.swaminarayan.yoga`** (at its host/registrar). `sunilbhagat.com` = OURS
+  (founder) → **sameAs only, no redirect**. `shreeswaminarayanashramrishikesh.com` = **FAKE /
+  impersonation** (copies our /about-us title) → owner files a Google spam/impersonation report +
+  trademark takedown; we do not link it.
+
+### Real bugs found (code)
+- **`/book/rooms/[id]`** is `"use client"` → inherits `/book`'s metadata: every room URL ships a
+  **duplicate title/description + a canonical pointing at `/book`** while marked indexable →
+  explains the pos 25–41 room pages. Fix = server-component wrapper with `generateMetadata` +
+  server-side room fetch (copy the `blog/[slug]` pattern) + `HotelRoom`/`Offer` JSON-LD.
+- **`/rooms`** → `next.config.ts` 307-redirects it into `/admin/rooms` (robots-blocked login
+  wall). Indexed showing duplicate homepage copy, 308 impr / **0 clicks** / pos 7.5. Fix =
+  remove that redirect, **301 `/rooms` → `/book`**.
+- **Fake `4.8 (127 reviews)`** hardcoded in `RoomDetailsClientPage.tsx` — remove (integrity).
+
+### Phased plan (by ROI) — full detail in `~/.claude/plans/prancy-dancing-octopus.md`
+- **Phase 1 (technical + CTR + schema):** redo GA4 (C0); fix `/book/rooms/[id]` (C1) + room
+  schema; security headers; remove `images.unoptimized`; narrow middleware; ISR; fix `/rooms`
+  (C3); CTR title/meta rewrites (foreground Ashram name, price/numeral anchors); wire
+  `BreadcrumbList` (P0), `ImageObject` + `/sitemap-images.xml` (targets the "photos" query),
+  `Event` on `/events`, `Product` on `/shop`. **Do NOT** add `AggregateRating` on our own
+  `LodgingBusiness` (out-of-policy) — the review-star win comes via GBP.
+- **Phase 2 (content):** SERP-overlap shows 3 separate spaces. Build `/dharamshala-in-rishikesh`
+  (fastest win, pos 4→1-3), pillar `/ashram-stay-in-rishikesh` (6 cluster-B queries on one page),
+  blog `ganga-aarti-timings-rishikesh`, then spokes. Add "dharamshala" spelling to `KEYWORDS`.
+- **Phase 3 (local):** entity/name split is the #1 zero-click driver — GBP category "Ashram",
+  merge duplicate listings, dispute the Yappe wrong-address listing, reconcile NAP, review-gen
+  flow (QR + post-stay WhatsApp/email), citation sync (protect JustDial's 1,303 reviews).
+- **Phase 4 (GEO):** on-site AI-readiness already good; the unlock is **off-site brand mentions**
+  (currently zero — no Wikidata/Reddit/listicle presence). Robots need no change. Founder
+  `Person` schema. **Hindi deferred** (validated: ranks pos 1.5–2.8, 0 clicks, no Hindi content).
+
 ## Iteration log
 - **2026-07-12** — Phase 1 on-site foundation implemented & verified (this document). Off-site,
   content, and analytics work still pending.
+- **2026-07-21** — First GSC baseline captured; 6 domain-expert research agents run; phased
+  growth program written and approved (see section above + plan file). Execution started with
+  Step 0 (baseline/docs) and Phase 1 first slice.

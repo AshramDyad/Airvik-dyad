@@ -22,6 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { trackEvent } from "@/lib/analytics";
 
 const quickLinks = [
   { href: "/book", label: "Rooms" },
@@ -136,6 +137,12 @@ export function Footer({ propertyLocation }: FooterProps) {
                 <a
                   href="tel:+918511151708"
                   className="flex min-w-0 items-start gap-3 hover:text-primary transition-colors focus-visible:outline-none"
+                  onClick={() =>
+                    trackEvent("call_click", {
+                      phone: "+918511151708",
+                      location: "footer",
+                    })
+                  }
                 >
                   <Phone className="h-5 w-5 text-primary flex-shrink-0" />
                   <span className="w-full break-words">+91 8511151708</span>
@@ -144,6 +151,12 @@ export function Footer({ propertyLocation }: FooterProps) {
                 <a
                   href="tel:+919411109999"
                   className="flex min-w-0 items-start gap-3 hover:text-primary transition-colors focus-visible:outline-none"
+                  onClick={() =>
+                    trackEvent("call_click", {
+                      phone: "+919411109999",
+                      location: "footer",
+                    })
+                  }
                 >
                   <div className="h-5 w-5 flex-shrink-0" />
                   <span className="w-full break-words">+91 9411109999</span>
@@ -152,6 +165,12 @@ export function Footer({ propertyLocation }: FooterProps) {
                 <a
                   href="tel:+919319825050"
                   className="flex min-w-0 items-start gap-3 hover:text-primary transition-colors focus-visible:outline-none"
+                  onClick={() =>
+                    trackEvent("call_click", {
+                      phone: "+919319825050",
+                      location: "footer",
+                    })
+                  }
                 >
                   <div className="h-5 w-5 flex-shrink-0" />
                   <span className="w-full break-words">+91 9319825050</span>
