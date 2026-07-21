@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { FiPhone } from "react-icons/fi";
+import { trackEvent } from "@/lib/analytics";
 
 const navLinks = [
   { href: "/", label: "Home" },
@@ -105,6 +106,9 @@ export function Header({ propertyLocation }: HeaderProps) {
                   href={whatsappContactUrl}
                   aria-label="Contact us on WhatsApp"
                   rel="noopener noreferrer"
+                  onClick={() =>
+                    trackEvent("whatsapp_click", { location: "header_mobile_topbar" })
+                  }
                 >
                   <FaWhatsapp
                     className="!size-3.5 shrink-0"
@@ -128,6 +132,12 @@ export function Header({ propertyLocation }: HeaderProps) {
               <a
                 href="tel:+918511151708"
                 className="text-sm font-medium text-white/90 flex items-center gap-1.5 hover:text-white transition-colors"
+                onClick={() =>
+                  trackEvent("call_click", {
+                    phone: "+918511151708",
+                    location: "header_topbar",
+                  })
+                }
               >
                 <FiPhone className="size-5" aria-hidden="true" />
                 +91 8511151708
@@ -138,6 +148,12 @@ export function Header({ propertyLocation }: HeaderProps) {
               <a
                 href="tel:+919411109999"
                 className="text-sm font-medium text-white/90 flex items-center gap-1.5 hover:text-white transition-colors"
+                onClick={() =>
+                  trackEvent("call_click", {
+                    phone: "+919411109999",
+                    location: "header_topbar",
+                  })
+                }
               >
                 +91 9411109999
               </a>
@@ -227,7 +243,12 @@ export function Header({ propertyLocation }: HeaderProps) {
               asChild
               className="bg-primary hover:bg-primary-hover capitalize text-primary-foreground justify-center text-center gap-2"
             >
-              <Link href="/book">
+              <Link
+                href="/book"
+                onClick={() =>
+                  trackEvent("book_click", { location: "header_desktop" })
+                }
+              >
                 {" "}
                 <FaRegCalendarCheck className="size-4" />
                 book now
@@ -241,6 +262,9 @@ export function Header({ propertyLocation }: HeaderProps) {
                 href={whatsappContactUrl}
                 aria-label="Contact us on WhatsApp"
                 rel="noopener noreferrer"
+                onClick={() =>
+                  trackEvent("whatsapp_click", { location: "header_desktop" })
+                }
               >
                 <FaWhatsapp className="h-4 w-4" aria-hidden="true" />
                 Whatapp
@@ -317,7 +341,12 @@ export function Header({ propertyLocation }: HeaderProps) {
                       asChild
                       className="bg-primary hover:bg-primary-hover text-primary-foreground flex w-full justify-center text-center gap-2"
                     >
-                      <Link href="/book">
+                      <Link
+                        href="/book"
+                        onClick={() =>
+                          trackEvent("book_click", { location: "header_mobile" })
+                        }
+                      >
                         <FaRegCalendarCheck className="h-4 w-4" />
                         Book Now
                       </Link>
@@ -332,6 +361,9 @@ export function Header({ propertyLocation }: HeaderProps) {
                         href={whatsappContactUrl}
                         aria-label="Contact us on WhatsApp"
                         rel="noopener noreferrer"
+                        onClick={() =>
+                          trackEvent("whatsapp_click", { location: "header_mobile" })
+                        }
                       >
                         <FaWhatsapp className="h-4 w-4" aria-hidden="true" />
                         Ashram Connect

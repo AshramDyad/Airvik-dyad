@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { formatCurrency } from "@/lib/currency";
 import { storeDonationReceipt } from "@/lib/donations/receipt-storage";
 import type { DonationReceipt } from "@/lib/donations/receipt-storage";
+import { trackEvent } from "@/lib/analytics";
 
 type CreateOrderResponse = {
   mock?: boolean;
@@ -108,6 +109,11 @@ export function DonationForm({ currency }: DonationFormProps) {
   const onSubmit = handleSubmit(async (values) => {
     try {
       setIsSubmitting(true);
+      trackEvent("donate_click", {
+        amount: values.amount,
+        frequency: values.frequency,
+        currency: values.currency,
+      });
       const response = await fetch("/api/donations/create-order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
