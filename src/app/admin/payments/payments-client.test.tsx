@@ -47,9 +47,7 @@ describe("PaymentsClient", () => {
   it("renders a clickable booking link for a matched transaction", async () => {
     mockFetch({
       rows: [buildTransaction({ reference: "UTR-1" })],
-      links: [
-        { reference: "UTR-1", reservationId: "res-1", bookingId: "A100001" },
-      ],
+      links: [buildBookingLink({ reference: "UTR-1" })],
     });
 
     render(<PaymentsClient />);
@@ -158,6 +156,72 @@ describe("PaymentsClient", () => {
     expect(requestBody).toEqual({ transactionId: "UTR-5" });
   });
 
+  it("lets an Administration user unattach an attached payment", async () => {
+    const user = userEvent.setup();
+    mockAdministration();
+    mockFetch({
+      rows: [buildTransaction({ reference: "UTR-1", amount: 2500 })],
+      links: [buildBookingLink({ reference: "UTR-1", folioItemId: "folio-9" })],
+    });
+
+    render(<PaymentsClient />);
+
+    const unattachButton = await screen.findByRole("button", {
+      name: "Unattach",
+    });
+    await user.click(unattachButton);
+    await user.click(screen.getByRole("button", { name: /yes, delete it/i }));
+
+    await waitFor(() => {
+      expect(mockedAuthorizedFetch).toHaveBeenCalledWith(
+        "/api/admin/payment-statement/unattach",
+        expect.objectContaining({ method: "POST" })
+      );
+    });
+
+    const unattachCall = mockedAuthorizedFetch.mock.calls.find(
+      ([url]) => url === "/api/admin/payment-statement/unattach"
+    );
+    const requestBody = JSON.parse(
+      (unattachCall?.[1]?.body as string | undefined) ?? "{}"
+    );
+    expect(requestBody).toEqual({ folioItemId: "folio-9" });
+  });
+
+  it("hides Unattach for an auto-matched payment even for Administration", async () => {
+    mockAdministration();
+    mockFetch({
+      rows: [buildTransaction({ reference: "UTR-1" })],
+      links: [buildBookingLink({ reference: "UTR-1", canUnattach: false })],
+    });
+
+    render(<PaymentsClient />);
+
+    await screen.findByRole("link", { name: "A100001" });
+    expect(
+      screen.queryByRole("button", { name: "Unattach" })
+    ).not.toBeInTheDocument();
+  });
+
+  it("hides Unattach from a non-Administration role that can attach", async () => {
+    mockedUseAuthContext.mockReturnValue({
+      hasPermission: (permission: Permission) => permission === "update:payment",
+      hasFeatureAccess: (feature: string) => feature === "donationsCreate",
+      userRole: { name: "Receptionist" },
+    } as unknown as ReturnType<typeof useAuthContext>);
+    mockFetch({
+      rows: [buildTransaction({ reference: "UTR-1" })],
+      links: [buildBookingLink({ reference: "UTR-1" })],
+    });
+
+    render(<PaymentsClient />);
+
+    await screen.findByRole("link", { name: "A100001" });
+    expect(
+      screen.queryByRole("button", { name: "Unattach" })
+    ).not.toBeInTheDocument();
+  });
+
   it("renders a clickable slip-no link and hides both buttons when a receipt exists", async () => {
     mockFetch({
       rows: [buildTransaction({ reference: "UTR-4" })],
@@ -177,6 +241,27 @@ describe("PaymentsClient", () => {
     ).not.toBeInTheDocument();
   });
 });
+
+function mockAdministration() {
+  mockedUseAuthContext.mockReturnValue({
+    hasPermission: (permission: Permission) => permission === "update:payment",
+    hasFeatureAccess: (feature: string) => feature === "donationsCreate",
+    userRole: { name: "Administration" },
+  } as unknown as ReturnType<typeof useAuthContext>);
+}
+
+function buildBookingLink(
+  overrides: Partial<StatementBookingLink> = {}
+): StatementBookingLink {
+  return {
+    reference: "UTR-1",
+    reservationId: "res-1",
+    bookingId: "A100001",
+    folioItemId: "folio-1",
+    canUnattach: true,
+    ...overrides,
+  };
+}
 
 function mockFetch(options: {
   rows: GoogleSheetTransaction[];
@@ -203,6 +288,9 @@ function mockFetch(options: {
     }
     if (url.startsWith("/api/admin/payment-statement/attach")) {
       return Promise.resolve(jsonResponse({ reservationId: "res-1" }, { status: 201 }));
+    }
+    if (url.startsWith("/api/admin/payment-statement/unattach")) {
+      return Promise.resolve(jsonResponse({ ok: true, statusReverted: true }));
     }
     // reconcile + anything else
     return Promise.resolve(jsonResponse({}));

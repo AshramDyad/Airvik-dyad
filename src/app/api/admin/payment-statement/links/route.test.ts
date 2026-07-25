@@ -48,7 +48,13 @@ describe("payment statement links route", () => {
       supabase as unknown as ReturnType<typeof createServerSupabaseClient>
     );
     mockedGetLinks.mockResolvedValue([
-      { reference: "UTR-1", reservationId: "res-1", bookingId: "A100001" },
+      {
+        reference: "UTR-1",
+        reservationId: "res-1",
+        bookingId: "A100001",
+        folioItemId: "folio-1",
+        canUnattach: true,
+      },
     ]);
 
     const response = await GET(buildRequest());
@@ -60,7 +66,13 @@ describe("payment statement links route", () => {
     expect(featureCall?.[1]).toBe("payments");
     expect(mockedGetLinks).toHaveBeenCalledWith({ supabase });
     expect(body.links).toEqual([
-      { reference: "UTR-1", reservationId: "res-1", bookingId: "A100001" },
+      {
+        reference: "UTR-1",
+        reservationId: "res-1",
+        bookingId: "A100001",
+        folioItemId: "folio-1",
+        canUnattach: true,
+      },
     ]);
   });
 });

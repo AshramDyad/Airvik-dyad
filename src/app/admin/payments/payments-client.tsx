@@ -12,6 +12,7 @@ import {
   ReceiptText,
   RefreshCw,
   Search,
+  Unlink,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -34,6 +35,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { DeleteConfirmationDialog } from "@/components/shared/delete-confirmation-dialog";
 import {
   Table,
   TableBody,
@@ -42,6 +44,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { ROLE_NAMES } from "@/constants/roles";
 import { useAuthContext } from "@/context/auth-context";
 import { useDataContext } from "@/context/data-context";
 import type {
@@ -67,9 +70,16 @@ type LoadOptions = {
   silent?: boolean;
 };
 
+// What the confirmation dialog needs to describe the payment being removed.
+type UnattachTarget = {
+  folioItemId: string;
+  bookingCode: string;
+  amountLabel: string;
+};
+
 export function PaymentsClient() {
   const { property } = useDataContext();
-  const { hasPermission, hasFeatureAccess } = useAuthContext();
+  const { hasPermission, hasFeatureAccess, userRole } = useAuthContext();
   const [payload, setPayload] =
     React.useState<GoogleSheetTransactionsApiResponse | null>(null);
   const [bookingLinks, setBookingLinks] = React.useState<
@@ -94,6 +104,8 @@ export function PaymentsClient() {
   const [attachBookingId, setAttachBookingId] = React.useState("");
   const [attachError, setAttachError] = React.useState<string | null>(null);
   const [isAttaching, setIsAttaching] = React.useState(false);
+  const [unattachTarget, setUnattachTarget] =
+    React.useState<UnattachTarget | null>(null);
   const [receiptTarget, setReceiptTarget] =
     React.useState<GoogleSheetTransaction | null>(null);
   const [receiptSlipInput, setReceiptSlipInput] = React.useState("");
@@ -105,6 +117,9 @@ export function PaymentsClient() {
   const currency = property?.currency || "INR";
   const timeZone = property?.timezone || DEFAULT_TIME_ZONE;
   const canAttachPayment = hasPermission("update:payment");
+  // Deleting a recorded payment is a stricter action than adding one, so it stays
+  // with Administration rather than every role that can attach.
+  const canUnattachPayment = userRole?.name === ROLE_NAMES.ADMINISTRATION;
   const canCreateReceipt = hasFeatureAccess("donationsCreate");
   const canManageReceipt = hasFeatureAccess("donationsManage");
 
@@ -276,6 +291,40 @@ export function PaymentsClient() {
       );
     } finally {
       setIsAttaching(false);
+    }
+  }
+
+  async function handleUnattach() {
+    if (!unattachTarget) {
+      return;
+    }
+
+    const target = unattachTarget;
+    setUnattachTarget(null);
+
+    try {
+      const response = await authorizedFetch(
+        "/api/admin/payment-statement/unattach",
+        {
+          method: "POST",
+          cache: "no-store",
+          body: JSON.stringify({ folioItemId: target.folioItemId }),
+        }
+      );
+      const body: unknown = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(readMessage(body) ?? "Unable to unattach payment.");
+      }
+
+      // The row loses its booking link and shows the Attach button again.
+      await loadBookingLinks();
+      toast.success(`Payment unattached from booking ${target.bookingCode}.`);
+    } catch (unattachException) {
+      toast.error(
+        unattachException instanceof Error
+          ? unattachException.message
+          : "Unable to unattach payment."
+      );
     }
   }
 
@@ -552,12 +601,33 @@ export function PaymentsClient() {
                       </TableCell>
                       <TableCell>
                         {bookingLink ? (
-                          <Link
-                            href={`/admin/reservations/${bookingLink.reservationId}`}
-                            className="font-mono text-xs text-primary hover:underline"
-                          >
-                            {formatBookingCode(bookingLink.bookingId)}
-                          </Link>
+                          <div className="flex items-center gap-2">
+                            <Link
+                              href={`/admin/reservations/${bookingLink.reservationId}`}
+                              className="font-mono text-xs text-primary hover:underline"
+                            >
+                              {formatBookingCode(bookingLink.bookingId)}
+                            </Link>
+                            {canUnattachPayment && bookingLink.canUnattach && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 shrink-0 px-2 text-xs"
+                                onClick={() =>
+                                  setUnattachTarget({
+                                    folioItemId: bookingLink.folioItemId,
+                                    bookingCode: formatBookingCode(
+                                      bookingLink.bookingId
+                                    ),
+                                    amountLabel: getAmountDisplay(row, currency),
+                                  })
+                                }
+                              >
+                                <Unlink className="h-3.5 w-3.5" />
+                                Unattach
+                              </Button>
+                            )}
+                          </div>
                         ) : receiptSlipNo !== undefined ? (
                           <Link
                             href="/admin/manual-receipt"
@@ -778,6 +848,21 @@ export function PaymentsClient() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <DeleteConfirmationDialog
+        isOpen={unattachTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setUnattachTarget(null);
+          }
+        }}
+        onConfirm={handleUnattach}
+        itemName={
+          unattachTarget
+            ? `the ${unattachTarget.amountLabel} payment recorded on booking ${unattachTarget.bookingCode}`
+            : undefined
+        }
+      />
     </div>
   );
 }
