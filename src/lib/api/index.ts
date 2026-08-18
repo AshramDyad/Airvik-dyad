@@ -29,16 +29,13 @@ import {
   DbCategory,
   DbPost,
   DbPostUpdatePayload,
-  DbPostWithCategories,
   fromDbCategory,
   fromDbPost,
-  fromDbPostWithCategories,
 } from "@/lib/api/blog-mappers";
 
 const INTERNAL_FOLIO_SOURCE = "internal" as const;
 
 // Column selection constants to reduce egress
-const PROPERTY_SELECT_COLUMNS = 'id, name, description, address, city, state, country, phone, email, currency, timezone, tax_rate, tax_enabled, logo_url' as const;
 const GUEST_SELECT_COLUMNS = 'id, first_name, last_name, email, phone, address, pincode, city, state, country, created_at' as const;
 const ROOM_SELECT_COLUMNS = 'id, room_number, room_type_id, status, photos' as const;
 
@@ -1599,6 +1596,13 @@ export const createPost = async (postData: Omit<Post, "id" | "created_at" | "upd
     content: postData.content,
     excerpt: postData.excerpt,
     featured_image: postData.featured_image,
+    seo_title: postData.seo_title,
+    meta_description: postData.meta_description,
+    focus_keyword: postData.focus_keyword,
+    target_keywords: postData.target_keywords ?? [],
+    featured_image_alt: postData.featured_image_alt,
+    seo_notes: postData.seo_notes,
+    source_query_data: postData.source_query_data ?? [],
     status: postData.status,
     published_at: postData.status === 'published' ? new Date().toISOString() : null,
     author_id: postData.author_id // Assuming passed or handled by RLS default
@@ -1631,6 +1635,13 @@ export const updatePost = async (
   if (postData.content !== undefined) updatePayload.content = postData.content;
   if (postData.excerpt !== undefined) updatePayload.excerpt = postData.excerpt;
   if (postData.featured_image !== undefined) updatePayload.featured_image = postData.featured_image;
+  if (postData.seo_title !== undefined) updatePayload.seo_title = postData.seo_title;
+  if (postData.meta_description !== undefined) updatePayload.meta_description = postData.meta_description;
+  if (postData.focus_keyword !== undefined) updatePayload.focus_keyword = postData.focus_keyword;
+  if (postData.target_keywords !== undefined) updatePayload.target_keywords = postData.target_keywords;
+  if (postData.featured_image_alt !== undefined) updatePayload.featured_image_alt = postData.featured_image_alt;
+  if (postData.seo_notes !== undefined) updatePayload.seo_notes = postData.seo_notes;
+  if (postData.source_query_data !== undefined) updatePayload.source_query_data = postData.source_query_data;
   if (postData.status) {
     updatePayload.status = postData.status;
     if (postData.status === 'published' && !postData.published_at) {

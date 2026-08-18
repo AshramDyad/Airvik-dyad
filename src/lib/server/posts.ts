@@ -4,6 +4,10 @@ import {
   fromDbPostWithCategories,
 } from "@/lib/api/blog-mappers";
 import { getServerSupabaseClient } from "@/lib/server/supabase";
+import {
+  type InternalLinkOption,
+  STATIC_INTERNAL_LINKS,
+} from "@/lib/seo/internal-links";
 
 type PostSearchParams = {
   month?: string;
@@ -220,4 +224,44 @@ export const countPosts = async (
   }
 
   return count ?? 0;
+};
+
+export const getInternalLinkOptions = async (
+  excludePostId?: string,
+): Promise<InternalLinkOption[]> => {
+  const publishedPosts = await getPosts({ status: "published" });
+  const postOptions = publishedPosts
+    .filter((post) => post.id !== excludePostId)
+    .map((post) => ({
+      label: post.title,
+      href: `/blog/${post.slug}`,
+      type: "post" as const,
+    }));
+
+  return [...STATIC_INTERNAL_LINKS, ...postOptions];
+};
+
+export const getRelatedPosts = async (
+  post: Post,
+  limit = 3,
+): Promise<Post[]> => {
+  const posts = await getPosts({ status: "published" });
+  const categoryIds = new Set((post.categories ?? []).map((category) => category.id));
+
+  return posts
+    .filter((candidate) => candidate.id !== post.id)
+    .map((candidate) => ({
+      candidate,
+      sharedCategories: (candidate.categories ?? []).filter((category) =>
+        categoryIds.has(category.id),
+      ).length,
+    }))
+    .sort((left, right) => {
+      if (right.sharedCategories !== left.sharedCategories) {
+        return right.sharedCategories - left.sharedCategories;
+      }
+      return right.candidate.updated_at.localeCompare(left.candidate.updated_at);
+    })
+    .slice(0, limit)
+    .map(({ candidate }) => candidate);
 };

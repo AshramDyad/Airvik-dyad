@@ -7,10 +7,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import dynamic from "next/dynamic";
 import { RichTextEditor } from "@/components/admin/posts/rich-text-editor";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
 import {
   Form,
   FormControl,
@@ -32,6 +30,14 @@ import { useAuthContext } from "@/context/auth-context";
 import { Image as ImageIcon, Loader2, X } from "lucide-react";
 import Image from "next/image";
 import { Textarea } from "@/components/ui/textarea";
+import type { InternalLinkOption } from "@/lib/seo/internal-links";
+
+const valuesForButton = (status: "draft" | "published", hasPost: boolean): string => {
+  if (status === "published") {
+    return hasPost ? "Update & Publish" : "Publish";
+  }
+  return hasPost ? "Update Draft" : "Save Draft";
+};
 
 const postSchema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -39,16 +45,41 @@ const postSchema = z.object({
   content: z.string().optional(),
   excerpt: z.string().optional(),
   featured_image: z.string().optional(),
+  featured_image_alt: z.string().optional(),
+  seo_title: z.string().optional(),
+  meta_description: z.string().optional(),
+  focus_keyword: z.string().optional(),
+  target_keywords: z.string().optional(),
+  seo_notes: z.string().optional(),
   categoryIds: z.array(z.string()).optional(),
   status: z.enum(["draft", "published"]),
+}).superRefine((values, context) => {
+  if (values.status !== "published") {
+    return;
+  }
+
+  if (!values.content?.trim()) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["content"], message: "Content is required before publishing" });
+  }
+  if (!values.seo_title?.trim()) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["seo_title"], message: "SEO title is required before publishing" });
+  }
+  if (!values.meta_description?.trim()) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["meta_description"], message: "Meta description is required before publishing" });
+  }
+  if (values.featured_image && !values.featured_image_alt?.trim()) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["featured_image_alt"], message: "Add image alt text before publishing" });
+  }
 });
 
 export function PostForm({
   post,
   categories,
+  internalLinkOptions = [],
 }: {
   post?: Post;
   categories: Category[];
+  internalLinkOptions?: InternalLinkOption[];
 }) {
   const router = useRouter();
   const { currentUser } = useAuthContext();
@@ -65,6 +96,12 @@ export function PostForm({
       content: post?.content || "",
       excerpt: post?.excerpt || "",
       featured_image: post?.featured_image || "",
+      featured_image_alt: post?.featured_image_alt || "",
+      seo_title: post?.seo_title || "",
+      meta_description: post?.meta_description || "",
+      focus_keyword: post?.focus_keyword || "",
+      target_keywords: post?.target_keywords?.join(", ") || "",
+      seo_notes: post?.seo_notes || "",
       categoryIds: defaultCategoryIds,
       status: post?.status || "draft",
     },
@@ -72,6 +109,7 @@ export function PostForm({
 
   // Auto-generate slug
   const titleValue = form.watch("title");
+  const statusValue = form.watch("status");
   useEffect(() => {
     if (!post) {
       const slug = titleValue
@@ -103,7 +141,11 @@ export function PostForm({
     try {
       const updatedValues = {
         ...values,
-        content: values.content || ""
+        content: values.content || "",
+        target_keywords: values.target_keywords
+          ?.split(",")
+          .map((keyword) => keyword.trim())
+          .filter(Boolean),
       };
       
       if (post) {
@@ -161,6 +203,7 @@ export function PostForm({
                     value={field.value || ""}
                     onChange={field.onChange}
                     placeholder="Write your post content here..."
+                    internalLinkOptions={internalLinkOptions}
                   />
                 </FormControl>
                 <FormMessage />
@@ -198,7 +241,7 @@ export function PostForm({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Status</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select status" />
@@ -216,9 +259,97 @@ export function PostForm({
             <div className="flex justify-between pt-4">
               <Button type="submit" disabled={isSaving}>
                 {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {post ? "Update" : "Publish"}
+                {valuesForButton(statusValue, Boolean(post))}
               </Button>
             </div>
+          </div>
+
+          <div className="bg-card p-6 rounded-lg border space-y-4">
+            <h3 className="font-semibold">Search preview</h3>
+            <FormField
+              control={form.control}
+              name="seo_title"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>SEO title</FormLabel>
+                  <FormControl><Input placeholder="Search result title" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="meta_description"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Meta description</FormLabel>
+                  <FormControl><Textarea placeholder="Short, specific page summary" className="min-h-24" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="focus_keyword"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Focus keyword</FormLabel>
+                  <FormControl><Input placeholder="Main search phrase" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="target_keywords"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Related keywords</FormLabel>
+                  <FormControl><Textarea placeholder="Comma-separated related searches" className="min-h-24" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="seo_notes"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>SEO/source notes</FormLabel>
+                  <FormControl><Textarea placeholder="Facts to verify before publishing" className="min-h-24" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            {post?.source_query_data && post.source_query_data.length > 0 ? (
+              <details className="rounded-md border p-3">
+                <summary className="cursor-pointer text-sm font-medium">
+                  Source query data ({post.source_query_data.length})
+                </summary>
+                <div className="mt-3 max-h-64 overflow-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b text-muted-foreground">
+                        <th className="py-2 pr-2">Query</th>
+                        <th className="py-2 pr-2">Priority</th>
+                        <th className="py-2 pr-2">Impressions</th>
+                        <th className="py-2">Position</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {post.source_query_data.map((sourceQuery) => (
+                        <tr key={`${sourceQuery.query}-${sourceQuery.source_target_path}`} className="border-b last:border-0">
+                          <td className="py-2 pr-2">{sourceQuery.query}</td>
+                          <td className="py-2 pr-2">{sourceQuery.priority}</td>
+                          <td className="py-2 pr-2">{sourceQuery.impressions}</td>
+                          <td className="py-2">{sourceQuery.average_position}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </details>
+            ) : null}
           </div>
 
           {/* Categories */}
@@ -300,7 +431,7 @@ export function PostForm({
                                                     accept="image/*"
                                                     onChange={handleImageUpload}
                                                     disabled={isUploading}
-                                                />
+                                        />
                                             </label>
                                         </div>
                                         {isUploading && <p className="text-xs text-muted-foreground mt-2">Uploading...</p>}
@@ -311,6 +442,17 @@ export function PostForm({
                         <FormMessage />
                     </FormItem>
                 )}
+            />
+            <FormField
+              control={form.control}
+              name="featured_image_alt"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Image alt text</FormLabel>
+                  <FormControl><Input placeholder="Describe the image" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
           </div>
           

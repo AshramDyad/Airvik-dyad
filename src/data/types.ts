@@ -650,6 +650,18 @@ export interface Category {
   };
 }
 
+export type SeoPriority = "P1" | "P2" | "P3";
+
+export interface PostSourceQuery {
+  query: string;
+  priority: SeoPriority;
+  impressions: number;
+  clicks: number;
+  average_position: number;
+  action: string;
+  source_target_path: string;
+}
+
 export interface Post {
   id: string;
   title: string;
@@ -662,6 +674,13 @@ export interface Post {
   author_id: string;
   created_at: string;
   updated_at: string;
+  seo_title?: string;
+  meta_description?: string;
+  focus_keyword?: string;
+  target_keywords?: string[];
+  featured_image_alt?: string;
+  seo_notes?: string;
+  source_query_data?: PostSourceQuery[];
   categories?: Category[];
   author?: {
     email: string;

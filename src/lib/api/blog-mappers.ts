@@ -1,4 +1,4 @@
-import { Category, Post } from "@/data/types";
+import { Category, Post, PostSourceQuery } from "@/data/types";
 
 export type DbCategory = {
   id: string;
@@ -21,6 +21,13 @@ export type DbPost = {
   author_id: string | null;
   created_at: string;
   updated_at: string;
+  seo_title: string | null;
+  meta_description: string | null;
+  focus_keyword: string | null;
+  target_keywords: string[] | null;
+  featured_image_alt: string | null;
+  seo_notes: string | null;
+  source_query_data: PostSourceQuery[] | null;
 };
 
 export type DbPostCategory = {
@@ -42,6 +49,13 @@ export type DbPostUpdatePayload = Partial<
     | "status"
     | "published_at"
     | "updated_at"
+    | "seo_title"
+    | "meta_description"
+    | "focus_keyword"
+    | "target_keywords"
+    | "featured_image_alt"
+    | "seo_notes"
+    | "source_query_data"
   >
 >;
 
@@ -66,6 +80,13 @@ export const fromDbPost = (dbPost: DbPost): Post => ({
   author_id: dbPost.author_id ?? "",
   created_at: dbPost.created_at,
   updated_at: dbPost.updated_at,
+  seo_title: dbPost.seo_title ?? undefined,
+  meta_description: dbPost.meta_description ?? undefined,
+  focus_keyword: dbPost.focus_keyword ?? undefined,
+  target_keywords: dbPost.target_keywords ?? undefined,
+  featured_image_alt: dbPost.featured_image_alt ?? undefined,
+  seo_notes: dbPost.seo_notes ?? undefined,
+  source_query_data: dbPost.source_query_data ?? undefined,
 });
 
 export const fromDbPostWithCategories = (

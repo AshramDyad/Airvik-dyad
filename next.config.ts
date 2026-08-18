@@ -41,6 +41,7 @@ imageRemotePatterns.push({
 });
 
 const nextConfig: NextConfig = {
+  outputFileTracingRoot: __dirname,
   eslint: {
     // Allow production builds to succeed even if lint errors are present.
     ignoreDuringBuilds: true,

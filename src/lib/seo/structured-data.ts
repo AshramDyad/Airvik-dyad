@@ -165,6 +165,8 @@ export function blogPostingSchema(post: {
   datePublished?: string;
   dateModified?: string;
   authorName?: string;
+  section?: string;
+  keywords?: string[];
   url: string;
 }) {
   return {
@@ -178,5 +180,7 @@ export function blogPostingSchema(post: {
     author: { "@type": "Organization", name: post.authorName ?? SITE.name, "@id": ORG_ID },
     publisher: { "@id": ORG_ID },
     mainEntityOfPage: absoluteUrl(post.url),
+    articleSection: post.section,
+    keywords: post.keywords?.join(", "),
   };
 }

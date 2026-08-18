@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import {
   eachDayOfInterval,
   endOfMonth,
@@ -223,6 +223,10 @@ describe("AvailabilityCalendar", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 4, 25, 12));
+    vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
+      callback(0);
+      return 0;
+    });
     resetBuilderSequences();
     installCalendarLayoutMeasurements();
     mockDataContext();
@@ -230,6 +234,7 @@ describe("AvailabilityCalendar", () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     restoreHTMLElementProperty("offsetLeft", originalOffsetLeft);
     restoreHTMLElementProperty("offsetWidth", originalOffsetWidth);
     vi.useRealTimers();
@@ -237,6 +242,10 @@ describe("AvailabilityCalendar", () => {
 
   it("starts the current month at today's column", () => {
     render(<AvailabilityCalendar />);
+
+    act(() => {
+      vi.advanceTimersByTime(32);
+    });
 
     const calendarRegion = screen.getByRole("region", {
       name: "Availability grid for May 2026",

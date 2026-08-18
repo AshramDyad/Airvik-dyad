@@ -1,6 +1,6 @@
 "use client";
 
-import { useEditor, EditorContent, Editor } from "@tiptap/react";
+import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Image from "@tiptap/extension-image";
 import Link from "@tiptap/extension-link";
@@ -11,7 +11,6 @@ import {
   Bold,
   Italic,
   Underline as UnderlineIcon,
-  Strikethrough,
   AlignLeft,
   AlignCenter,
   AlignRight,
@@ -37,20 +36,26 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Separator } from "@/components/ui/separator";
 import { uploadFile } from "@/lib/api";
-import { useCallback, useEffect } from "react";
+import { useCallback, useState } from "react";
 import { cn } from "@/lib/utils";
+import type { InternalLinkOption } from "@/lib/seo/internal-links";
+import { InternalLinkPicker } from "@/components/admin/posts/internal-link-picker";
 
 interface RichTextEditorProps {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  internalLinkOptions?: InternalLinkOption[];
 }
 
 export function RichTextEditor({
   value,
   onChange,
   placeholder = "Start writing...",
+  internalLinkOptions = [],
 }: RichTextEditorProps) {
+  const [internalLinkPickerOpen, setInternalLinkPickerOpen] = useState(false);
+  const [savedSelection, setSavedSelection] = useState<{ from: number; to: number } | null>(null);
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -128,6 +133,39 @@ export function RichTextEditor({
     // update link
     editor.chain().focus().extendMarkRange("link").setLink({ href: url }).run();
   }, [editor]);
+
+  const openInternalLinkPicker = useCallback(() => {
+    if (!editor) return;
+    const { from, to } = editor.state.selection;
+    setSavedSelection({ from, to });
+    setInternalLinkPickerOpen(true);
+  }, [editor]);
+
+  const insertInternalLink = useCallback(
+    (option: InternalLinkOption) => {
+      if (!editor) return;
+      const selection = savedSelection ?? editor.state.selection;
+      const hasTextSelection = selection.to > selection.from;
+      const chain = editor.chain().focus().setTextSelection(selection);
+
+      if (hasTextSelection) {
+        chain.setLink({ href: option.href }).run();
+      } else {
+        editor
+          .chain()
+          .focus()
+          .setTextSelection(selection)
+          .insertContent({
+            type: "text",
+            text: option.label,
+            marks: [{ type: "link", attrs: { href: option.href } }],
+          })
+          .run();
+      }
+      setSavedSelection(null);
+    },
+    [editor, savedSelection],
+  );
 
   if (!editor) return null;
 
@@ -325,6 +363,17 @@ export function RichTextEditor({
         <Button
           variant="ghost"
           size="sm"
+          onClick={openInternalLinkPicker}
+          aria-label="Insert internal link"
+          type="button"
+          disabled={internalLinkOptions.length === 0}
+        >
+          <LinkIcon className="h-4 w-4" />
+          <span className="sr-only">Internal page</span>
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={addImage}
           aria-label="Insert image"
           type="button"
@@ -354,6 +403,12 @@ export function RichTextEditor({
         </Button>
       </div>
       <EditorContent editor={editor} />
+      <InternalLinkPicker
+        open={internalLinkPickerOpen}
+        onOpenChange={setInternalLinkPickerOpen}
+        options={internalLinkOptions}
+        onSelect={insertInternalLink}
+      />
     </div>
   );
 }

@@ -2,6 +2,7 @@ import type { Reservation, ReservationStatus } from "@/data/types";
 
 export const ROOM_HOLD_STATUS: ReservationStatus = "Room Hold";
 export const ROOM_HOLD_LABEL = "(Pending) Room Hold";
+const ROOM_HOLD_DURATION_MS = 30 * 60 * 1000;
 
 export const ACTIVE_RESERVATION_STATUSES: readonly ReservationStatus[] = [
   "Pending",
@@ -51,20 +52,33 @@ export function getReservationStatusLabel(status: ReservationStatus): string {
 }
 
 export function isActiveRoomHold(
-  reservation: ReservationAvailabilityShape
+  reservation: ReservationAvailabilityShape,
+  now: Date = new Date()
 ): boolean {
-  return reservation.status === ROOM_HOLD_STATUS;
+  if (reservation.status !== ROOM_HOLD_STATUS) {
+    return false;
+  }
+
+  // Legacy holds without an expiry remain blocking until an administrator
+  // resolves them. This is safer than making an unknown hold bookable.
+  if (!reservation.holdExpiresAt) {
+    return true;
+  }
+
+  const expiry = Date.parse(reservation.holdExpiresAt);
+  return Number.isNaN(expiry) || expiry > now.getTime();
 }
 
 export function doesReservationBlockAvailability(
-  reservation: ReservationAvailabilityShape
+  reservation: ReservationAvailabilityShape,
+  now: Date = new Date()
 ): boolean {
   if (reservation.status === "Cancelled" || reservation.status === "No-show") {
     return false;
   }
 
   if (reservation.status === ROOM_HOLD_STATUS) {
-    return isActiveRoomHold(reservation);
+    return isActiveRoomHold(reservation, now);
   }
 
   return true;
@@ -72,14 +86,15 @@ export function doesReservationBlockAvailability(
 
 export function getActiveHoldRoomIdsForDateRange(
   reservations: ReservationDateRangeShape[],
-  dateRange: DateRangeShape
+  dateRange: DateRangeShape,
+  now: Date = new Date()
 ): Set<string> {
   const heldRoomIds = new Set<string>();
   const rangeStart = dateRange.from.getTime();
   const rangeEnd = dateRange.to.getTime();
 
   reservations.forEach((reservation) => {
-    if (!isActiveRoomHold(reservation)) {
+    if (!isActiveRoomHold(reservation, now)) {
       return;
     }
 
@@ -93,6 +108,10 @@ export function getActiveHoldRoomIdsForDateRange(
   });
 
   return heldRoomIds;
+}
+
+export function getRoomHoldExpiresAt(now: Date = new Date()): string {
+  return new Date(now.getTime() + ROOM_HOLD_DURATION_MS).toISOString();
 }
 
 export function resolveAggregateStatus(statuses: ReservationStatus[]): ReservationStatus {

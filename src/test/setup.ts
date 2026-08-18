@@ -2,6 +2,27 @@ import "@testing-library/jest-dom/vitest";
 import type { ReactNode } from "react";
 import { afterAll, afterEach, beforeAll, vi } from "vitest";
 
+if (typeof globalThis.ResizeObserver === "undefined") {
+  class TestResizeObserver implements ResizeObserver {
+    constructor(callback: ResizeObserverCallback) {
+      void callback;
+    }
+
+    observe(target: Element, options?: ResizeObserverOptions): void {
+      void target;
+      void options;
+    }
+
+    unobserve(target: Element): void {
+      void target;
+    }
+
+    disconnect(): void {}
+  }
+
+  globalThis.ResizeObserver = TestResizeObserver;
+}
+
 let server: typeof import("./server")["server"] | null = null;
 
 async function ensureServer() {

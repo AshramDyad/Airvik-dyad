@@ -85,7 +85,7 @@ export function PostsTable({ posts, showDraftBadge = true }: PostsTableProps) {
                       </button>
                       <span className="text-muted-foreground">|</span>
                       <Link
-                        href={`/blog/${post.slug}`}
+                        href={post.status === "draft" ? `/admin/posts/${post.id}/preview` : `/blog/${post.slug}`}
                         target="_blank"
                         className="text-xs text-muted-foreground hover:text-foreground hover:underline flex items-center"
                       >

@@ -7,6 +7,7 @@ import { countPosts, getPosts } from "@/lib/server/posts";
 import { PostsTable } from "@/components/admin/posts/posts-table";
 import { PostsFilters } from "@/components/admin/posts/posts-filters";
 import { requirePageFeature } from "@/lib/server/page-auth";
+import { SeoDraftImporter } from "@/components/admin/posts/seo-draft-importer";
 
 export default async function PostsPage({
   searchParams,
@@ -49,6 +50,8 @@ export default async function PostsPage({
           </Link>
         </Button>
       </div>
+
+      <SeoDraftImporter />
 
       <PostsFilters
         categories={categories}

@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Inter, Source_Serif_4, JetBrains_Mono } from "next/font/google";
 import { SITE, SITE_URL, ALL_KEYWORDS } from "@/config/site";
 import "yet-another-react-lightbox/styles.css";
 import "yet-another-react-lightbox/plugins/counter.css";
@@ -11,21 +10,6 @@ import { AuthProvider } from "@/context/auth-context";
 import { DataProvider } from "@/context/data-context";
 import { StickyBookingButton } from "@/components/sticky-booking-button";
 import { GoogleAnalytics } from "@next/third-parties/google";
-
-const fontSans = Inter({
-  subsets: ["latin"],
-  variable: "--font-sans",
-});
-
-const fontSerif = Source_Serif_4({
-  subsets: ["latin"],
-  variable: "--font-serif",
-});
-
-const fontMono = JetBrains_Mono({
-  subsets: ["latin"],
-  variable: "--font-mono",
-});
 
 // GA stays OFF until NEXT_PUBLIC_GA_ID is set in the Vercel Production env.
 const GA_ID = process.env.NEXT_PUBLIC_GA_ID;
@@ -92,7 +76,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body
         suppressHydrationWarning
-        className={`${fontSans.variable} ${fontSerif.variable} ${fontMono.variable} font-sans antialiased`}
+        className="font-sans antialiased"
       >
         <ThemeProvider
           attribute="class"

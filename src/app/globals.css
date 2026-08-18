@@ -4,6 +4,9 @@
 
 @layer base {
   :root {
+    --font-sans: Arial, Helvetica, sans-serif;
+    --font-serif: Georgia, "Times New Roman", serif;
+    --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
     --background: 0 0% 100%;
     --foreground: 20.8696 18.4% 24.5098%;
     --card: 36 41.6667% 95.2941%;

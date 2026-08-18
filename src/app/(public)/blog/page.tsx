@@ -35,7 +35,7 @@ export default async function BlogPage() {
                   {post.featured_image ? (
                     <Image
                       src={post.featured_image}
-                      alt={post.title}
+                      alt={post.featured_image_alt || post.title}
                       fill
                       className="object-cover transition-transform duration-300 group-hover:scale-105"
                     />
