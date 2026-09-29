@@ -42,7 +42,8 @@ export async function getStatementBookingLinks(args: {
     .eq("payment_method", "UPI Gateway")
     .in("external_source", ["payment_request", "payment_override"])
     .lt("amount", 0)
-    .not("transaction_id", "is", null);
+    .not("transaction_id", "is", null)
+    .limit(10000);
 
   if (error) {
     throw new Error(error.message);
