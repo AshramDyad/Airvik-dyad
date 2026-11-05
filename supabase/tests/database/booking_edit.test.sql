@@ -116,22 +116,38 @@ CREATE TEMP TABLE edit_results(label text PRIMARY KEY, result jsonb);
 SELECT ok(NOT has_function_privilege('anon', 'public.save_booking_edit(uuid,uuid,jsonb,jsonb)', 'EXECUTE'), 'anonymous callers cannot save');
 SELECT ok(NOT has_function_privilege('authenticated', 'public.save_booking_edit(uuid,uuid,jsonb,jsonb)', 'EXECUTE'), 'browser authenticated callers cannot save directly');
 SELECT ok(has_function_privilege('service_role', 'public.save_booking_edit(uuid,uuid,jsonb,jsonb)', 'EXECUTE'), 'the server service role can save');
+
+-- Existing bookings may store no notes as NULL, an empty string, or whitespace.
+UPDATE public.reservations SET notes = CASE
+  WHEN id = '94690002-0000-4000-8000-000000000001' THEN ''
+  WHEN id = '94690002-0000-4000-8000-000000000002' THEN E' \t\n'
+  ELSE NULL END WHERE booking_id = 'A946900001';
 INSERT INTO edit_results VALUES ('no-change', pg_temp.edit_save('A946900001'));
 SELECT is((SELECT count(*) FROM public.admin_activity_logs WHERE entity_label = 'A946900001'), 0::bigint, 'no-change save performs no reservation activity writes');
 SELECT is((SELECT count(*) FROM public.reservations WHERE booking_id = 'A946900001' AND status = 'Confirmed'), 37::bigint, 'no-change keeps all 37 rooms');
+SELECT is((SELECT notes FROM public.reservations WHERE id = '94690002-0000-4000-8000-000000000001'), '', 'empty notes are preserved on a no-change save');
+SELECT is((SELECT notes FROM public.reservations WHERE id = '94690002-0000-4000-8000-000000000002'), E' \t\n', 'whitespace-only notes are preserved on a no-change save');
 
 INSERT INTO edit_results VALUES ('swap', pg_temp.edit_save('A946900001', pg_temp.edit_plan('A946900001',
-  ARRAY(SELECT ('94690001-0000-4000-8000-' || lpad(n::text, 12, '0'))::uuid FROM generate_series(2, 38) AS n))));
+  ARRAY['94690001-0000-4000-8000-000000000038'::uuid] ||
+  ARRAY(SELECT ('94690001-0000-4000-8000-' || lpad(n::text, 12, '0'))::uuid FROM generate_series(2, 37) AS n))));
 SELECT is((SELECT room_id::text FROM public.reservations WHERE id = '94690002-0000-4000-8000-000000000001'),
   '94690001-0000-4000-8000-000000000038', 'room 206 was replaced with 210 on the original reservation ID');
 SELECT is((SELECT sum(number_of_guests) FROM public.reservations WHERE booking_id = 'A946900001' AND status = 'Confirmed'), 90::bigint, '37-room swap preserves 90 guests after a fresh read');
 SELECT is((SELECT sum(total_amount) FROM public.reservations WHERE booking_id = 'A946900001'), 7400::numeric, '37-room totals remain consistent');
 SELECT is((SELECT reservation_id::text FROM public.folio_items WHERE id = '94690003-0000-4000-8000-000000000001'),
   '94690002-0000-4000-8000-000000000001', 'room replacement does not detach its payment');
-SELECT ok((SELECT count(*) FROM public.admin_activity_logs WHERE entity_label = 'A946900001') < 37, 'unchanged rows are skipped, not all 37 written');
+SELECT is((SELECT count(*) FROM public.admin_activity_logs WHERE entity_label = 'A946900001'), 1::bigint, 'only the replaced room is updated when notes are blank');
+SELECT is((SELECT notes FROM public.reservations WHERE id = '94690002-0000-4000-8000-000000000001'), '', 'a changed room preserves its existing blank notes');
+SELECT is((SELECT notes FROM public.reservations WHERE id = '94690002-0000-4000-8000-000000000002'), E' \t\n', 'an unchanged room preserves its whitespace-only notes');
 SELECT is(jsonb_array_length((SELECT result->'reservations' FROM edit_results WHERE label = 'swap')), 37, 'save returns all canonical booking rows');
 SELECT ok(EXISTS (SELECT 1 FROM edit_results, jsonb_array_elements(result->'reservations') r,
   jsonb_array_elements(r->'folio') f WHERE label = 'swap' AND f->>'transaction_id' = 'S58965663'), 'save result includes payment references');
+
+INSERT INTO edit_results VALUES ('notes-added', pg_temp.edit_save('A946900001', pg_temp.edit_plan('A946900001', p_notes => 'Actual note')));
+SELECT is((SELECT count(*) FROM public.reservations WHERE booking_id = 'A946900001' AND notes = 'Actual note'), 37::bigint, 'adding a real note updates all rooms');
+INSERT INTO edit_results VALUES ('notes-cleared', pg_temp.edit_save('A946900001', pg_temp.edit_plan('A946900001')));
+SELECT is((SELECT count(*) FROM public.reservations WHERE booking_id = 'A946900001' AND notes IS NULL), 37::bigint, 'clearing a real note saves the removal');
 
 -- Permissions, stale edits, invalid plans and room conflicts are checked by the database too.
 UPDATE public.profiles SET role_id = '94690000-0000-4000-8000-000000000004' WHERE id = '94690000-0000-4000-8000-000000000001';
