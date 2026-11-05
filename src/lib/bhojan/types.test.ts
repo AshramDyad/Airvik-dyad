@@ -11,9 +11,10 @@ describe('Bhojan validity', () => {
     expect(passValidity(fixture(), false, new Date('2026-11-07T06:28:59Z')).valid).toBe(true);
     expect(passValidity(fixture(), false, new Date('2026-11-07T06:29:00Z')).reason).toBe('Pass expired');
   });
-  it('requires both arrival date and check-in', () => {
-    expect(passValidity(fixture(), false, new Date('2026-11-04T18:29:59Z')).valid).toBe(false);
+  it('accepts early check-in but rejects a booking that is not checked in', () => {
+    expect(passValidity(fixture(), false, new Date('2026-11-04T18:29:59Z')).valid).toBe(true);
     expect(passValidity(fixture(), false, new Date('2026-11-04T18:30:00Z')).valid).toBe(true);
+    expect(passValidity(fixture('Confirmed'), false, new Date('2026-11-04T18:29:59Z')).valid).toBe(false);
     expect(passValidity(fixture('Confirmed'), false, new Date('2026-11-05T12:00:00Z')).valid).toBe(false);
   });
   it('rejects checked-out and revoked passes', () => {

@@ -31,7 +31,7 @@ UPDATE public.reservations SET status='Checked-out' WHERE id='b0000000-0000-4000
 SELECT ok((SELECT revoked FROM public.bhojan_passes WHERE booking_id='A999998888' AND pass_number=4),'partial checkout revokes room passes');
 SELECT ok((SELECT (public.validate_bhojan_pass(token)->>'valid')::boolean FROM public.bhojan_passes WHERE booking_id='A999998888' AND pass_number=1),'other room stays valid');
 UPDATE public.reservations SET check_in_date=check_in_date+1 WHERE id='b0000000-0000-4000-8000-000000000006';
-SELECT is((SELECT public.validate_bhojan_pass(token)->>'reason' FROM public.bhojan_passes WHERE booking_id='A999998888' AND pass_number=1),'Stay has not started','arrival date enforced');
+SELECT ok((SELECT (public.validate_bhojan_pass(token)->>'valid')::boolean FROM public.bhojan_passes WHERE booking_id='A999998888' AND pass_number=1),'early check-in is valid before the booked arrival date');
 UPDATE public.reservations SET check_in_date=current_date-3,check_out_date=current_date-1 WHERE id='b0000000-0000-4000-8000-000000000006';
 SELECT is((SELECT public.validate_bhojan_pass(token)->>'reason' FROM public.bhojan_passes WHERE booking_id='A999998888' AND pass_number=1),'Pass expired','expiry enforced');
 SELECT is(public.validate_bhojan_pass('b0000000-0000-4000-8000-000000000099')->>'reason','Invalid pass','unknown token rejected');

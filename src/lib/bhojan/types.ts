@@ -15,11 +15,9 @@ export const previewSchema = z.object({
 export type PassPreview = z.infer<typeof previewSchema>;
 export type BhojanPass = z.infer<typeof passSchema>;
 export function passValidity(reservation: { status: string; check_in_date: string; check_out_date: string }, revoked: boolean, now = new Date()) {
-  const starts = Date.parse(`${reservation.check_in_date}T00:00:00+05:30`);
   const ends = Date.parse(`${reservation.check_out_date}T11:59:00+05:30`);
   if (revoked) return { valid: false, reason: 'Pass no longer active' };
   if (now.getTime() >= ends) return { valid: false, reason: 'Pass expired' };
-  if (now.getTime() < starts) return { valid: false, reason: 'Stay has not started' };
   if (reservation.status !== 'Checked-in') return { valid: false, reason: 'Not checked in' };
   return { valid: true, reason: 'Valid pass' };
 }
