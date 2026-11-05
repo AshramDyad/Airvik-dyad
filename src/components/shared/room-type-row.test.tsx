@@ -144,7 +144,6 @@ describe("RoomTypeRow", () => {
     vi.useRealTimers();
     resetBuilderSequences();
     mockedGetReservationById.mockResolvedValue({
-      success: true,
       data: null,
       error: null,
       count: null,
@@ -152,7 +151,6 @@ describe("RoomTypeRow", () => {
       statusText: "OK",
     });
     mockedGetReservationsByBookingId.mockResolvedValue({
-      success: true,
       data: [],
       error: null,
       count: null,

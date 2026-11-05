@@ -1,5 +1,8 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { PostgrestError } from "@supabase/supabase-js";
+import { authorizedFetch, ClientSessionError } from "@/lib/auth/client-session";
+import { fromDbReservation, type DbReservation, type DbFolioItem } from "@/lib/reservations/reservation-mappers";
+import { bookingEditDbResultSchema, BookingEditError, type BookingEditInput, type BookingEditResult } from "@/lib/reservations/booking-edit";
 import type {
   Property,
   Guest,
@@ -95,56 +98,6 @@ type DbRoomType = {
   photos?: string[] | null;
   main_photo_url?: string | null;
   is_visible: boolean | null;
-};
-
-type DbFolioItem = {
-  id: string;
-  reservation_id: string;
-  description: string;
-  amount: number;
-  timestamp: string;
-  payment_method: string | null;
-  transaction_id: string | null;
-  external_source: string | null;
-  external_reference: string | null;
-  external_metadata: Record<string, unknown> | null;
-  received_by: string | null;
-  received_at: string | null;
-};
-
-
-type DbReservation = {
-  id: string;
-  booking_id: string;
-  guest_id: string;
-  room_id: string;
-  rate_plan_id: string | null;
-  check_in_date: string;
-  check_out_date: string;
-  number_of_guests: number;
-  status: ReservationStatus;
-  notes?: string | null;
-  folio?: DbFolioItem[] | null;
-  total_amount: number;
-  booking_date: string;
-  source: Reservation["source"];
-  payment_method: Reservation["paymentMethod"] | null;
-  adult_count: number | null;
-  child_count: number | null;
-  hold_expires_at: string | null;
-  tax_enabled_snapshot: boolean | null;
-  tax_rate_snapshot: number | null;
-  external_source: string | null;
-  external_id: string | null;
-  external_metadata: Record<string, unknown> | null;
-  guest?: DbReservationGuest | null;
-};
-
-type DbReservationGuest = {
-  first_name: string | null;
-  last_name: string | null;
-  email: string | null;
-  phone: string | null;
 };
 
 type ReservationUpdatePayload = Partial<
@@ -430,61 +383,6 @@ export const fromDbRoomType = (dbRoomType: DbRoomType): RoomType => ({
   photos: dbRoomType.photos ?? [],
   mainPhotoUrl: dbRoomType.main_photo_url ?? undefined,
   isVisible: dbRoomType.is_visible ?? true,
-});
-
-const fromDbFolioItem = (dbFolio: DbFolioItem): FolioItem => ({
-  id: dbFolio.id,
-  description: dbFolio.description,
-  amount: Number(dbFolio.amount),
-  timestamp: dbFolio.timestamp,
-  paymentMethod: dbFolio.payment_method ?? undefined,
-  transactionId: dbFolio.transaction_id ?? undefined,
-  externalSource: dbFolio.external_source ?? undefined,
-  externalReference: dbFolio.external_reference ?? undefined,
-  externalMetadata: dbFolio.external_metadata ?? undefined,
-  receivedBy: dbFolio.received_by ?? undefined,
-  receivedAt: dbFolio.received_at ?? undefined,
-});
-
-
-const fromDbReservation = (dbReservation: DbReservation): Reservation => ({
-  id: dbReservation.id,
-  bookingId: dbReservation.booking_id,
-  guestId: dbReservation.guest_id,
-  roomId: dbReservation.room_id,
-  ratePlanId: dbReservation.rate_plan_id ?? null,
-  checkInDate: dbReservation.check_in_date,
-  checkOutDate: dbReservation.check_out_date,
-  numberOfGuests: dbReservation.number_of_guests,
-  status: dbReservation.status,
-  notes: dbReservation.notes ?? undefined,
-  folio: (dbReservation.folio as DbFolioItem[])?.map(fromDbFolioItem) ?? [],
-  totalAmount: dbReservation.total_amount,
-  bookingDate: dbReservation.booking_date,
-  source: dbReservation.source,
-  paymentMethod: dbReservation.payment_method ?? "Not specified",
-  adultCount:
-    typeof dbReservation.adult_count === "number"
-      ? dbReservation.adult_count
-      : dbReservation.number_of_guests,
-  childCount:
-    typeof dbReservation.child_count === "number"
-      ? dbReservation.child_count
-      : 0,
-  holdExpiresAt: dbReservation.hold_expires_at,
-  taxEnabledSnapshot: Boolean(dbReservation.tax_enabled_snapshot ?? false),
-  taxRateSnapshot: dbReservation.tax_rate_snapshot ?? 0,
-  externalSource: dbReservation.external_source ?? undefined,
-  externalId: dbReservation.external_id,
-  externalMetadata: dbReservation.external_metadata ?? undefined,
-  guestSnapshot: dbReservation.guest
-    ? {
-      firstName: dbReservation.guest.first_name,
-      lastName: dbReservation.guest.last_name,
-      email: dbReservation.guest.email,
-      phone: dbReservation.guest.phone,
-    }
-    : undefined,
 });
 
 const toDbFolioItem = (folioItem: FolioItem, reservationId?: string): DbFolioItem => ({
@@ -1078,6 +976,43 @@ export const createReservationsWithTotal = async (
   const typedData = data as DbReservation[];
   return { data: typedData.map(fromDbReservation), error: null };
 };
+export const saveBookingEdit = async (id: string, input: BookingEditInput): Promise<BookingEditResult> => {
+  const controller = new AbortController();
+  const unconfirmed = () => new BookingEditError("Couldn't confirm the save. Check the booking before trying again.", 0, "SAVE_UNCONFIRMED");
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => {
+      reject(unconfirmed());
+      controller.abort();
+    }, 30_000);
+  });
+  const save = async (): Promise<BookingEditResult> => {
+    const response = await authorizedFetch(`/api/admin/reservations/${encodeURIComponent(id)}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input),
+      signal: controller.signal, retryOnUnauthorized: false,
+    });
+    const body: unknown = await response.json();
+    if (!response.ok) {
+      const message = typeof body === "object" && body !== null && "message" in body && typeof body.message === "string" ? body.message : "Could not save the booking.";
+      const code = typeof body === "object" && body !== null && "code" in body && typeof body.code === "string" ? body.code : "SAVE_FAILED";
+      throw new BookingEditError(message, response.status, code);
+    }
+    const result = bookingEditDbResultSchema.parse(body);
+    return { bookingId: result.bookingId, reservations: result.reservations.map(fromDbReservation) };
+  };
+  try {
+    // Bound the whole operation, including session lookup and response parsing.
+    return await Promise.race([save(), timeout]);
+  } catch (error) {
+    if (error instanceof BookingEditError) throw error;
+    if (error instanceof ClientSessionError) throw new BookingEditError(error.message, 401, "SESSION_EXPIRED");
+    // A lost response does not tell us whether the transaction committed.
+    throw unconfirmed();
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
 export const updateReservation = async (id: string, updatedData: Partial<Reservation>) => {
   const { data, error, ...rest } = await supabase.from('reservations').update(toDbReservation(updatedData)).eq('id', id).select().single();
   if (error || !data) return { data, error, ...rest };

@@ -2,6 +2,14 @@
 
 import { supabase } from "@/integrations/supabase/client";
 
+// A missing session is known to happen before a request is dispatched.
+export class ClientSessionError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ClientSessionError";
+  }
+}
+
 export async function getValidSession() {
   const { data, error } = await supabase.auth.getSession();
   if (!error && data.session) {
@@ -22,7 +30,7 @@ export async function authorizedFetch(
 ) {
   const session = await getValidSession();
   if (!session) {
-    throw new Error("Please sign in again to continue.");
+    throw new ClientSessionError("Please sign in again to continue.");
   }
 
   const { retryOnUnauthorized = true, headers, ...rest } = options;
@@ -37,7 +45,7 @@ export async function authorizedFetch(
   if (response.status === 401 && retryOnUnauthorized) {
     const refreshed = await getValidSession();
     if (!refreshed) {
-      throw new Error("Session expired. Please sign in again.");
+      throw new ClientSessionError("Session expired. Please sign in again.");
     }
     return fetch(input, {
       ...rest,

@@ -33,7 +33,6 @@ function reservationByIdResponse(
   reservation: Reservation | null
 ): Awaited<ReturnType<typeof getReservationById>> {
   return {
-    success: true,
     data: reservation,
     error: null,
     count: null,
@@ -46,7 +45,6 @@ function reservationsByBookingIdResponse(
   reservations: Reservation[]
 ): Awaited<ReturnType<typeof getReservationsByBookingId>> {
   return {
-    success: true,
     data: reservations,
     error: null,
     count: null,

@@ -30,6 +30,9 @@ import {
   type ReservationSyncMessage,
 } from "@/lib/reservations/realtime-sync";
 import { sortReservationsByBookingDate } from "@/lib/reservations/sort";
+import { replaceBookingReservations } from "@/lib/reservations/merge-booking";
+import { createReservationSyncScheduler, type ReservationSyncBatch } from "@/lib/reservations/sync-scheduler";
+import { BookingEditError, type BookingEditInput, type BookingEditResult } from "@/lib/reservations/booking-edit";
 import { isReservationUuid } from "@/lib/reservations/identifiers";
 import {
   buildRoomOccupancyAssignments,
@@ -344,14 +347,32 @@ export function useAppData() {
   } | null>(null);
   const reservationSyncSourceIdRef = React.useRef(createReservationSyncSourceId());
   const reservationSyncRevisionRef = React.useRef(0);
-  const reservationSyncTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pendingReservationSyncHintRef = React.useRef<ReservationSyncHint>({});
+  const reservationDataRevisionRef = React.useRef(0);
+  const bookingDataRevisionsRef = React.useRef(new Map<string, number>());
+  const bookingLookupRevisionRef = React.useRef(0);
+  const reservationsRef = React.useRef(reservations);
+  const reservationSyncExecutorRef = React.useRef<(batch: ReservationSyncBatch) => Promise<void>>(async () => {});
+  const reservationSyncSchedulerRef = React.useRef<ReturnType<typeof createReservationSyncScheduler> | null>(null);
   const reservationBroadcastRef = React.useRef<BroadcastChannel | null>(null);
   const supabaseReservationSyncChannelRef = React.useRef<RealtimeChannel | null>(null);
 
   React.useEffect(() => {
     activeBookingReservationsRef.current = activeBookingReservations;
   }, [activeBookingReservations]);
+
+  React.useEffect(() => { reservationsRef.current = reservations; }, [reservations]);
+
+  const applySavedBooking = React.useCallback((result: BookingEditResult) => {
+    reservationDataRevisionRef.current += 1;
+    bookingDataRevisionsRef.current.set(result.bookingId, (bookingDataRevisionsRef.current.get(result.bookingId) ?? 0) + 1);
+    reservationsRef.current = replaceBookingReservations(reservationsRef.current, result.bookingId, result.reservations);
+    setReservations((current) => replaceBookingReservations(current, result.bookingId, result.reservations));
+    setTodayReservations((current) => replaceBookingReservations(current, result.bookingId, result.reservations));
+    if (activeBookingReservationsRef.current[0]?.bookingId === result.bookingId) {
+      activeBookingReservationsRef.current = result.reservations;
+      setActiveBookingReservations(result.reservations);
+    }
+  }, []);
 
   const loadBookingDetails = React.useCallback(
     async (id: string) => {
@@ -365,6 +386,8 @@ export function useAppData() {
       }
 
       console.log(`[Lookup] Starting lookup for ID: ${id}`);
+      const lookupRevision = ++bookingLookupRevisionRef.current;
+      const dataRevision = reservationDataRevisionRef.current;
       setIsBookingLookupLoading(true);
       setLookupStatus(prev => ({ ...prev, [id]: 'pending' }));
 
@@ -399,6 +422,16 @@ export function useAppData() {
         if (targetBookingId) {
           console.log(`[Lookup] Fetching siblings for bookingId: ${targetBookingId}`);
           const { data: siblings } = await api.getReservationsByBookingId(targetBookingId);
+          if (lookupRevision !== bookingLookupRevisionRef.current) return;
+          if (dataRevision !== reservationDataRevisionRef.current) {
+            const latest = reservationsRef.current.filter((row) => row.bookingId === targetBookingId);
+            if (latest.length) {
+              activeBookingReservationsRef.current = latest;
+              setActiveBookingReservations(latest);
+            }
+            setLookupStatus(prev => ({ ...prev, [id]: latest.length ? 'success' : 'error' }));
+            return;
+          }
           if (siblings && siblings.length > 0) {
             console.log(`[Lookup] Successfully found ${siblings.length} records for ${targetBookingId}`);
             setActiveBookingReservations(siblings);
@@ -415,7 +448,7 @@ export function useAppData() {
         console.error(`[Lookup] Error during lookup for ${id}:`, error);
         setLookupStatus(prev => ({ ...prev, [id]: 'error' }));
       } finally {
-        setIsBookingLookupLoading(false);
+        if (lookupRevision === bookingLookupRevisionRef.current) setIsBookingLookupLoading(false);
       }
     },
     [userId, isSessionLoading]
@@ -429,6 +462,7 @@ export function useAppData() {
       statuses?: ReservationStatus[];
     }) => {
       lastReservationsPageParamsRef.current = params;
+      const dataRevision = reservationDataRevisionRef.current;
       setIsReservationsInitialLoading(true);
       try {
         const response = await fetchReservationsFromApi({
@@ -438,6 +472,7 @@ export function useAppData() {
           statuses: params.statuses,
           includeCount: true,
         });
+        if (dataRevision !== reservationDataRevisionRef.current || params !== lastReservationsPageParamsRef.current) return;
         const bookingsData = response.data || [];
 
         setBookings(bookingsData);
@@ -455,6 +490,7 @@ export function useAppData() {
   );
 
   const fetchData = React.useCallback(async (options?: { keepExisting?: boolean }) => {
+    const dataRevision = reservationDataRevisionRef.current;
     if (isSessionLoading) {
       console.log("[AppData] Postponing fetchData: session still loading");
       return;
@@ -562,9 +598,11 @@ export function useAppData() {
       const bookingsData = dashboardReservationsRes.data ?? [];
       const flatReservations = bookingsData.flatMap(b => b.subRows || []);
 
-      setTodayReservations(sortReservationsByBookingDate(flatReservations));
-      setReservations(sortReservationsByBookingDate(flatReservations));
-      setReservationsTotalCount(dashboardReservationsRes.count ?? 0);
+      if (dataRevision === reservationDataRevisionRef.current) {
+        setTodayReservations(sortReservationsByBookingDate(flatReservations));
+        setReservations(sortReservationsByBookingDate(flatReservations));
+        setReservationsTotalCount(dashboardReservationsRes.count ?? 0);
+      }
       setIsReservationsInitialLoading(false);
 
       setRoomTypes(roomTypesData);
@@ -595,8 +633,9 @@ export function useAppData() {
     if (isLoading || isSessionLoading || !userId) return;
 
     let cancelled = false;
+    const dataRevision = reservationDataRevisionRef.current;
     api.getReservations().then((res) => {
-      if (cancelled) return;
+      if (cancelled || dataRevision !== reservationDataRevisionRef.current) return;
       if (Array.isArray(res.data)) {
         setReservations(sortReservationsByBookingDate(res.data));
       }
@@ -609,6 +648,7 @@ export function useAppData() {
 
   const reloadCurrentReservationsPage = React.useCallback(async () => {
     const params = lastReservationsPageParamsRef.current;
+    const dataRevision = reservationDataRevisionRef.current;
     if (!params) {
       return;
     }
@@ -618,6 +658,7 @@ export function useAppData() {
         ...params,
         includeCount: true,
       });
+      if (dataRevision !== reservationDataRevisionRef.current || params !== lastReservationsPageParamsRef.current) return;
       setBookings(response.data || []);
       setReservationsTotalCount(response.count ?? 0);
       if (response.statusCounts) {
@@ -630,6 +671,7 @@ export function useAppData() {
 
   const refreshOpenBookingDetails = React.useCallback(
     async (hint: ReservationSyncHint = {}) => {
+      const dataRevision = reservationDataRevisionRef.current;
       const activeReservations = activeBookingReservationsRef.current;
       const activeBookingId = activeReservations[0]?.bookingId;
       if (!activeBookingId) {
@@ -652,25 +694,58 @@ export function useAppData() {
         return;
       }
 
+      if (dataRevision !== reservationDataRevisionRef.current || activeBookingReservationsRef.current[0]?.bookingId !== activeBookingId) return;
+
       if (data.length > 0) {
-        setActiveBookingReservations(data);
+        applySavedBooking({ bookingId: activeBookingId, reservations: data });
       }
     },
-    []
+    [applySavedBooking]
   );
 
   const syncReservationsFromServer = React.useCallback(
-    async (hint: ReservationSyncHint = {}) => {
+    async (batch: ReservationSyncBatch) => {
       if (isSessionLoading || !userId) {
         return;
       }
-
       await revalidateReservationsCache();
-      await fetchData({ keepExisting: true });
+      if (batch.fullRefresh) {
+        await fetchData({ keepExisting: true });
+        await reloadCurrentReservationsPage();
+        await refreshOpenBookingDetails();
+        return;
+      }
+      const dataRevision = reservationDataRevisionRef.current;
+      const bookingIds = new Set<string>();
+      for (const hint of batch.hints) {
+        if (hint.bookingId) { bookingIds.add(hint.bookingId); continue; }
+        if (hint.reservationId) {
+          const known = reservationsRef.current.find((row) => row.id === hint.reservationId);
+          if (known) { bookingIds.add(known.bookingId); continue; }
+          const { data } = await api.getReservationById(hint.reservationId);
+          if (data) bookingIds.add(data.bookingId);
+        }
+      }
+      if (!bookingIds.size) {
+        const openBookingId = activeBookingReservationsRef.current[0]?.bookingId;
+        if (openBookingId) bookingIds.add(openBookingId);
+      }
+      const updates = await Promise.all([...bookingIds].map(async (bookingId) => {
+        const { data, error } = await api.getReservationsByBookingId(bookingId);
+        if (error) throw error;
+        return { bookingId, reservations: data };
+      }));
+      if (dataRevision !== reservationDataRevisionRef.current) {
+        for (const hint of batch.hints) reservationSyncSchedulerRef.current?.enqueue(hint);
+        return;
+      }
+      for (const update of updates) {
+        applySavedBooking(update);
+      }
       await reloadCurrentReservationsPage();
-      await refreshOpenBookingDetails(hint);
     },
     [
+      applySavedBooking,
       fetchData,
       isSessionLoading,
       refreshOpenBookingDetails,
@@ -679,28 +754,19 @@ export function useAppData() {
     ]
   );
 
-  const scheduleReservationsSync = React.useCallback(
-    (hint: ReservationSyncHint = {}) => {
-      pendingReservationSyncHintRef.current = {
-        ...pendingReservationSyncHintRef.current,
-        ...hint,
-      };
-
-      if (reservationSyncTimerRef.current) {
-        clearTimeout(reservationSyncTimerRef.current);
-      }
-
-      reservationSyncTimerRef.current = setTimeout(() => {
-        const nextHint = pendingReservationSyncHintRef.current;
-        pendingReservationSyncHintRef.current = {};
-        reservationSyncTimerRef.current = null;
-        void syncReservationsFromServer(nextHint).catch((error) => {
-          console.error("[AppData] Failed to sync reservations:", error);
-        });
-      }, 150);
-    },
-    [syncReservationsFromServer]
-  );
+  reservationSyncExecutorRef.current = syncReservationsFromServer;
+  const getReservationSyncScheduler = React.useCallback(() => {
+    if (!reservationSyncSchedulerRef.current) {
+      reservationSyncSchedulerRef.current = createReservationSyncScheduler(
+        (batch) => reservationSyncExecutorRef.current(batch),
+        (error) => console.error("[AppData] Failed to sync reservations:", error),
+      );
+    }
+    return reservationSyncSchedulerRef.current;
+  }, []);
+  const scheduleReservationsSync = React.useCallback((hint: ReservationSyncHint = {}) => {
+    getReservationSyncScheduler().enqueue(hint);
+  }, [getReservationSyncScheduler]);
 
   const publishReservationSyncMessage = React.useCallback(
     (hint: ReservationSyncHint = {}) => {
@@ -750,16 +816,41 @@ export function useAppData() {
     [publishReservationSyncMessage, scheduleReservationsSync]
   );
 
-  const refreshReservations = React.useCallback(
-    () => syncReservationsFromServer(),
-    [syncReservationsFromServer]
-  );
+  const refreshReservations = React.useCallback(() => getReservationSyncScheduler().refresh(), [getReservationSyncScheduler]);
+
+  const saveBookingEdit = React.useCallback(async (reservationId: string, input: BookingEditInput): Promise<BookingEditResult> => {
+    const revisionsAtStart = new Map(bookingDataRevisionsRef.current);
+    try {
+      const result = await api.saveBookingEdit(reservationId, input);
+      // A realtime read may have received a later commit while PATCH was in flight.
+      if ((bookingDataRevisionsRef.current.get(result.bookingId) ?? 0) === (revisionsAtStart.get(result.bookingId) ?? 0)) applySavedBooking(result);
+      try { publishReservationSyncMessage({ reservationId, bookingId: result.bookingId }); }
+      catch (error) { console.error("[BookingEdit] Saved, but change notification failed", error); }
+      scheduleReservationsSync({ bookingId: result.bookingId });
+      return result;
+    } catch (error) {
+      if (error instanceof BookingEditError && error.code === "SAVE_UNCONFIRMED") {
+        // Exactly one targeted verification, never an automatic write retry.
+        const dataRevision = reservationDataRevisionRef.current;
+        const verify = async () => {
+          const knownBookingId = reservationsRef.current.find((row) => row.id === reservationId)?.bookingId
+            ?? activeBookingReservationsRef.current.find((row) => row.id === reservationId)?.bookingId;
+          const bookingId = knownBookingId ?? (await api.getReservationById(reservationId)).data?.bookingId;
+          if (!bookingId) return;
+          const result = await api.getReservationsByBookingId(bookingId);
+          if (!result.error && dataRevision === reservationDataRevisionRef.current) applySavedBooking({ bookingId, reservations: result.data });
+        };
+        void verify().catch((readError) => console.error("[BookingEdit] Could not verify save", readError));
+      }
+      throw error;
+    }
+  }, [applySavedBooking, publishReservationSyncMessage, scheduleReservationsSync]);
 
   React.useEffect(() => {
     return () => {
-      if (reservationSyncTimerRef.current) {
-        clearTimeout(reservationSyncTimerRef.current);
-      }
+      reservationDataRevisionRef.current += 1;
+      reservationSyncSchedulerRef.current?.dispose();
+      reservationSyncSchedulerRef.current = null;
     };
   }, []);
 
@@ -1984,6 +2075,7 @@ export function useAppData() {
     refetchUsers,
     updateGuest,
     updateReservation,
+    saveBookingEdit,
     updateReservationStatus,
     updateBookingReservationStatus,
     addFolioItem,

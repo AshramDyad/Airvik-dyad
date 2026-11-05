@@ -2,6 +2,7 @@ import type {
   Amenity,
   FolioItem,
   Guest,
+  Property,
   RatePlan,
   Reservation,
   Role,
@@ -13,6 +14,8 @@ import type {
   User,
 } from "@/data/types";
 import { allPermissions } from "@/data/types";
+import type { DbReservation } from "@/lib/reservations/reservation-mappers";
+import type { Session } from "@supabase/supabase-js";
 
 let roleSequence = 1;
 let userSequence = 1;
@@ -81,8 +84,13 @@ export const buildAmenity = (overrides: Partial<Amenity> = {}): Amenity => {
   return { ...base, ...overrides };
 };
 
-export const buildProperty = () => {
-  const property = {
+export const buildSession = (user: User = buildUser()): Session => ({
+  access_token: "test-token", refresh_token: "test-refresh", expires_in: 3600, token_type: "bearer",
+  user: { id: user.id, email: user.email, aud: "authenticated", role: "authenticated", app_metadata: {}, user_metadata: {}, created_at: "2026-10-01T00:00:00.000Z" },
+});
+
+export const buildProperty = (): Property => {
+  const property: Property = {
     id: `property-${propertySequence}`,
     name: `Hotel ${propertySequence}`,
     address: "123 Ocean Drive",
@@ -93,6 +101,11 @@ export const buildProperty = () => {
     google_maps_url: "https://maps.example.com/property",
     timezone: "America/New_York",
     currency: "USD",
+    allowSameDayTurnover: true,
+    showPartialDays: true,
+    defaultUnitsView: "remaining",
+    tax_enabled: false,
+    tax_percentage: 0,
   };
 
   propertySequence += 1;
@@ -235,6 +248,47 @@ export const buildReservation = (
 
   return { ...base, ...overrides };
 };
+
+export const buildDbReservation = (
+  reservation: Reservation = buildReservation(),
+  overrides: Partial<DbReservation> = {}
+): DbReservation => ({
+  id: reservation.id,
+  booking_id: reservation.bookingId,
+  guest_id: reservation.guestId,
+  room_id: reservation.roomId,
+  rate_plan_id: reservation.ratePlanId,
+  check_in_date: reservation.checkInDate,
+  check_out_date: reservation.checkOutDate,
+  number_of_guests: reservation.numberOfGuests,
+  status: reservation.status,
+  notes: reservation.notes ?? null,
+  total_amount: reservation.totalAmount,
+  booking_date: reservation.bookingDate,
+  source: reservation.source,
+  payment_method: reservation.paymentMethod,
+  adult_count: reservation.adultCount,
+  child_count: reservation.childCount,
+  hold_expires_at: reservation.holdExpiresAt ?? null,
+  tax_enabled_snapshot: reservation.taxEnabledSnapshot ?? false,
+  tax_rate_snapshot: reservation.taxRateSnapshot ?? 0,
+  external_source: reservation.externalSource ?? "internal",
+  external_id: reservation.externalId ?? null,
+  external_metadata: reservation.externalMetadata ?? {},
+  guest: reservation.guestSnapshot ? {
+    first_name: reservation.guestSnapshot.firstName ?? null,
+    last_name: reservation.guestSnapshot.lastName ?? null,
+    email: reservation.guestSnapshot.email ?? null,
+    phone: reservation.guestSnapshot.phone ?? null,
+  } : null,
+  folio: reservation.folio.map((item) => ({
+    id: item.id, reservation_id: reservation.id, description: item.description, amount: item.amount,
+    timestamp: item.timestamp, payment_method: item.paymentMethod ?? null, transaction_id: item.transactionId ?? null,
+    external_source: item.externalSource ?? "internal", external_reference: item.externalReference ?? null,
+    external_metadata: item.externalMetadata ?? {}, received_by: item.receivedBy ?? null, received_at: item.receivedAt ?? null,
+  })),
+  ...overrides,
+});
 
 export const buildStickyNote = (overrides: Partial<StickyNote> = {}): StickyNote => {
   const colors: Array<'yellow' | 'pink' | 'blue' | 'green'> = ['yellow', 'pink', 'blue', 'green'];

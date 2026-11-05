@@ -33,25 +33,17 @@ import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { isBookableRoom, ROOM_STATUS_LABELS } from "@/lib/rooms";
 import {
-  getNewRoomReservationStatusForPayment,
-  shouldConfirmNewRoomsAfterGatewayEdit,
-} from "@/lib/payments/reservation-payment-policy";
-import {
   calculateMultipleRoomPricing,
-  calculateRoomPricing,
   resolveRoomNightlyRate,
   type RoomPricingOverrides,
 } from "@/lib/pricing-calculator";
 import { deriveSavedCustomNightlyRates } from "@/lib/reservations/custom-pricing";
 import { resolveReservationTaxConfig } from "@/lib/reservations/calculate-financials";
-import { buildRoomOccupancyAssignments } from "@/lib/reservations/guest-allocation";
+import { BookingEditError, createReservationEditSnapshot } from "@/lib/reservations/booking-edit";
 import {
   doesReservationBlockAvailability,
   isActiveReservationStatus,
 } from "@/lib/reservations/status";
-import { markReservationAsRemoved } from "@/lib/reservations/filters";
-import { collectPaymentFolioToReassign } from "@/lib/reservations/reassign-payments";
-import { isReservationUuid } from "@/lib/reservations/identifiers";
 import { useCurrencyFormatter } from "@/hooks/use-currency";
 import type { Reservation, RoomType } from "@/data/types";
 import type { ReservationWithDetails } from "@/app/admin/reservations/components/columns";
@@ -86,8 +78,8 @@ const buildEditReservationSchema = (
   z
     .object({
       dateRange: dateRangeSchema,
-      adults: z.coerce.number().min(0, "Adults cannot be negative"),
-      children: z.coerce.number().min(0, "Children cannot be negative"),
+      adults: z.coerce.number().int("Enter a whole guest count").min(0, "Adults cannot be negative"),
+      children: z.coerce.number().int("Enter a whole guest count").min(0, "Children cannot be negative"),
       roomIds: z.array(z.string()).min(1, "Select at least one room"),
       roomTypeId: z.string().optional(),
       notes: z.string().max(500, "Notes must be under 500 characters").optional(),
@@ -144,9 +136,7 @@ export function ReservationEditForm({
   onSuccess,
 }: ReservationEditFormProps) {
   const {
-    updateReservation,
-    addRoomsToBooking,
-    reassignFolioItems,
+    saveBookingEdit,
     reservations,
     rooms,
     roomTypes,
@@ -154,8 +144,6 @@ export function ReservationEditForm({
     ratePlans,
     seasonalPrices,
     property,
-    validateBookingRequest,
-    refreshReservations,
     activeBookingReservations,
   } = useDataContext();
 
@@ -281,8 +269,13 @@ export function ReservationEditForm({
     mode: "onChange",
     reValidateMode: "onChange",
   });
+  // Read during render so React Hook Form subscribes to dirty-state changes.
+  const { isDirty, isSubmitting } = form.formState;
 
   const lastResetSignatureRef = React.useRef<string | null>(null);
+  const lastResetValuesRef = React.useRef(formDefaultValues);
+  const originalReservationsRef = React.useRef(createReservationEditSnapshot(activeGroupReservations));
+  const submissionInFlightRef = React.useRef(false);
 
   const defaultValuesSignature = React.useMemo(
     () =>
@@ -309,11 +302,15 @@ export function ReservationEditForm({
   );
 
   React.useEffect(() => {
-    if (form.formState.isSubmitting) return;
+    // Validation is async: values may already be edited before isDirty updates.
+    const hasDraft = JSON.stringify(form.getValues()) !== JSON.stringify(lastResetValuesRef.current);
+    if (isSubmitting || isDirty || hasDraft) return;
+    originalReservationsRef.current = createReservationEditSnapshot(activeGroupReservations);
     if (lastResetSignatureRef.current === defaultValuesSignature) return;
     form.reset(formDefaultValues);
+    lastResetValuesRef.current = formDefaultValues;
     lastResetSignatureRef.current = defaultValuesSignature;
-  }, [form, formDefaultValues, defaultValuesSignature]);
+  }, [form, formDefaultValues, defaultValuesSignature, activeGroupReservations, isDirty, isSubmitting]);
 
   React.useEffect(() => {
     void form.trigger("roomIds");
@@ -436,6 +433,8 @@ export function ReservationEditForm({
   const canSubmit = form.formState.isValid && hasCapacity && selectedRoomIds.length > 0 && !ratePlanUnavailable;
 
   React.useEffect(() => {
+    const hasDraft = JSON.stringify(form.getValues()) !== JSON.stringify(lastResetValuesRef.current);
+    if (isSubmitting || isDirty || hasDraft) return;
     if (!watchedDateRange?.from || !watchedDateRange?.to) return;
     const availableIds = new Set(allAvailableRooms.map((room) => room.id));
     const current = form.getValues("roomIds") ?? [];
@@ -443,7 +442,7 @@ export function ReservationEditForm({
     if (filtered.length !== current.length) {
       form.setValue("roomIds", filtered, { shouldValidate: true });
     }
-  }, [allAvailableRooms, form, watchedDateRange]);
+  }, [allAvailableRooms, form, watchedDateRange, isDirty, isSubmitting]);
 
   React.useEffect(() => {
     void form.trigger("roomIds");
@@ -461,16 +460,6 @@ export function ReservationEditForm({
       percentage: config.percentage,
     };
   }, [taxSnapshotSource, property]);
-  const taxSnapshot = React.useMemo(
-    () => {
-      const enabled = Boolean(taxConfig.enabled);
-      return {
-        taxEnabledSnapshot: enabled,
-        taxRateSnapshot: enabled ? taxConfig.percentage : 0,
-      };
-    },
-    [taxConfig]
-  );
 
   const selectedRoomTypes = React.useMemo(() => {
     return selectedRoomIds
@@ -556,25 +545,6 @@ export function ReservationEditForm({
     [customRatesValue, form]
   );
 
-  const buildCustomRoomTotals = React.useCallback(
-    (roomIdsList: string[], stayNights: number): Array<number | null> => {
-      if (!stayNights || stayNights <= 0) {
-        return roomIdsList.map(() => null);
-      }
-      return roomIdsList.map((roomId) => {
-        const room = roomMap.get(roomId);
-        if (!room) return null;
-        const roomType = roomTypeMap.get(room.roomTypeId);
-        if (!roomType) return null;
-        const override = customRatesValue[roomType.id];
-        if (typeof override !== "number" || override <= 0) {
-          return null;
-        }
-        return override * stayNights;
-      });
-    },
-    [customRatesValue, roomMap, roomTypeMap]
-  );
 
   const editCheckInDate = watchedDateRange?.from
     ? formatISO(watchedDateRange.from, { representation: "date" })
@@ -593,28 +563,6 @@ export function ReservationEditForm({
     });
   }, [selectedRoomTypes, ratePlan, nights, taxConfig, nightlyOverrides, seasonalPrices, editCheckInDate]);
 
-  const resolveRoomCharge = React.useCallback(
-    (roomId: string, stayNights: number) => {
-      if (!stayNights || stayNights <= 0 || !ratePlan) {
-        return null;
-      }
-      const room = roomMap.get(roomId);
-      const roomType = room ? roomTypeMap.get(room.roomTypeId) : undefined;
-      const pricingResult = calculateRoomPricing({
-        roomType,
-        ratePlan,
-        nights: stayNights,
-        rooms: 1,
-        taxConfig,
-        nightlyRateOverride: roomType ? customRatesValue[roomType.id] : undefined,
-        seasonalPrices,
-        checkInDate: editCheckInDate,
-      });
-      return pricingResult.totalCost;
-    },
-    [roomMap, roomTypeMap, ratePlan, taxConfig, customRatesValue, seasonalPrices, editCheckInDate]
-  );
-
   const handleRoomToggle = (roomId: string) => {
     if (ratePlanUnavailable) {
       toast.error("Assign a rate plan before selecting rooms.");
@@ -625,7 +573,7 @@ export function ReservationEditForm({
       form.setValue(
         "roomIds",
         current.filter((id) => id !== roomId),
-        { shouldValidate: true }
+        { shouldDirty: true, shouldValidate: true }
       );
       return;
     }
@@ -645,320 +593,34 @@ export function ReservationEditForm({
       return;
     }
 
-    form.setValue("roomIds", [...current, roomId], { shouldValidate: true });
+    form.setValue("roomIds", [...current, roomId], { shouldDirty: true, shouldValidate: true });
   };
 
   const handleSubmit = async (values: EditFormValues) => {
-    const { dateRange, adults: adultCount, children: childCount, notes } = values;
-    if (!dateRange?.from || !dateRange?.to) {
+    if (submissionInFlightRef.current) return;
+    if (!values.dateRange?.from || !values.dateRange?.to) {
       form.setError("dateRange", { message: "Select stay dates" });
       return;
     }
-
-    // Ensure we have a rate plan - assign default if this is an imported reservation
-    const effectiveRatePlan = ratePlan || getDefaultRatePlan;
-    if (!effectiveRatePlan) {
-      toast.error("No rate plans available. Please create a rate plan first.");
-      return;
-    }
-
-    const uniqueRoomIds = Array.from(new Set(values.roomIds));
-    form.setValue("roomIds", uniqueRoomIds, { shouldValidate: true });
-
-    const totalGuestsSelected = adultCount + childCount;
-    // Debug logging - remove in production
-    console.log('reservation.ratePlanId:', reservation.ratePlanId);
-    console.log('effectiveRatePlan:', effectiveRatePlan);
-    console.log('effectiveRatePlan.id:', effectiveRatePlan?.id);
-    console.log('isReservationUuid(effectiveRatePlan.id):', isReservationUuid(effectiveRatePlan?.id));
-
-    const baseReservationPayload = {
-      checkInDate: formatISO(dateRange.from, { representation: "date" }),
-      checkOutDate: formatISO(dateRange.to, { representation: "date" }),
-      notes: notes?.trim() || undefined,
-      // Only include rate plan ID if it's a valid UUID
-      ...(reservation.ratePlanId === null && isReservationUuid(effectiveRatePlan?.id) && {
-        ratePlanId: effectiveRatePlan.id
-      }),
-    };
-    const roomOccupancies = buildRoomOccupancyAssignments(
-      uniqueRoomIds,
-      adultCount,
-      childCount
-    );
-    const occupancyByRoomId = new Map(
-      roomOccupancies.map((entry) => [entry.roomId, entry])
-    );
-    const { taxEnabledSnapshot, taxRateSnapshot } = taxSnapshot;
-
-    const stayNights = Math.max(differenceInDays(dateRange.to, dateRange.from), 1);
-    const roomChargeMap = new Map<string, number>();
-    uniqueRoomIds.forEach((roomId) => {
-      const computed = resolveRoomCharge(roomId, stayNights);
-      if (typeof computed === "number" && Number.isFinite(computed)) {
-        roomChargeMap.set(roomId, computed);
-      }
-    });
-
-    const remainingReservations = [...activeGroupReservations];
-    const assignments: Array<{ reservation: Reservation; roomId: string }> = [];
-
-    uniqueRoomIds.forEach((roomId) => {
-      const matchIndex = remainingReservations.findIndex((entry) => entry.roomId === roomId);
-      if (matchIndex !== -1) {
-        const matched = remainingReservations.splice(matchIndex, 1)[0];
-        assignments.push({ reservation: matched, roomId });
-      }
-    });
-
-    const roomsStillNeeded = uniqueRoomIds.filter(
-      (roomId) => !assignments.some((assignment) => assignment.roomId === roomId)
-    );
-
-    const roomsToCreate: string[] = [];
-    roomsStillNeeded.forEach((roomId) => {
-      const reassignmentTarget = remainingReservations.shift();
-      if (reassignmentTarget) {
-        assignments.push({ reservation: reassignmentTarget, roomId });
-      } else {
-        roomsToCreate.push(roomId);
-      }
-    });
-
-    const reservationsToCancel = [...remainingReservations];
-
-    const dateSummary = `${format(dateRange.from, "MMM d, yyyy")} - ${format(
-      dateRange.to,
-      "MMM d, yyyy"
-    )}`;
-    const revertStack: Array<() => Promise<unknown> | void> = [];
-    // Fallback survivor for re-homed payments when every existing room was
-    // swapped out (no kept room): the first newly created room of the booking.
-    let firstCreatedReservationId: string | null = null;
-
+    submissionInFlightRef.current = true;
     try {
-      const availabilityResults = await Promise.all(
-        uniqueRoomIds.map(async (roomId, index) => {
-          const allocation =
-            occupancyByRoomId.get(roomId) ?? roomOccupancies[index] ?? {
-              adults: adultCount,
-              children: childCount,
-            };
-
-          return {
-            roomId,
-            result: await validateBookingRequest(
-              baseReservationPayload.checkInDate,
-              baseReservationPayload.checkOutDate,
-              roomId,
-              allocation.adults,
-              allocation.children,
-              reservation.bookingId
-            ),
-          };
-        })
-      );
-
-      const unavailable = availabilityResults.find(({ result }) => !result.isValid);
-      if (unavailable) {
-        const room = roomMap.get(unavailable.roomId);
-        const roomType = room ? roomTypeMap.get(room.roomTypeId) : undefined;
-        const roomLabel = room?.roomNumber ? `Room ${room.roomNumber}` : "Selected room";
-        const roomLine = roomType?.name ? `${roomLabel}, ${roomType.name}` : roomLabel;
-        toast.error("These rooms are not available for these dates.", {
-          description: `${dateSummary}\n${roomLine}.`,
-        });
-        return;
-      }
-      for (const { reservation: entry, roomId } of assignments) {
-        const previousPayload = {
-          checkInDate: entry.checkInDate,
-          checkOutDate: entry.checkOutDate,
-          adultCount: entry.adultCount,
-          childCount: entry.childCount,
-          numberOfGuests: entry.numberOfGuests ?? entry.adultCount + entry.childCount,
-          notes: entry.notes ?? undefined,
-          roomId: entry.roomId,
-          totalAmount: entry.totalAmount,
-          taxEnabledSnapshot: entry.taxEnabledSnapshot ?? false,
-          taxRateSnapshot: entry.taxRateSnapshot ?? 0,
-        };
-        const allocation =
-          occupancyByRoomId.get(roomId) ?? {
-            adults: adultCount,
-            children: childCount,
-          };
-        await updateReservation(entry.id, {
-          ...baseReservationPayload,
-          roomId,
-          adultCount: allocation.adults,
-          childCount: allocation.children,
-          numberOfGuests: allocation.adults + allocation.children,
-          totalAmount: roomChargeMap.get(roomId) ?? entry.totalAmount,
-          taxEnabledSnapshot,
-          taxRateSnapshot,
-        });
-        revertStack.push(() =>
-          updateReservation(entry.id, {
-            ...previousPayload,
-          })
-        );
-      }
-
-      const hasExplicitRoomRemoval =
-        uniqueRoomIds.length > 0 &&
-        activeGroupReservations.some(
-          (entry) => !uniqueRoomIds.includes(entry.roomId)
-        );
-
-      if (hasExplicitRoomRemoval) {
-        for (const entry of reservationsToCancel) {
-          if (entry.status === "Cancelled") {
-            continue;
-          }
-          const previousStatus = entry.status;
-          const previousMetadata = entry.externalMetadata
-            ? { ...entry.externalMetadata }
-            : null;
-          await updateReservation(entry.id, {
-            status: "Cancelled",
-            externalMetadata: markReservationAsRemoved(entry.externalMetadata),
-          });
-          revertStack.push(() =>
-            updateReservation(entry.id, {
-              status: previousStatus,
-              externalMetadata: previousMetadata ?? {},
-            })
-          );
-        }
-      }
-
-      if (roomsToCreate.length) {
-        const newRoomOccupancies = roomsToCreate.map((roomId) => {
-          const allocation = occupancyByRoomId.get(roomId) ?? {
-            adults: adultCount,
-            children: childCount,
-          };
-          return {
-            roomId,
-            adults: allocation.adults,
-            children: allocation.children,
-          };
-        });
-
-        const customTotalsForNewRooms = buildCustomRoomTotals(roomsToCreate, stayNights);
-        const hasCustomTotals = customTotalsForNewRooms.some(
-          (total) => typeof total === "number" && total > 0
-        );
-        const paymentMethod =
-          (reservation.paymentMethod as Reservation["paymentMethod"]) ?? "Not specified";
-
-        const createdReservations = await addRoomsToBooking({
-          bookingId: reservation.bookingId,
-          roomIds: roomsToCreate,
-          guestId: reservation.guestId,
-          ratePlanId: reservation.ratePlanId ?? "",
-          checkInDate: baseReservationPayload.checkInDate,
-          checkOutDate: baseReservationPayload.checkOutDate,
-          numberOfGuests: totalGuestsSelected,
-          adultCount,
-          childCount,
-          status: getNewRoomReservationStatusForPayment({
-            paymentMethod,
-            currentStatus: reservation.status,
-          }),
-          notes: baseReservationPayload.notes,
-          bookingDate: reservation.bookingDate,
-          source: reservation.source,
-          paymentMethod,
-          taxEnabledSnapshot,
-          taxRateSnapshot,
-          roomOccupancies: newRoomOccupancies,
-          customRoomTotals: hasCustomTotals ? customTotalsForNewRooms : undefined,
-        });
-
-        if (createdReservations.length) {
-          firstCreatedReservationId = createdReservations[0].id;
-          revertStack.push(() =>
-            Promise.all(
-              createdReservations.map((createdReservation) =>
-                updateReservation(createdReservation.id, {
-                  status: "Cancelled",
-                  externalMetadata: markReservationAsRemoved(
-                    createdReservation.externalMetadata
-                  ),
-                })
-              )
-            )
-          );
-        }
-
-        if (
-          shouldConfirmNewRoomsAfterGatewayEdit({
-            paymentMethod,
-            currentStatus: reservation.status,
-          })
-        ) {
-          for (const createdReservation of createdReservations) {
-            await updateReservation(createdReservation.id, {
-              status: "Confirmed",
-              holdExpiresAt: null,
-            });
-          }
-        }
-      }
-
-      // Re-home payments from any removed rooms onto a surviving room so the
-      // money stays with the booking instead of being stranded on a cancelled
-      // room. Charges stay behind with the removed room; only payments move.
-      const paymentReassignments = collectPaymentFolioToReassign(reservationsToCancel);
-      if (paymentReassignments.length > 0) {
-        const survivorReservationId =
-          assignments[0]?.reservation.id ?? firstCreatedReservationId;
-        if (survivorReservationId) {
-          await reassignFolioItems(
-            paymentReassignments.map((entry) => entry.folioItemId),
-            survivorReservationId
-          );
-          revertStack.push(async () => {
-            // Move each payment back to the room it came from.
-            for (const { folioItemId, fromReservationId } of paymentReassignments) {
-              await reassignFolioItems([folioItemId], fromReservationId);
-            }
-          });
-        }
-      }
-
-      await refreshReservations();
+      await saveBookingEdit(reservation.id, {
+        checkInDate: formatISO(values.dateRange.from, { representation: "date" }),
+        checkOutDate: formatISO(values.dateRange.to, { representation: "date" }),
+        adultCount: values.adults, childCount: values.children,
+        roomIds: [...new Set(values.roomIds)], notes: values.notes?.trim() || null,
+        customRates: values.customRates ?? {}, expectedReservations: originalReservationsRef.current,
+      });
       toast.success("Reservation updated successfully.");
       onSuccess?.();
     } catch (error) {
-      if (revertStack.length) {
-        for (const revert of revertStack.reverse()) {
-          try {
-            await Promise.resolve(revert());
-          } catch {
-            // Best-effort rollback; ignore failures while reverting.
-          }
-        }
-      }
-      await refreshReservations();
-
-      const isConflict =
-        typeof error === "object" &&
-        error !== null &&
-        "code" in error &&
-        (error as { code: string }).code === "23P01";
-
-      toast.error(
-        isConflict ? "Room No Longer Available" : "Failed to update reservation",
-        {
-          description: isConflict
-            ? (error as { message?: string }).message ||
-              "One or more rooms are already booked for the selected dates."
-            : (error as Error)?.message ?? "We rolled back partial changes. Please try again.",
-        },
-      );
+      const unconfirmed = error instanceof BookingEditError && error.code === "SAVE_UNCONFIRMED";
+      const stale = error instanceof BookingEditError && ["PT409", "STALE_BOOKING", "40001"].includes(error.code);
+      toast.error(unconfirmed ? "Couldn't confirm the save" : stale ? "Booking changed" : "Failed to update reservation", {
+        description: error instanceof Error ? error.message : "Check the booking before trying again.",
+      });
+    } finally {
+      submissionInFlightRef.current = false;
     }
   };
 
@@ -1341,7 +1003,7 @@ export function ReservationEditForm({
 
             <div className="rounded-2xl border border-border/60 p-4">
               <div className="flex flex-col gap-3">
-                <Button type="button" variant="outline" onClick={handleCancel}>
+                <Button type="button" variant="outline" onClick={handleCancel} disabled={form.formState.isSubmitting}>
                   Cancel
                 </Button>
                 <Button type="submit" disabled={!canSubmit || form.formState.isSubmitting}>

@@ -99,6 +99,7 @@ import type {
   AdminActivityLogInput,
 } from "@/data/types";
 import type { RoomOccupancyAssignment } from "@/lib/reservations/guest-allocation";
+import type { BookingEditInput, BookingEditResult } from "@/lib/reservations/booking-edit";
 
 type AddReservationPayload = Omit<
   Reservation,
@@ -175,6 +176,7 @@ interface DataContextType {
     reservationId: string,
     updatedData: Partial<Omit<Reservation, "id">>
   ) => void;
+  saveBookingEdit: (reservationId: string, input: BookingEditInput) => Promise<BookingEditResult>;
   updateReservationStatus: (
     reservationId: string,
     status: ReservationStatus
