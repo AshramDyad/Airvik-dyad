@@ -32,8 +32,17 @@ describe('Bhojan scanner', () => {
     const view = render(<Scanner />);
     await waitFor(() => expect(camera.start).toHaveBeenCalled());
     await act(async () => camera.scan({ data: 'bhojan:b0000000-0000-4000-8000-000000000002' }));
-    expect(screen.getByRole('status')).toHaveTextContent('No connection');
+    expect(screen.getByRole('status')).toHaveTextContent('Couldn’t confirm scan—scan again to check.');
     expect(screen.getByRole('status')).not.toHaveTextContent('Invalid');
+    view.unmount();
+  });
+  it('shows the previous scan time when the pass is locked', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(Response.json({ valid: false, reason: 'Already scanned at 8:10 PM', passNumber: 1, room: '206' }));
+    const view = render(<Scanner />);
+    await waitFor(() => expect(camera.start).toHaveBeenCalled());
+    await act(async () => camera.scan({ data: 'bhojan:b0000000-0000-4000-8000-000000000003' }));
+    expect(screen.getByRole('status')).toHaveTextContent('Already scanned at 8:10 PM');
+    expect(screen.getByRole('main')).toHaveStyle({ background: '#b91c1c' });
     view.unmount();
   });
 });

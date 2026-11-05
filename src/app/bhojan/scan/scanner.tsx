@@ -23,6 +23,7 @@ export default function Scanner() {
       lastSeen = now;
       if (busy || repeated || disposed) return;
       lastCode = raw;
+      let displayMs = 1400;
       if (reset) clearTimeout(reset);
       if (!/^bhojan:[0-9a-f-]{36}$/i.test(raw)) {
         setFeedback({ kind: 'invalid', text: 'Not a Bhojan pass' });
@@ -35,12 +36,14 @@ export default function Scanner() {
           const response = await fetch('/api/bhojan/validate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: raw.slice(7) }), signal: request.signal, cache: 'no-store' });
           if (!response.ok) throw new Error('Validation unavailable');
           const data = validationSchema.parse(await response.json());
+          if (!data.valid && data.reason.startsWith('Already scanned at ')) displayMs = 5000;
           if (!disposed) setFeedback({ kind: data.valid ? 'valid' : 'invalid', text: `${data.reason}${data.passNumber ? ` · Pass ${data.passNumber} · Room ${data.room ?? '—'}` : ''}` });
         } catch {
-          if (!disposed) { setFeedback({ kind: 'error', text: 'No connection — remove pass, then scan again' }); }
+          displayMs = 5000;
+          if (!disposed) { setFeedback({ kind: 'error', text: 'Couldn’t confirm scan—scan again to check.' }); }
         } finally { clearTimeout(timeout); busy = false; }
       }
-      if (!disposed) reset = setTimeout(() => setFeedback({ kind: 'idle', text: 'Point camera at a Bhojan pass' }), 1400);
+      if (!disposed) reset = setTimeout(() => setFeedback({ kind: 'idle', text: 'Point camera at a Bhojan pass' }), displayMs);
     };
     void import('qr-scanner').then(async ({ default: Camera }) => {
       if (disposed || !video.current) return;
