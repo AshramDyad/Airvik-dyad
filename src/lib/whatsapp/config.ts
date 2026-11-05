@@ -51,6 +51,16 @@ export function getVerifyToken(): string {
   return token;
 }
 
+/** Use only explicitly configured server credentials for booking confirmations. */
+export function getEnvNumberConfig(): WhatsAppNumberConfig {
+  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+  const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
+  if (!phoneNumberId || !accessToken) {
+    throw new Error("WhatsApp sending is not configured.");
+  }
+  return { apiVersion: getApiVersion(), phoneNumberId, accessToken, wabaId: process.env.WHATSAPP_WABA_ID ?? null };
+}
+
 /**
  * Resolve the active number config. Prefers the most recent `whatsapp_config` row
  * (written at onboarding); if the table is empty/absent it falls back to env vars.
@@ -80,17 +90,5 @@ export async function getNumberConfig(): Promise<WhatsAppNumberConfig> {
     console.warn(`[WhatsApp] whatsapp_config lookup failed, using env: ${message}`);
   }
 
-  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
-  const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
-  if (!phoneNumberId || !accessToken) {
-    throw new Error(
-      "Missing WhatsApp number config. Onboard via Embedded Signup, or set WHATSAPP_PHONE_NUMBER_ID and WHATSAPP_ACCESS_TOKEN.",
-    );
-  }
-  return {
-    apiVersion: getApiVersion(),
-    phoneNumberId,
-    accessToken,
-    wabaId: process.env.WHATSAPP_WABA_ID ?? null,
-  };
+  return getEnvNumberConfig();
 }

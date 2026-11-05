@@ -17,6 +17,8 @@ import {
 } from "@/app/admin/reservations/components/credit-note-dialogs";
 import { InvoiceDownloadButton } from "@/components/shared/invoice-download-button";
 import { SendInvoiceWhatsAppButton } from "@/components/shared/send-invoice-whatsapp-button";
+import { useAuthContext } from "@/context/auth-context";
+import { SendBookingConfirmationButton } from "./SendBookingConfirmationButton";
 import * as React from "react";
 
 interface ReservationHeaderProps {
@@ -31,6 +33,7 @@ export function ReservationHeader({
   bookingReservations: resolvedBookingReservations,
 }: ReservationHeaderProps) {
   const { updateReservationStatus, updateBookingReservationStatus, guests, rooms, roomTypes, property, reservations } = useDataContext();
+  const { hasPermission } = useAuthContext();
   const [isCancelDialogOpen, setIsCancelDialogOpen] = React.useState(false);
   const searchParams = useSearchParams();
   const isNewlyCreated = searchParams?.get("createdBooking") === "1";
@@ -85,6 +88,16 @@ export function ReservationHeader({
   );
   const canBeCheckedIn = reservation.status === "Confirmed";
   const canBeCheckedOut = reservation.status === "Checked-in";
+  const phone = (guest?.phone || reservation.guestSnapshot?.phone || "").trim();
+  const digits = phone.replace(/\D/g, "");
+  const validPhone = /^\+?[\d\s().-]+$/.test(phone) && /^[1-9]\d{7,14}$/.test(digits.length === 10 ? `91${digits}` : digits);
+  const confirmationDisabledReason = !hasPermission("update:reservation")
+    ? "You do not have permission to send a confirmation."
+    : effectiveStatus !== "Confirmed" || bookingReservations.some((entry) => entry.status !== "Confirmed" && entry.status !== "Cancelled")
+      ? "All active rooms must be confirmed before sending."
+      : !validPhone
+        ? "The guest has no valid phone number."
+        : undefined;
 
   return (
     <>
@@ -163,6 +176,7 @@ export function ReservationHeader({
             variant="outline"
             size="sm"
           />
+          <SendBookingConfirmationButton reservationId={reservation.id} disabledReason={confirmationDisabledReason} />
           <Button
             variant="outline"
             size="sm"

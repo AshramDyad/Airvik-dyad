@@ -1,0 +1,45 @@
+BEGIN;
+CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
+SET LOCAL search_path=public,extensions,pg_temp;
+SELECT no_plan();
+INSERT INTO public.roles(id,name,permissions) VALUES('b0000000-0000-4000-8000-000000000001','Bhojan fixture',ARRAY['update:reservation']);
+INSERT INTO auth.users(id,email,raw_user_meta_data,raw_app_meta_data) VALUES('b0000000-0000-4000-8000-000000000002','bhojan@example.invalid','{}','{}');
+INSERT INTO public.profiles(id,name,role_id) VALUES('b0000000-0000-4000-8000-000000000002','Bhojan fixture','b0000000-0000-4000-8000-000000000001') ON CONFLICT(id) DO UPDATE SET role_id=excluded.role_id;
+INSERT INTO public.room_types(id,name,max_occupancy,price) VALUES('b0000000-0000-4000-8000-000000000003','Bhojan fixture',10,100);
+INSERT INTO public.rooms(id,room_number,room_type_id,status) SELECT ('b0000000-0000-4000-8000-00000000000'||n)::uuid,'Bhojan-test-'||n,'b0000000-0000-4000-8000-000000000003','Clean' FROM generate_series(4,5)n;
+INSERT INTO public.reservations(id,booking_id,room_id,check_in_date,check_out_date,number_of_guests,adult_count,child_count,total_amount,status)
+SELECT ('b0000000-0000-4000-8000-00000000000'||(n+2))::uuid,'A999998888',('b0000000-0000-4000-8000-00000000000'||n)::uuid,
+(current_timestamp AT TIME ZONE 'Asia/Kolkata')::date,(current_timestamp AT TIME ZONE 'Asia/Kolkata')::date+2,
+CASE n WHEN 4 THEN 3 ELSE 2 END,2,CASE n WHEN 4 THEN 1 ELSE 0 END,100,'Confirmed' FROM generate_series(4,5)n;
+SELECT public.issue_bhojan_passes('b0000000-0000-4000-8000-000000000006','b0000000-0000-4000-8000-000000000002');
+SELECT is((SELECT count(*)::int FROM public.bhojan_passes WHERE booking_id='A999998888'),5,'one pass per adult and child');
+SELECT public.issue_bhojan_passes('b0000000-0000-4000-8000-000000000006','b0000000-0000-4000-8000-000000000002');
+SELECT is((SELECT count(*)::int FROM public.bhojan_passes WHERE booking_id='A999998888'),5,'repeat issuance is idempotent');
+SELECT is((SELECT public.validate_bhojan_pass(token)->>'reason' FROM public.bhojan_passes WHERE booking_id='A999998888' AND pass_number=1),'Not checked in','confirmation alone cannot admit');
+UPDATE public.reservations SET status='Checked-in' WHERE booking_id='A999998888';
+SELECT ok((SELECT (public.validate_bhojan_pass(token)->>'valid')::boolean FROM public.bhojan_passes WHERE booking_id='A999998888' AND pass_number=1),'checked-in pass valid');
+SELECT ok((SELECT (public.validate_bhojan_pass(token)->>'valid')::boolean FROM public.bhojan_passes WHERE booking_id='A999998888' AND pass_number=1),'repeated scan remains valid');
+UPDATE public.reservations SET check_out_date=check_out_date+2 WHERE booking_id='A999998888';
+SELECT ok((SELECT (public.validate_bhojan_pass(token)->>'valid')::boolean FROM public.bhojan_passes WHERE booking_id='A999998888' AND pass_number=1),'extension preserves token');
+UPDATE public.reservations SET number_of_guests=2,adult_count=1 WHERE id='b0000000-0000-4000-8000-000000000006';
+SELECT ok((SELECT revoked FROM public.bhojan_passes WHERE booking_id='A999998888' AND pass_number=3),'highest excess pass revoked');
+UPDATE public.reservations SET number_of_guests=3,adult_count=2 WHERE id='b0000000-0000-4000-8000-000000000006';
+SELECT public.issue_bhojan_passes('b0000000-0000-4000-8000-000000000006','b0000000-0000-4000-8000-000000000002');
+SELECT ok((SELECT revoked FROM public.bhojan_passes WHERE booking_id='A999998888' AND pass_number=3),'revoked token never reactivated');
+SELECT is((SELECT count(*)::int FROM public.bhojan_passes WHERE booking_id='A999998888' AND NOT revoked),5,'extra guest gets new token');
+UPDATE public.reservations SET status='Checked-out' WHERE id='b0000000-0000-4000-8000-000000000007';
+SELECT ok((SELECT revoked FROM public.bhojan_passes WHERE booking_id='A999998888' AND pass_number=4),'partial checkout revokes room passes');
+SELECT ok((SELECT (public.validate_bhojan_pass(token)->>'valid')::boolean FROM public.bhojan_passes WHERE booking_id='A999998888' AND pass_number=1),'other room stays valid');
+UPDATE public.reservations SET check_in_date=check_in_date+1 WHERE id='b0000000-0000-4000-8000-000000000006';
+SELECT is((SELECT public.validate_bhojan_pass(token)->>'reason' FROM public.bhojan_passes WHERE booking_id='A999998888' AND pass_number=1),'Stay has not started','arrival date enforced');
+UPDATE public.reservations SET check_in_date=current_date-3,check_out_date=current_date-1 WHERE id='b0000000-0000-4000-8000-000000000006';
+SELECT is((SELECT public.validate_bhojan_pass(token)->>'reason' FROM public.bhojan_passes WHERE booking_id='A999998888' AND pass_number=1),'Pass expired','expiry enforced');
+SELECT is(public.validate_bhojan_pass('b0000000-0000-4000-8000-000000000099')->>'reason','Invalid pass','unknown token rejected');
+SELECT throws_ok($$SELECT public.issue_bhojan_passes('b0000000-0000-4000-8000-000000000006','b0000000-0000-4000-8000-000000000099')$$,'P0001','Permission denied','permission required');
+SELECT ok(NOT has_table_privilege('anon','public.bhojan_passes','SELECT'),'anonymous cannot read pass table');
+SELECT ok(NOT has_function_privilege('authenticated','public.issue_bhojan_passes(uuid,uuid)','EXECUTE'),'browser cannot call issuance directly');
+SELECT public.record_whatsapp_inbound('test-number','919999999999',now());
+SELECT public.record_whatsapp_inbound('test-number','919999999999',now()-interval '2 hours');
+SELECT is((SELECT last_message_at FROM public.whatsapp_inbound_windows WHERE phone_number_id='test-number'),now(),'older webhook cannot move window backwards');
+SELECT * FROM finish();
+ROLLBACK;

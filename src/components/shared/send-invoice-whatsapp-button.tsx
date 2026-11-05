@@ -96,7 +96,7 @@ export function SendInvoiceWhatsAppButton({
       ) : (
         <>
           <Send className="mr-2 h-4 w-4" />
-          WhatsApp
+          Send receipt
         </>
       )}
     </Button>

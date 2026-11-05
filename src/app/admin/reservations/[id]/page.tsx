@@ -5,6 +5,7 @@ import { useParams, notFound } from "next/navigation";
 import { differenceInDays, parseISO } from "date-fns";
 
 import { useDataContext } from "@/context/data-context";
+import { BhojanPasses } from "./components/BhojanPasses";
 import { ReservationHeader } from "./components/ReservationHeader";
 import { GuestDetailsCard } from "./components/GuestDetailsCard";
 import { StayDetailsCard } from "./components/StayDetailsCard";
@@ -308,7 +309,8 @@ export default function ReservationDetailsPage() {
               reservation={reservationWithDetails}
               groupSummary={groupSummary}
             />
-            <ReservationActivityTimeline reservationId={reservation.id} />
+            <PermissionGate permissions={["update:reservation"]} fallback={null}><BhojanPasses reservationId={reservationIdFromParams} /></PermissionGate>
+              <ReservationActivityTimeline reservationId={reservation.id} />
           </div>
         </div>
       </div>

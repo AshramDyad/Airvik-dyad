@@ -3,16 +3,7 @@ import { SITE, SITE_URL, ALL_KEYWORDS } from "@/config/site";
 import "yet-another-react-lightbox/styles.css";
 import "yet-another-react-lightbox/plugins/counter.css";
 import "./globals.css";
-import { Toaster } from "@/components/ui/sonner";
-import { ThemeProvider } from "@/components/theme-provider";
-import { SessionProvider } from "@/context/session-context";
-import { AuthProvider } from "@/context/auth-context";
-import { DataProvider } from "@/context/data-context";
-import { StickyBookingButton } from "@/components/sticky-booking-button";
-import { GoogleAnalytics } from "@next/third-parties/google";
-
-// GA stays OFF until NEXT_PUBLIC_GA_ID is set in the Vercel Production env.
-const GA_ID = process.env.NEXT_PUBLIC_GA_ID;
+import { RouteProviders } from "@/components/route-providers";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -78,23 +69,7 @@ export default function RootLayout({
         suppressHydrationWarning
         className="font-sans antialiased"
       >
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="light"
-          enableSystem={false}
-          disableTransitionOnChange
-        >
-          <SessionProvider>
-            <AuthProvider>
-              <DataProvider>
-                {children}
-                <StickyBookingButton />
-                <Toaster position="top-right" />
-              </DataProvider>
-            </AuthProvider>
-          </SessionProvider>
-        </ThemeProvider>
-        {GA_ID ? <GoogleAnalytics gaId={GA_ID} /> : null}
+        <RouteProviders>{children}</RouteProviders>
       </body>
     </html>
   );

@@ -20,6 +20,9 @@ function getProxySupabaseConfig(): { url: string; anonKey: string } {
 }
 
 export async function updateSession(request: NextRequest): Promise<NextResponse> {
+  if (request.nextUrl.pathname === '/bhojan/scan' || request.nextUrl.pathname.startsWith('/bhojan/') || request.nextUrl.pathname === '/api/bhojan/validate') {
+    return NextResponse.next({ request });
+  }
   let supabaseResponse: NextResponse = NextResponse.next({ request });
 
   const { url, anonKey } = getProxySupabaseConfig();
