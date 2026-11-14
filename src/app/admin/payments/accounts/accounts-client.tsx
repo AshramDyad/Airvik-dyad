@@ -29,6 +29,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useDataContext } from "@/context/data-context";
+import { useAdminLiveSurface } from "@/context/admin-live-context";
 import type {
   CashReceiverSummary,
   PaymentAccountingSummary,
@@ -53,6 +54,20 @@ export function AccountsClient() {
   const [isRefreshing, setIsRefreshing] = React.useState(false);
 
   const timeZone = property?.timezone || "Asia/Kolkata";
+
+  // Report only the date filter, never payment details or other form values.
+  const selectedDate = /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : "not selected";
+  const viewedDate = payload?.date;
+  useAdminLiveSurface(
+    "section",
+    isLoading
+      ? `Accounts date selected: ${selectedDate} (loading)`
+      : error
+        ? `Accounts date selected: ${selectedDate} (load failed)`
+        : viewedDate && /^\d{4}-\d{2}-\d{2}$/.test(viewedDate)
+          ? `Accounts date viewed: ${viewedDate}`
+          : null
+  );
 
   const loadAccounts = React.useCallback(
     async (nextDate: string, silent = false) => {
