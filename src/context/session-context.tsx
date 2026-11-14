@@ -4,9 +4,12 @@ import * as React from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase, lastRefreshRateLimited } from "@/integrations/supabase/client";
 
+import { flushAdminHistoryBeforeSignOut } from "@/lib/admin-history/recorder";
+
 let pendingIntentionalSignOut = false;
 
 export async function signOutUser(): Promise<void> {
+  await Promise.race([flushAdminHistoryBeforeSignOut().catch(() => {}), new Promise(resolve => setTimeout(resolve, 2000))]);
   pendingIntentionalSignOut = true;
   await supabase.auth.signOut();
 }

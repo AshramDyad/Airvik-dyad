@@ -39,6 +39,7 @@ import { useAdminActivityLogs } from "@/hooks/use-admin-activity-logs";
 import { useCurrencyFormatter } from "@/hooks/use-currency";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LIVE_VIEWER_ID } from "@/lib/admin-live/model";
+import { BrowsingHistory } from "./browsing-history";
 import { LiveActivity } from "./live-activity";
 import {
   formatActivityActor,
@@ -63,12 +64,14 @@ const LIMIT_OPTIONS = [10, 25, 50, 100, 200] as const;
 export default function ActivityPage() {
   const { currentUser } = useAuthContext();
   if (currentUser?.id !== LIVE_VIEWER_ID) return <ActivityLog />;
-  return <Tabs defaultValue="live" activityLabels={{ live: "Live now", history: "Activity log" }}>
+  return <Tabs defaultValue="live" activityLabels={{ live: "Live now", history: "Activity log", browsing: "Browsing history" }}>
     <TabsList>
       <TabsTrigger value="live">Live now</TabsTrigger>
+      <TabsTrigger value="browsing">Browsing history</TabsTrigger>
       <TabsTrigger value="history">Activity log</TabsTrigger>
     </TabsList>
     <TabsContent value="live"><LiveActivity /></TabsContent>
+    <TabsContent value="browsing"><BrowsingHistory /></TabsContent>
     <TabsContent value="history"><ActivityLog /></TabsContent>
   </Tabs>;
 }

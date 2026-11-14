@@ -143,7 +143,7 @@ export function LiveActivity() {
           </div>
         </details>;
       })}
-      <p className="text-xs text-muted-foreground">Background or sleeping tabs can become stale. Tab labels identify app connections, not browser tab positions. Live activity is not saved as history.</p>
+      <p className="text-xs text-muted-foreground">Background or sleeping tabs can become stale. Tab labels identify app connections, not browser tab positions. Recorded navigation is available in Browsing history for 90 days.</p>
     </CardContent>
   </Card>;
 }

@@ -10,6 +10,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { IDLE_MS, type LiveLocation } from "@/lib/admin-live/model";
 import { createLiveTransport, type LiveTransport } from "@/lib/admin-live/transport";
 
+import { createHistoryRecorder } from "@/lib/admin-history/recorder";
+
 type SurfaceKind = "section" | "dialog" | "booking";
 type Surface = { pathname: string; kind: SurfaceKind; label: string };
 type Register = (id: string, surface: Surface) => () => void;
@@ -41,6 +43,9 @@ export function AdminLiveProvider({ children }: { children: React.ReactNode }) {
   const [signedOut, setSignedOut] = React.useState(false);
   const [transport, setTransport] = React.useState<LiveTransport | null>(null);
   const transportRef = React.useRef<LiveTransport | null>(null);
+  const historyRef = React.useRef<ReturnType<typeof createHistoryRecorder> | null>(null);
+  const sessionRef = React.useRef(session);
+  sessionRef.current = session;
   const surfaces = React.useRef(new Map<string, Surface>());
   const pathRef = React.useRef(pathname);
   pathRef.current = pathname;
@@ -64,9 +69,11 @@ export function AdminLiveProvider({ children }: { children: React.ReactNode }) {
   const register = React.useCallback<Register>((id, surface) => {
     surfaces.current.set(id, surface);
     transportRef.current?.publish();
+    historyRef.current?.change();
     return () => {
       surfaces.current.delete(id);
       transportRef.current?.publish();
+      historyRef.current?.change();
     };
   }, []);
 
@@ -93,14 +100,16 @@ export function AdminLiveProvider({ children }: { children: React.ReactNode }) {
     const live = createLiveTransport(supabase, userId, getPayload);
     transportRef.current = live;
     setTransport(live);
+    const history = createHistoryRecorder(userId, () => sessionRef.current, getPayload);
+    historyRef.current = history;
     const interaction = () => {
       const wasIdle = performance.now() - lastInteraction >= IDLE_MS;
       lastInteraction = performance.now();
-      if (wasIdle) live.publish();
+      if (wasIdle) { live.publish(); history.change(); }
     };
-    const visibility = () => live.publish();
-    const hide = () => live.suspend();
-    const show = () => { live.resume(); live.publish(); };
+    const visibility = () => { live.publish(); history.change(); if (document.visibilityState === "hidden") history.flushHidden?.(); };
+    const hide = () => { history.suspend(); live.suspend(); };
+    const show = () => { history.resume(); live.resume(); live.publish(); };
     const offline = () => live.suspend();
     const online = () => live.resume();
     const interactionEvents = ["pointerdown", "pointermove", "keydown", "scroll"] as const;
@@ -113,6 +122,8 @@ export function AdminLiveProvider({ children }: { children: React.ReactNode }) {
     window.addEventListener("offline", offline);
     window.addEventListener("online", online);
     return () => {
+      history.dispose();
+      historyRef.current = null;
       live.dispose();
       transportRef.current = null;
       setTransport(null);
@@ -127,7 +138,7 @@ export function AdminLiveProvider({ children }: { children: React.ReactNode }) {
     };
   }, [enabled, userId]);
 
-  React.useEffect(() => { transportRef.current?.publish(); }, [pathname]);
+  React.useEffect(() => { transportRef.current?.publish(); historyRef.current?.change(); }, [pathname]);
 
   return <SurfaceContext.Provider value={register}>
     <TransportContext.Provider value={transport}>{children}</TransportContext.Provider>
