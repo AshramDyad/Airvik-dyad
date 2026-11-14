@@ -4,8 +4,20 @@ import * as React from "react"
 import * as TabsPrimitive from "@radix-ui/react-tabs"
 
 import { cn } from "@/lib/utils"
+import { useAdminLiveSurface } from "@/context/admin-live-context"
 
-const Tabs = TabsPrimitive.Root
+const Tabs = React.forwardRef<React.ElementRef<typeof TabsPrimitive.Root>, React.ComponentPropsWithoutRef<typeof TabsPrimitive.Root> & { activityLabels?: Record<string, string> }>(
+  ({ activityLabels, value, defaultValue, onValueChange, ...props }, ref) => {
+    const [internalValue, setInternalValue] = React.useState(defaultValue)
+    const selected = value ?? internalValue
+    useAdminLiveSurface("section", selected ? activityLabels?.[selected] : null)
+    return <TabsPrimitive.Root {...props} ref={ref} value={value} defaultValue={defaultValue} onValueChange={next => {
+      setInternalValue(next)
+      onValueChange?.(next)
+    }} />
+  }
+)
+Tabs.displayName = TabsPrimitive.Root.displayName
 
 const TabsList = React.forwardRef<
   React.ElementRef<typeof TabsPrimitive.List>,

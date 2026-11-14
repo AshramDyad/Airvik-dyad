@@ -33,6 +33,7 @@ export function InternalLinkPicker({
 
   return (
     <CommandDialog
+      activityLabel="Select internal link"
       open={open}
       onOpenChange={(nextOpen) => {
         setSearch("");

@@ -89,7 +89,7 @@ export function SendBookingConfirmationButton({ reservationId, disabledReason }:
   }
 
   return (
-    <Dialog open={open} onOpenChange={(next) => void changeOpen(next)}>
+    <Dialog activityLabel="Send booking confirmation" open={open} onOpenChange={(next) => void changeOpen(next)}>
       <DialogTrigger asChild>
         <Button variant="outline" size="sm" disabled={Boolean(disabledReason)} title={disabledReason} aria-describedby={disabledReason ? reasonId : undefined}>
           <FaWhatsapp aria-hidden="true" className="mr-2 h-4 w-4" /> Send confirmation

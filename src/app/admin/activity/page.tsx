@@ -37,6 +37,9 @@ import { PermissionGate } from "@/components/admin/permission-gate";
 import { useAuthContext } from "@/context/auth-context";
 import { useAdminActivityLogs } from "@/hooks/use-admin-activity-logs";
 import { useCurrencyFormatter } from "@/hooks/use-currency";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { LIVE_VIEWER_ID } from "@/lib/admin-live/model";
+import { LiveActivity } from "./live-activity";
 import {
   formatActivityActor,
   formatActivityOutcome,
@@ -58,6 +61,19 @@ const ROLE_OPTIONS = [
 const LIMIT_OPTIONS = [10, 25, 50, 100, 200] as const;
 
 export default function ActivityPage() {
+  const { currentUser } = useAuthContext();
+  if (currentUser?.id !== LIVE_VIEWER_ID) return <ActivityLog />;
+  return <Tabs defaultValue="live" activityLabels={{ live: "Live now", history: "Activity log" }}>
+    <TabsList>
+      <TabsTrigger value="live">Live now</TabsTrigger>
+      <TabsTrigger value="history">Activity log</TabsTrigger>
+    </TabsList>
+    <TabsContent value="live"><LiveActivity /></TabsContent>
+    <TabsContent value="history"><ActivityLog /></TabsContent>
+  </Tabs>;
+}
+
+function ActivityLog() {
   const { hasFeatureAccess } = useAuthContext();
   const canView = hasFeatureAccess("activity");
   const {

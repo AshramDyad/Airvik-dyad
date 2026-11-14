@@ -23,7 +23,7 @@ const Command = React.forwardRef<
 ))
 Command.displayName = CommandPrimitive.displayName
 
-const CommandDialog = ({ children, ...props }: DialogProps) => {
+const CommandDialog = ({ children, ...props }: DialogProps & { activityLabel?: string }) => {
   return (
     <Dialog {...props}>
       <DialogContent className="overflow-hidden rounded-3xl border border-border/50 bg-card/95 p-0 shadow-xl backdrop-blur">

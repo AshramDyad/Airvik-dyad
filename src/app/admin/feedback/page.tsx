@@ -605,7 +605,7 @@ function FeedbackDetailDialog({ feedback, open, onOpenChange, onSave, isSaving }
 
   if (!feedback) {
     return (
-      <Dialog open={open} onOpenChange={onOpenChange}>
+      <Dialog activityLabel="View feedback" open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Feedback details</DialogTitle>
@@ -633,7 +633,7 @@ function FeedbackDetailDialog({ feedback, open, onOpenChange, onSave, isSaving }
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog activityLabel="Edit feedback" open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl space-y-6">
         <DialogHeader>
           <DialogTitle>Feedback from {feedback.isAnonymous ? "Anonymous" : feedback.name ?? "Guest"}</DialogTitle>

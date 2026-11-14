@@ -676,7 +676,7 @@ export function PaymentsClient() {
         </CardContent>
       </Card>
 
-      <Dialog
+      <Dialog activityLabel="Attach payment to booking"
         open={attachTarget !== null}
         onOpenChange={(open) => {
           if (!open) {
@@ -750,7 +750,7 @@ export function PaymentsClient() {
         </DialogContent>
       </Dialog>
 
-      <Dialog
+      <Dialog activityLabel="Attach receipt to transaction"
         open={receiptTarget !== null}
         onOpenChange={(open) => {
           if (!open) {

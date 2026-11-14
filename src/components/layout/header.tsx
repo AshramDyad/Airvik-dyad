@@ -39,7 +39,7 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b border-border/50 px-4 shadow-sm lg:h-24 lg:px-8">
-      <Sheet open={isMenuOpen} onOpenChange={setIsMenuOpen}>
+      <Sheet activityLabel="Navigation menu" open={isMenuOpen} onOpenChange={setIsMenuOpen}>
         <SheetTrigger asChild>
           <Button
             variant="ghost"

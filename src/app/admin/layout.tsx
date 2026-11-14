@@ -9,6 +9,7 @@ import { useAuthContext } from "@/context/auth-context";
 import { useDataContext } from "@/context/data-context";
 import { GeistSpinner } from "@/components/shared/vercel-spinner";
 import { ADMIN_SHELL_ROLES } from "@/constants/roles";
+import { AdminLiveProvider } from "@/context/admin-live-context";
 
 export default function AdminLayout({
   children,
@@ -55,6 +56,7 @@ function AdminLayoutInner({
   }
 
   return (
+    <AdminLiveProvider>
     <div
       className={cn(
         "grid min-h-screen overflow-hidden w-full bg-background transition-colors",
@@ -82,5 +84,6 @@ function AdminLayoutInner({
         </main>
       </div>
     </div>
+    </AdminLiveProvider>
   );
 }

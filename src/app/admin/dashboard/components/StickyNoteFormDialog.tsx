@@ -118,7 +118,7 @@ export function StickyNoteFormDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog activityLabel="Sticky note form" open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent 
         className="w-[calc(100vw-2rem)] h-auto max-h-[85vh] max-w-[420px] rounded-2xl p-4 sm:w-full sm:max-w-md sm:p-6 overflow-y-auto [&>button]:rounded-xl [&>button]:bg-primary/10 [&>button]:text-primary [&>button]:hover:text-primary"

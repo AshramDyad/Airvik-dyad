@@ -372,7 +372,7 @@ export function CreatePaymentClient() {
         </CardContent>
       </Card>
 
-      <Dialog open={isQrDialogOpen} onOpenChange={setIsQrDialogOpen}>
+      <Dialog activityLabel="Payment QR" open={isQrDialogOpen} onOpenChange={setIsQrDialogOpen}>
         <DialogContent className="max-w-[520px] p-6">
           <DialogHeader>
             <DialogTitle className="font-sans text-lg">Payment QR</DialogTitle>

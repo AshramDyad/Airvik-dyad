@@ -234,7 +234,7 @@ export function OwnerOverviewClient() {
       </div>
 
       {/* Settled / Settling / Payout */}
-      <Tabs defaultValue="settled">
+      <Tabs activityLabels={{ settled: "Settled", settling: "Settling", payout: "Payout" }} defaultValue="settled">
         <TabsList>
           <TabsTrigger value="settled">
             Settled {summary ? `(${summary.settled.length})` : ""}

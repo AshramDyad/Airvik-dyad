@@ -80,7 +80,7 @@ export function BhojanPasses({ reservationId }: { reservationId: string }) {
         {!preview.passes.length && <p>No passes issued yet.</p>}
       </>}
       {message && <p role="status" className="text-sm">{message}</p>}
-      <Dialog open={mode !== null} onOpenChange={open => { if (!open && !busy) setMode(null); }}>
+      <Dialog activityLabel="Bhojan passes" open={mode !== null} onOpenChange={open => { if (!open && !busy) setMode(null); }}>
         <DialogContent onEscapeKeyDown={e => { if (busy) e.preventDefault(); }} onPointerDownOutside={e => { if (busy) e.preventDefault(); }}>
           <DialogHeader><DialogTitle>Send Bhojan passes</DialogTitle><DialogDescription>{selected.length} individual pass images to {preview?.phone}. The main guest can forward each pass.</DialogDescription></DialogHeader>
           <p className="text-sm">{preview?.bookingId}: {selected.map(p => `Pass ${p.pass_number} (room ${p.room})`).join(', ')}. Validity follows the current booking.</p>

@@ -6,8 +6,16 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { X } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+import { useAdminLiveSurface } from "@/context/admin-live-context"
 
-const Sheet = SheetPrimitive.Root
+function Sheet({ activityLabel, open, defaultOpen, onOpenChange, ...props }: React.ComponentPropsWithoutRef<typeof SheetPrimitive.Root> & { activityLabel?: string }) {
+  const [internalOpen, setInternalOpen] = React.useState(defaultOpen ?? false)
+  useAdminLiveSurface("dialog", activityLabel, open ?? internalOpen)
+  return <SheetPrimitive.Root {...props} open={open} defaultOpen={defaultOpen} onOpenChange={next => {
+    setInternalOpen(next)
+    onOpenChange?.(next)
+  }} />
+}
 
 const SheetTrigger = SheetPrimitive.Trigger
 

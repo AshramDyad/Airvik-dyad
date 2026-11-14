@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useAdminLiveSurface } from "@/context/admin-live-context";
 import { useParams, useRouter, notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
@@ -47,6 +48,8 @@ export default function ReservationEditPage() {
     console.log(`[EditPage] Finding reservation for ${reservationId}: ${found ? 'Found' : 'Not Found'}`);
     return found;
   }, [reservations, activeBookingReservations, bookings, reservationId]);
+
+  useAdminLiveSurface("booking", reservation?.bookingId);
 
   const isActuallyLoading = 
     isLoading || 

@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useAdminLiveSurface } from "@/context/admin-live-context";
 import { useParams, notFound } from "next/navigation";
 import { differenceInDays, parseISO } from "date-fns";
 
@@ -78,6 +79,8 @@ export default function ReservationDetailsPage() {
     Boolean(reservation) &&
     !resolvedBookingGroup.hasCompleteGroup &&
     (isBaseDataLoading || isBookingLookupPending);
+
+  useAdminLiveSurface("booking", reservation?.bookingId);
 
   const isActuallyLoading = isBaseDataLoading || isBookingLookupPending;
 

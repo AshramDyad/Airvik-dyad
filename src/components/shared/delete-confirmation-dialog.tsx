@@ -25,7 +25,7 @@ export function DeleteConfirmationDialog({
   itemName = "this item",
 }: DeleteConfirmationDialogProps) {
   return (
-    <AlertDialog open={isOpen} onOpenChange={onOpenChange}>
+    <AlertDialog activityLabel="Delete confirmation" open={isOpen} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>

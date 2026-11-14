@@ -523,7 +523,7 @@ export function ReservationPaymentRequestsPanel({
         </div>
       )}
 
-      <Dialog open={isQrDialogOpen} onOpenChange={setIsQrDialogOpen}>
+      <Dialog activityLabel="Payment QR" open={isQrDialogOpen} onOpenChange={setIsQrDialogOpen}>
         <DialogContent className="max-h-[calc(100vh-2rem)] max-w-[520px] overflow-y-auto p-6">
           <DialogHeader>
             <DialogTitle className="font-sans text-lg">Payment QR</DialogTitle>
@@ -570,7 +570,7 @@ export function ReservationPaymentRequestsPanel({
         </DialogContent>
       </Dialog>
 
-      <Dialog
+      <Dialog activityLabel="Confirm payment"
         open={requestPendingConfirm !== null}
         onOpenChange={(open) => {
           if (!open) {

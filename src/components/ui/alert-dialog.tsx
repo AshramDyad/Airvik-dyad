@@ -5,8 +5,16 @@ import * as AlertDialogPrimitive from "@radix-ui/react-alert-dialog"
 
 import { cn } from "@/lib/utils"
 import { buttonVariants } from "@/components/ui/button"
+import { useAdminLiveSurface } from "@/context/admin-live-context"
 
-const AlertDialog = AlertDialogPrimitive.Root
+function AlertDialog({ activityLabel, open, defaultOpen, onOpenChange, ...props }: React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Root> & { activityLabel?: string }) {
+  const [internalOpen, setInternalOpen] = React.useState(defaultOpen ?? false)
+  useAdminLiveSurface("dialog", activityLabel, open ?? internalOpen)
+  return <AlertDialogPrimitive.Root {...props} open={open} defaultOpen={defaultOpen} onOpenChange={next => {
+    setInternalOpen(next)
+    onOpenChange?.(next)
+  }} />
+}
 
 const AlertDialogTrigger = AlertDialogPrimitive.Trigger
 

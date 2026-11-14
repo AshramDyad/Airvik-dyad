@@ -96,6 +96,7 @@ export function PostsFilters({
   return (
     <div className="flex flex-col gap-4 rounded-lg border bg-card p-4">
       <Tabs
+        activityLabels={{ all: "All posts", draft: "Drafts" }}
         value={status}
         onValueChange={handleTabValueChange}
         className="w-full"

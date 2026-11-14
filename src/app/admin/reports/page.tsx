@@ -19,7 +19,7 @@ export default function ReportsPage() {
           Generate and view reports for your property.
         </p>
       </div>
-      <Tabs defaultValue="bookings" className="w-full">
+      <Tabs activityLabels={{ bookings: "Bookings", occupancy: "Occupancy", revenue: "Revenue" }} defaultValue="bookings" className="w-full">
         <TabsList className="flex w-full flex-wrap gap-2 rounded-2xl border border-border/40 bg-card/80 p-1 shadow-sm">
           <TabsTrigger
             value="bookings"

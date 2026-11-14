@@ -122,7 +122,7 @@ export function DiscountApprovalDialog({
   const busy = sending || verifying;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog activityLabel="Booking approval" open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
           <DialogTitle>Owner approval required</DialogTitle>

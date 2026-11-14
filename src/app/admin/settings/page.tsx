@@ -28,7 +28,7 @@ export default function SettingsPage() {
             Manage your property settings, team members, and billing information.
           </p>
         </div>
-        <Tabs defaultValue="property" className="w-full">
+        <Tabs activityLabels={{ property: "Property", amenities: "Amenities", roles: "Roles & Permissions", users: "Users", billing: "Billing", "data-tools": "Data tools" }} defaultValue="property" className="w-full">
           <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="property">Property</TabsTrigger>
             <TabsTrigger value="amenities">Amenities</TabsTrigger>

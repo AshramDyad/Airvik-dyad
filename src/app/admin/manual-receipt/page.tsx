@@ -597,7 +597,7 @@ export default function ManualReceiptPage() {
       )}
 
       {/* Edit Receipt Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={(open) => {
+      <Dialog activityLabel="Receipt form" open={dialogOpen} onOpenChange={(open) => {
         setDialogOpen(open);
         if (!open) setEditingReceipt(null);
       }}>

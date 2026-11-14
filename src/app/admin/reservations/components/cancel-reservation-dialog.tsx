@@ -23,7 +23,7 @@ export function CancelReservationDialog({
   onConfirm,
 }: CancelReservationDialogProps) {
   return (
-    <AlertDialog open={isOpen} onOpenChange={onOpenChange}>
+    <AlertDialog activityLabel="Cancel reservation" open={isOpen} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Are you sure?</AlertDialogTitle>
