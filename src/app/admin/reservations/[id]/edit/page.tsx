@@ -124,7 +124,6 @@ export default function ReservationEditPage() {
 
   return (
     <>
-    {qa.notice}
     <QaBookingBoundary key={`${reservation.id}:${qaScenario}`} scenario={qaScenario}>
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">

@@ -280,7 +280,6 @@ export default function ReservationDetailsPage() {
 
   return (
     <PermissionGate feature="reservations">
-      {qa.notice}
       <QaBookingBoundary key={`${reservation.id}:${qaScenario}`} scenario={qaScenario}>
       <div className="min-w-0 space-y-6">
         <ReservationHeader

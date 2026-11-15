@@ -198,7 +198,6 @@ export default function ReservationsPage() {
   return (
     <PermissionGate feature="reservations">
       <div className="h-full">
-        {qa.notice}
         <DataTable
           columns={columns}
           data={qaRows}

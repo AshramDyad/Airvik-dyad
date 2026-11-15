@@ -10,7 +10,6 @@ export const QA_SCENARIOS = [
 ] as const;
 type Scenario = typeof QA_SCENARIOS[number];
 const OWNER_ID = "04ce4714-0567-4bc0-b2b7-2e940f87ff52";
-const STORAGE_KEY = "reservations-qa-session";
 const isScenario = (value: unknown): value is Scenario =>
   typeof value === "string" && QA_SCENARIOS.some(scenario => scenario === value);
 
@@ -27,33 +26,15 @@ export function isOldQaBooking(booking: DatedBooking, now = new Date()): boolean
   return parsed < cutoff && (booking.subRows ?? []).every(row => isOldQaBooking(row, now));
 }
 
-/** Explicit per-account, per-tab opt-in; the public server flag cannot be enabled by this hook. */
+/** One server-controlled switch; no browser opt-in or tester controls. */
 export function useReservationQa() {
   const { currentUser } = useAuthContext();
   const userId = currentUser?.id;
-  const [selection, setSelection] = React.useState<{ userId: string; scenario: Scenario } | null>(null);
-  const [enabled, setEnabled] = React.useState(false);
+  const [active, setActive] = React.useState<{ userId: string; scenario: Scenario } | null>(null);
 
   React.useEffect(() => {
-    setEnabled(false);
-    setSelection(null);
+    setActive(null);
     if (!userId || userId === OWNER_ID) return;
-    try {
-      const url = new URL(window.location.href);
-      const requested = url.searchParams.get("reservationQa");
-      if (isScenario(requested)) {
-        sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ userId, scenario: requested }));
-        url.searchParams.delete("reservationQa");
-        window.history.replaceState(null, "", url);
-      }
-      const stored = JSON.parse(sessionStorage.getItem(STORAGE_KEY) ?? "null");
-      if (stored?.userId === userId && isScenario(stored.scenario)) setSelection(stored);
-    } catch { /* Unavailable storage disables QA. */ }
-  }, [userId]);
-
-  const selected = selection?.userId === userId && userId !== OWNER_ID ? selection : null;
-  React.useEffect(() => {
-    if (!selected) return;
     let disposed = false;
     let inFlight = false;
     let controller: AbortController | undefined;
@@ -65,27 +46,21 @@ export function useReservationQa() {
       try {
         const response = await fetch(`/reservations-qa.json?t=${Date.now()}`, { cache: "no-store", signal: controller.signal });
         const config: unknown = response.ok ? await response.json() : null;
-        if (!disposed) setEnabled(!!config && typeof config === "object" && "enabled" in config && config.enabled === true);
-      } catch { if (!disposed) setEnabled(false); }
+        const scenario = config && typeof config === "object" &&
+          "enabled" in config && config.enabled === true &&
+          "scenario" in config && isScenario(config.scenario) ? config.scenario : null;
+        if (!disposed) setActive(scenario ? { userId, scenario } : null);
+      } catch { if (!disposed) setActive(null); }
       finally { clearTimeout(timeout); inFlight = false; }
     };
     void check();
     const timer = window.setInterval(() => void check(), 15000);
     window.addEventListener("focus", check);
     return () => { disposed = true; clearInterval(timer); controller?.abort(); window.removeEventListener("focus", check); };
-  }, [selected]);
+  }, [userId]);
 
-  const stop = () => {
-    setEnabled(false);
-    setSelection(null);
-    try { sessionStorage.removeItem(STORAGE_KEY); } catch { /* State still resets. */ }
-  };
-  const scenario = selected && enabled ? selected.scenario : null;
-  const notice = selected ? <div role="status" className="mb-3 flex items-center justify-between gap-3 rounded-md border p-3 text-sm">
-    <span>Reservations QA: {selected.scenario} · {enabled ? "active for stays checked out over 30 days ago" : "off — normal behaviour"}</span>
-    <Button type="button" variant="outline" size="sm" onClick={stop}>Stop QA in this tab</Button>
-  </div> : null;
-  return { scenario, notice };
+  const scenario = userId !== OWNER_ID && active?.userId === userId ? active?.scenario ?? null : null;
+  return { scenario };
 }
 
 export function QaBookingBoundary({ scenario, children }: { scenario: Scenario | null; children: React.ReactNode }) {
