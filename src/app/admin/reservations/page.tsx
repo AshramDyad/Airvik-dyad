@@ -201,7 +201,7 @@ export default function ReservationsPage() {
         <DataTable
           columns={columns}
           data={qaRows}
-          qaDisableBookingLinks={qa.scenario === "dead-link"}
+          qaScenario={qa.scenario}
           totalCount={reservationsTotalCount}
           isLoading={isReservationsInitialLoading}
           isRefreshing={isRefreshing}

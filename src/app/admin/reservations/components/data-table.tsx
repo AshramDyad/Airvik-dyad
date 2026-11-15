@@ -34,10 +34,10 @@ import { DataTablePagination } from "./data-table-pagination"
 import { CancelReservationDialog } from "./cancel-reservation-dialog"
 import type { ReservationWithDetails } from "./columns"
 import type { ReservationStatus } from "@/data/types"
-import { isOldQaBooking } from "@/lib/reservations/qa"
+import { getBookingQaScenario, type QaMode } from "@/lib/reservations/qa"
 import { GeistSpinner } from "@/components/shared/vercel-spinner"
 interface DataTableProps {
-  qaDisableBookingLinks?: boolean
+  qaScenario?: QaMode | null
   columns: ColumnDef<ReservationWithDetails, unknown>[]
   data: ReservationWithDetails[]
   onCancelReservation: (bookingId: string) => Promise<void> | void
@@ -61,7 +61,7 @@ interface DataTableProps {
 }
 
 export function DataTable({
-  qaDisableBookingLinks = false,
+  qaScenario = null,
   columns,
   data,
   onCancelReservation,
@@ -322,11 +322,11 @@ export function DataTable({
               <>
                 {table.getRowModel().rows.map((row) => (
                   <TableRow key={row.id}
-                    onClickCapture={qaDisableBookingLinks && isOldQaBooking(row.getParentRow()?.original ?? row.original) ? (event) => {
+                    onClickCapture={getBookingQaScenario(qaScenario, row.getParentRow()?.original ?? row.original) === "dead-link" ? (event) => {
                       const link = (event.target as HTMLElement).closest('a[href^="/admin/reservations/"]');
                       if (link) { event.preventDefault(); event.stopPropagation(); }
                     } : undefined}
-                    onAuxClickCapture={qaDisableBookingLinks && isOldQaBooking(row.getParentRow()?.original ?? row.original) ? (event) => {
+                    onAuxClickCapture={getBookingQaScenario(qaScenario, row.getParentRow()?.original ?? row.original) === "dead-link" ? (event) => {
                       const link = (event.target as HTMLElement).closest('a[href^="/admin/reservations/"]');
                       if (link) { event.preventDefault(); event.stopPropagation(); }
                     } : undefined}

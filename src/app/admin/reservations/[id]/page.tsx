@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useReservationQa, isOldQaBooking, QaBookingBoundary } from "@/lib/reservations/qa";
+import { useReservationQa, getBookingQaScenario, QaBookingBoundary } from "@/lib/reservations/qa";
 import { useAdminLiveSurface } from "@/context/admin-live-context";
 import { useParams, notFound } from "next/navigation";
 import { differenceInDays, parseISO } from "date-fns";
@@ -69,9 +69,8 @@ export default function ReservationDetailsPage() {
   );
 
   const reservation = resolvedBookingGroup.selectedReservation;
-  const qaScenario = reservation && resolvedBookingGroup.hasCompleteGroup &&
-    isOldQaBooking({ ...reservation, subRows: resolvedBookingGroup.bookingReservations })
-    ? qa.scenario : null;
+  const qaScenario = reservation && resolvedBookingGroup.hasCompleteGroup
+    ? getBookingQaScenario(qa.scenario, { ...reservation, subRows: resolvedBookingGroup.bookingReservations }) : null;
   const lookupState = reservationIdFromParams
     ? lookupStatus[reservationIdFromParams]
     : undefined;

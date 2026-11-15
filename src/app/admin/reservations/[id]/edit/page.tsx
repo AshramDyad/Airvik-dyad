@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useReservationQa, isOldQaBooking, QaBookingBoundary } from "@/lib/reservations/qa";
+import { useReservationQa, getBookingQaScenario, QaBookingBoundary } from "@/lib/reservations/qa";
 import { resolveBookingGroup } from "@/lib/reservations/resolve-booking-group";
 import { useAdminLiveSurface } from "@/context/admin-live-context";
 import { useParams, useRouter, notFound } from "next/navigation";
@@ -53,8 +53,8 @@ export default function ReservationEditPage() {
   }, [reservations, activeBookingReservations, bookings, reservationId]);
 
   const qaGroup = resolveBookingGroup({ reservationId, activeBookingReservations, reservations, bookings });
-  const qaScenario = reservation && qaGroup.hasCompleteGroup &&
-    isOldQaBooking({ ...reservation, subRows: qaGroup.bookingReservations }) ? qa.scenario : null;
+  const qaScenario = reservation && qaGroup.hasCompleteGroup
+    ? getBookingQaScenario(qa.scenario, { ...reservation, subRows: qaGroup.bookingReservations }) : null;
 
   useAdminLiveSurface("booking", reservation?.bookingId);
 

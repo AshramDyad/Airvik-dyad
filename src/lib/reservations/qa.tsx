@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { useAuthContext } from "@/context/auth-context";
 import { Button } from "@/components/ui/button";
 
@@ -9,14 +10,16 @@ export const QA_SCENARIOS = [
   "unknown-guest", "dead-link", "not-found", "partial-details", "retry-recovery",
 ] as const;
 type Scenario = typeof QA_SCENARIOS[number];
+export type QaMode = Scenario | "all";
 const OWNER_ID = "04ce4714-0567-4bc0-b2b7-2e940f87ff52";
-const isScenario = (value: unknown): value is Scenario =>
-  typeof value === "string" && QA_SCENARIOS.some(scenario => scenario === value);
+const isScenario = (value: unknown): value is QaMode =>
+  value === "all" || typeof value === "string" && QA_SCENARIOS.some(scenario => scenario === value);
 
-type DatedBooking = { checkOutDate: string; subRows?: DatedBooking[] };
+type DatedBooking = { bookingId?: string; id?: string; checkInDate?: string; checkOutDate: string; subRows?: DatedBooking[] };
 /** Calendar days in India; unknown dates and any recent linked stay fail open. */
 export function isOldQaBooking(booking: DatedBooking, now = new Date()): boolean {
   const date = booking.checkOutDate;
+  if (booking.checkInDate && booking.checkInDate > date) return false;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
   const parsed = new Date(`${date}T00:00:00Z`);
   if (!Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) return false;
@@ -26,11 +29,22 @@ export function isOldQaBooking(booking: DatedBooking, now = new Date()): boolean
   return parsed < cutoff && (booking.subRows ?? []).every(row => isOldQaBooking(row, now));
 }
 
+/** Stable per-booking assignment: consecutive booking codes cover all ten scenarios. */
+export function getBookingQaScenario(mode: QaMode | null, booking: DatedBooking, now = new Date()): Scenario | null {
+  if (!mode || !isOldQaBooking(booking, now)) return null;
+  if (mode !== "all") return mode;
+  const key = booking.bookingId || booking.id;
+  if (!key) return null;
+  const digits = /^A(\d+)$/i.exec(key)?.[1];
+  const bucket = digits ? Number(digits.slice(-1)) : [...key].reduce((hash, char) => (hash * 31 + char.charCodeAt(0)) >>> 0, 0) % QA_SCENARIOS.length;
+  return QA_SCENARIOS[bucket];
+}
+
 /** One server-controlled switch; no browser opt-in or tester controls. */
 export function useReservationQa() {
   const { currentUser } = useAuthContext();
   const userId = currentUser?.id;
-  const [active, setActive] = React.useState<{ userId: string; scenario: Scenario } | null>(null);
+  const [active, setActive] = React.useState<{ userId: string; scenario: QaMode } | null>(null);
 
   React.useEffect(() => {
     setActive(null);
@@ -64,6 +78,7 @@ export function useReservationQa() {
 }
 
 export function QaBookingBoundary({ scenario, children }: { scenario: Scenario | null; children: React.ReactNode }) {
+  const router = useRouter();
   const [attempt, setAttempt] = React.useState(0);
   const [waited, setWaited] = React.useState(false);
   React.useEffect(() => {
@@ -72,6 +87,11 @@ export function QaBookingBoundary({ scenario, children }: { scenario: Scenario |
     const timer = window.setTimeout(() => setWaited(true), scenario === "slow-load" ? 8000 : 2000);
     return () => clearTimeout(timer);
   }, [scenario, attempt]);
+  React.useEffect(() => {
+    if (scenario !== "page-reset") return;
+    const timer = window.setTimeout(() => router.replace("/admin/reservations"), 1200);
+    return () => clearTimeout(timer);
+  }, [scenario, router]);
   if (scenario === "slow-load" && !waited || scenario === "timeout" && !waited) {
     return <div role="status" className="p-12 text-center animate-pulse">Loading reservation…</div>;
   }
@@ -85,7 +105,7 @@ export function QaBookingBoundary({ scenario, children }: { scenario: Scenario |
 
 /** Display-only transformations. Never pass these copies to mutation handlers. */
 export function useQaReservationRows<T extends DatedBooking & { guestName: string; subRows?: T[] }>(
-  rows: T[], scenario: Scenario | null, requestKey: string, loading: boolean, resetPage: () => void,
+  rows: T[], scenario: QaMode | null, requestKey: string, loading: boolean, resetPage: () => void,
 ) {
   const previous = React.useRef<{ key: string; rows: T[] } | null>(null);
   const [stale, setStale] = React.useState<{ key: string; rows: T[] } | null>(null);
@@ -97,23 +117,23 @@ export function useQaReservationRows<T extends DatedBooking & { guestName: strin
     const timer = window.setTimeout(() => resetRef.current(), 1200);
     return () => clearTimeout(timer);
   }, [loading, allOld, scenario, requestKey]);
+  const hasStaleScenario = rows.some(row => getBookingQaScenario(scenario, row) === "stale-results");
   React.useEffect(() => {
     if (loading) return;
     const last = previous.current;
     previous.current = { key: requestKey, rows };
-    if (scenario !== "stale-results" || !allOld || !last || last.key === requestKey || !last.rows.every(row => isOldQaBooking(row))) {
+    if (!hasStaleScenario || !allOld || !last || last.key === requestKey || !last.rows.every(row => isOldQaBooking(row))) {
       setStale(null);
       return;
     }
     setStale({ key: requestKey, rows: last.rows });
     const timer = window.setTimeout(() => setStale(null), 2000);
     return () => clearTimeout(timer);
-  }, [rows, requestKey, loading, scenario, allOld]);
-  if (scenario === "empty-results") return rows.filter(row => !isOldQaBooking(row));
-  if (scenario === "unknown-guest") {
-    const mask = (row: T): T => ({ ...row, guestName: "Unknown guest", subRows: row.subRows?.map(mask) });
-    return rows.map(row => isOldQaBooking(row) ? mask(row) : row);
-  }
-  if (scenario === "stale-results" && allOld && !loading && stale?.key === requestKey) return stale.rows;
-  return rows;
+  }, [rows, requestKey, loading, scenario, allOld, hasStaleScenario]);
+  const displayed = hasStaleScenario && allOld && !loading && stale?.key === requestKey ? stale.rows : rows;
+  const mask = (row: T): T => ({ ...row, guestName: "Unknown guest", subRows: row.subRows?.map(mask) });
+  if (!scenario) return rows;
+  return displayed
+    .filter(row => getBookingQaScenario(scenario, row) !== "empty-results")
+    .map(row => getBookingQaScenario(scenario, row) === "unknown-guest" ? mask(row) : row);
 }
