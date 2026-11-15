@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useReservationQa, isOldQaBooking, QaBookingBoundary } from "@/lib/reservations/qa";
 import { useAdminLiveSurface } from "@/context/admin-live-context";
 import { useParams, notFound } from "next/navigation";
 import { differenceInDays, parseISO } from "date-fns";
@@ -26,6 +27,7 @@ import {
 import { isReservationRemovedDuringEdit } from "@/lib/reservations/filters";
 
 export default function ReservationDetailsPage() {
+  const qa = useReservationQa();
   const params = useParams<{ id: string }>();
   const {
     reservations,
@@ -67,6 +69,9 @@ export default function ReservationDetailsPage() {
   );
 
   const reservation = resolvedBookingGroup.selectedReservation;
+  const qaScenario = reservation && resolvedBookingGroup.hasCompleteGroup &&
+    isOldQaBooking({ ...reservation, subRows: resolvedBookingGroup.bookingReservations })
+    ? qa.scenario : null;
   const lookupState = reservationIdFromParams
     ? lookupStatus[reservationIdFromParams]
     : undefined;
@@ -275,6 +280,8 @@ export default function ReservationDetailsPage() {
 
   return (
     <PermissionGate feature="reservations">
+      {qa.notice}
+      <QaBookingBoundary key={`${reservation.id}:${qaScenario}`} scenario={qaScenario}>
       <div className="min-w-0 space-y-6">
         <ReservationHeader
           reservation={reservationWithDetails}
@@ -308,15 +315,16 @@ export default function ReservationDetailsPage() {
             />
           </div>
           <div className="min-w-0 space-y-6">
-            <BillingCard
+            {qaScenario === "partial-details" ? <div role="alert" className="rounded-md border p-6">Unable to load payment folio.</div> : <BillingCard
               reservation={reservationWithDetails}
               groupSummary={groupSummary}
-            />
+            />}
             <PermissionGate permissions={["update:reservation"]} fallback={null}><BhojanPasses reservationId={reservationIdFromParams} /></PermissionGate>
               <ReservationActivityTimeline reservationId={reservation.id} />
           </div>
         </div>
       </div>
+      </QaBookingBoundary>
     </PermissionGate>
   );
 }

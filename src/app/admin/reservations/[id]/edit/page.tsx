@@ -1,6 +1,8 @@
 "use client";
 
 import * as React from "react";
+import { useReservationQa, isOldQaBooking, QaBookingBoundary } from "@/lib/reservations/qa";
+import { resolveBookingGroup } from "@/lib/reservations/resolve-booking-group";
 import { useAdminLiveSurface } from "@/context/admin-live-context";
 import { useParams, useRouter, notFound } from "next/navigation";
 import Link from "next/link";
@@ -15,6 +17,7 @@ import type { ReservationWithDetails } from "@/app/admin/reservations/components
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function ReservationEditPage() {
+  const qa = useReservationQa();
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const {
@@ -48,6 +51,10 @@ export default function ReservationEditPage() {
     console.log(`[EditPage] Finding reservation for ${reservationId}: ${found ? 'Found' : 'Not Found'}`);
     return found;
   }, [reservations, activeBookingReservations, bookings, reservationId]);
+
+  const qaGroup = resolveBookingGroup({ reservationId, activeBookingReservations, reservations, bookings });
+  const qaScenario = reservation && qaGroup.hasCompleteGroup &&
+    isOldQaBooking({ ...reservation, subRows: qaGroup.bookingReservations }) ? qa.scenario : null;
 
   useAdminLiveSurface("booking", reservation?.bookingId);
 
@@ -116,6 +123,9 @@ export default function ReservationEditPage() {
   };
 
   return (
+    <>
+    {qa.notice}
+    <QaBookingBoundary key={`${reservation.id}:${qaScenario}`} scenario={qaScenario}>
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Button variant="outline" size="sm" asChild>
@@ -141,6 +151,8 @@ export default function ReservationEditPage() {
         onSuccess={handleSuccess}
       />
     </div>
+    </QaBookingBoundary>
+    </>
   );
 }
 

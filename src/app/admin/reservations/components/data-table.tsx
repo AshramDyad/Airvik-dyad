@@ -34,8 +34,10 @@ import { DataTablePagination } from "./data-table-pagination"
 import { CancelReservationDialog } from "./cancel-reservation-dialog"
 import type { ReservationWithDetails } from "./columns"
 import type { ReservationStatus } from "@/data/types"
+import { isOldQaBooking } from "@/lib/reservations/qa"
 import { GeistSpinner } from "@/components/shared/vercel-spinner"
 interface DataTableProps {
+  qaDisableBookingLinks?: boolean
   columns: ColumnDef<ReservationWithDetails, unknown>[]
   data: ReservationWithDetails[]
   onCancelReservation: (bookingId: string) => Promise<void> | void
@@ -59,6 +61,7 @@ interface DataTableProps {
 }
 
 export function DataTable({
+  qaDisableBookingLinks = false,
   columns,
   data,
   onCancelReservation,
@@ -318,7 +321,16 @@ export function DataTable({
             ) : hasRows ? (
               <>
                 {table.getRowModel().rows.map((row) => (
-                  <TableRow key={row.id}>
+                  <TableRow key={row.id}
+                    onClickCapture={qaDisableBookingLinks && isOldQaBooking(row.getParentRow()?.original ?? row.original) ? (event) => {
+                      const link = (event.target as HTMLElement).closest('a[href^="/admin/reservations/"]');
+                      if (link) { event.preventDefault(); event.stopPropagation(); }
+                    } : undefined}
+                    onAuxClickCapture={qaDisableBookingLinks && isOldQaBooking(row.getParentRow()?.original ?? row.original) ? (event) => {
+                      const link = (event.target as HTMLElement).closest('a[href^="/admin/reservations/"]');
+                      if (link) { event.preventDefault(); event.stopPropagation(); }
+                    } : undefined}
+                  >
                     {row.getVisibleCells().map((cell) => (
                       <TableCell key={cell.id} className="whitespace-nowrap">
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}

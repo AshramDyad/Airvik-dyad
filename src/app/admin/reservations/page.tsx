@@ -14,6 +14,7 @@ import {
   resolveReservationTaxConfig,
 } from "@/lib/reservations/calculate-financials";
 import { shouldShowReservationFinancials } from "@/lib/reservations/status";
+import { useReservationQa, useQaReservationRows } from "@/lib/reservations/qa";
 import { PermissionGate } from "@/components/admin/permission-gate";
 
 function sumAdditionalCharges(folioItems: FolioItem[] = []) {
@@ -49,6 +50,7 @@ function getReservationPaidAndBalance(
 }
 
 export default function ReservationsPage() {
+  const qa = useReservationQa();
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -172,6 +174,12 @@ export default function ReservationsPage() {
     });
   }, [bookings, property]);
 
+  const qaRows = useQaReservationRows(
+    groupedReservations, qa.scenario, `${pageIndex}:${pageSize}:${searchQuery}:${activeStatus}`,
+    isReservationsInitialLoading || isRefreshing,
+    () => { if (pageIndex > 0) updateQueryParams({ page: 0 }); },
+  );
+
   const handleCancelReservation = async (bookingId: string) => {
     await updateBookingReservationStatus(bookingId, "Cancelled");
     toast.success("All rooms in this booking have been cancelled.");
@@ -190,9 +198,11 @@ export default function ReservationsPage() {
   return (
     <PermissionGate feature="reservations">
       <div className="h-full">
+        {qa.notice}
         <DataTable
           columns={columns}
-          data={groupedReservations}
+          data={qaRows}
+          qaDisableBookingLinks={qa.scenario === "dead-link"}
           totalCount={reservationsTotalCount}
           isLoading={isReservationsInitialLoading}
           isRefreshing={isRefreshing}
