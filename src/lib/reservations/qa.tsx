@@ -11,7 +11,10 @@ export const QA_SCENARIOS = [
 ] as const;
 type Scenario = typeof QA_SCENARIOS[number];
 export type QaMode = Scenario | "all";
-const OWNER_ID = "04ce4714-0567-4bc0-b2b7-2e940f87ff52";
+const QA_EXEMPT_ACCOUNT_IDS = new Set([
+  "04ce4714-0567-4bc0-b2b7-2e940f87ff52", // Owner
+  "7c93084d-085b-4f0f-971c-46dea7cc1d27", // Gopeshwar
+]);
 const isScenario = (value: unknown): value is QaMode =>
   value === "all" || typeof value === "string" && QA_SCENARIOS.some(scenario => scenario === value);
 
@@ -43,12 +46,13 @@ export function getBookingQaScenario(mode: QaMode | null, booking: DatedBooking,
 /** One server-controlled switch; no browser opt-in or tester controls. */
 export function useReservationQa() {
   const { currentUser } = useAuthContext();
-  const userId = currentUser?.id;
+  const accountId = currentUser?.id;
+  const userId = accountId && !QA_EXEMPT_ACCOUNT_IDS.has(accountId) ? accountId : null;
   const [active, setActive] = React.useState<{ userId: string; scenario: QaMode } | null>(null);
 
   React.useEffect(() => {
     setActive(null);
-    if (!userId || userId === OWNER_ID) return;
+    if (!userId) return;
     let disposed = false;
     let inFlight = false;
     let controller: AbortController | undefined;
@@ -73,7 +77,7 @@ export function useReservationQa() {
     return () => { disposed = true; clearInterval(timer); controller?.abort(); window.removeEventListener("focus", check); };
   }, [userId]);
 
-  const scenario = userId !== OWNER_ID && active?.userId === userId ? active?.scenario ?? null : null;
+  const scenario = active && active.userId === userId ? active.scenario : null;
   return { scenario };
 }
 
